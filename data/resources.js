@@ -39,5 +39,16 @@ window.MANIFEST = [
     url: "pages/ch2-s1.html",
     tags: ["示范", "测试"],
     type: "练习"
+  },
+  {
+    id: "r1788620982863p8b6d",
+    title: "小船过河仿真模拟",
+    desc: "",
+    book: "b2",
+    chapter: "b2c1",
+    section: "b2c1s2",
+    url: "pages/res-resource-wjr3u.html",
+    tags: [],
+    type: "仿真资源"
   }
 ];

@@ -23,7 +23,8 @@
       <input id="search" type="search" placeholder="搜索标题、描述、标签或章节…" autocomplete="off" />
     </div>
 
-    <button class="btn primary" id="uploadBtn" type="button">⬆ 上传资源</button>
+    <button class="btn primary" id="uploadBtn" type="button" style="display:none;">⬆ 上传资源</button>
+    <button class="btn ghost" id="adminBtn" type="button">🔑 管理员登录</button>
   </header>
 
   <div class="layout">
@@ -32,8 +33,6 @@
       <h2>章节导航</h2>
       <button class="nav-all active" data-chapter="all" type="button">📚 全部资源</button>
       <div id="chapterNav"></div>
-      <div class="nav-sep"></div>
-      <button class="btn ghost" id="manageBtn" type="button" style="width:100%;justify-content:center;">🗂 我上传的资源</button>
     </aside>
 
     <!-- 主内容 -->
@@ -89,26 +88,35 @@
             <button class="x" id="clearFile" type="button" aria-label="移除">✕</button>
           </div>
         </div>
-
-        <div class="field">
-          <label class="publish-opt" id="publishOpt">
-            <input type="checkbox" id="publishOnline" checked />
-            <span>
-              <span class="t">☁️ 发布到线上（所有人可见）</span>
-              <span class="s">把资源写入 GitHub 仓库的 pages/ 并自动登记到资源清单，其他访客即可看到</span>
-            </span>
-          </label>
-          <div class="tokenRow" id="tokenRow">
-            <label for="fToken">GitHub 访问令牌（只保存于本浏览器，用于写入仓库）</label>
-            <input id="fToken" type="password" placeholder="ghp_… 或 github_pat_…" autocomplete="off" />
-            <p class="hint">令牌只存在你这份浏览器里，不会写进网页，其他访客拿不到。若不勾选“发布到线上”，则仅本地预览。</p>
-          </div>
-          <p class="hint">发布成功后约 1 分钟内 GitHub Pages 会重新构建，所有人即可访问。</p>
-        </div>
+        <p class="hint">保存后资源会发布到线上（写入仓库并登记到资源清单），约 1 分钟后所有访客均可访问。</p>
       </div>
       <footer>
         <button class="btn" id="cancelModal" type="button">取消</button>
         <button class="btn primary" id="saveResource" type="button">保存资源</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 管理员登录弹窗 -->
+  <div class="modal-mask" id="adminMask">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
+      <header>
+        <h3 id="adminTitle">管理员登录</h3>
+        <button class="close" id="closeAdminModal" type="button" aria-label="关闭">✕</button>
+      </header>
+      <div class="body">
+        <div class="field">
+          <label for="adminToken">GitHub 访问令牌（只保存在本浏览器，用于发布资源）</label>
+          <input id="adminToken" type="password" placeholder="ghp_… 或 github_pat_…" autocomplete="off" />
+          <p class="hint">令牌只存在你这台浏览器的 localStorage，不会写进网页。当前<strong>没有</strong>令牌的访客看不到“上传资源”按钮；输入一次后，本浏览器即保留并使用它上传。</p>
+        </div>
+        <div id="adminLoggedInRow" style="display:none;">
+          <button class="btn" id="clearTokenBtn" type="button">退出 / 清除本机令牌</button>
+        </div>
+      </div>
+      <footer>
+        <button class="btn" id="cancelAdminModal" type="button">取消</button>
+        <button class="btn primary" id="adminSave" type="button">登录</button>
       </footer>
     </div>
   </div>

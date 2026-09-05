@@ -510,10 +510,12 @@
     }
   }
 
-  function setPublishUI() {
-    const on = $("#publishOnline").checked;
-    $("#publishOpt").classList.toggle("on", on);
-    $("#tokenRow").style.display = on ? "block" : "none";
+  // 根据是否有本地令牌，显示/隐藏上传按钮
+  function refreshAdminUI() {
+    const has = !!getPublishToken();
+    $("#uploadBtn").style.display = has ? "" : "none";
+    $("#adminBtn").textContent = has ? "⚙ 管理员设置" : "🔑 管理员登录";
+    $("#adminLoggedInRow").style.display = has ? "block" : "none";
   }
 
   function openModal() {
@@ -522,15 +524,49 @@
     $("#fTitle").value = "";
     $("#fDesc").value = "";
     $("#fTags").value = "";
-    $("#fToken").value = getPublishToken();
     clearPendingFile();
-    setPublishUI();
     mask.classList.add("show");
     setTimeout(() => $("#fTitle").focus(), 50);
   }
 
   function closeModal() {
     mask.classList.remove("show");
+  }
+
+  // ---------- 管理员登录 ----------
+  const adminMask = $("#adminMask");
+
+  function openAdminModal() {
+    $("#adminToken").value = getPublishToken();
+    refreshAdminUI();
+    adminMask.classList.add("show");
+    setTimeout(() => $("#adminToken").focus(), 50);
+  }
+
+  function closeAdminModal() {
+    adminMask.classList.remove("show");
+  }
+
+  function saveAdmin() {
+    const t = $("#adminToken").value.trim();
+    if (!t) {
+      toast("请输入 GitHub 访问令牌", true);
+      return;
+    }
+    setPublishToken(t);
+    closeAdminModal();
+    refreshAdminUI();
+    toast("已登录，上传入口已开启");
+  }
+
+  function clearToken() {
+    if (!window.confirm("确定要清除本机保存的管理员令牌吗？清除后上传入口会隐藏。")) return;
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch (e) {}
+    closeAdminModal();
+    refreshAdminUI();
+    toast("已退出，上传入口已隐藏");
   }
 
   function setPendingFile(file) {
@@ -591,43 +627,31 @@
       createdAt: Date.now(),
     };
 
-    // 记住填过的令牌（仅存本浏览器）
-    const tokenField = $("#fToken").value.trim();
-    if (tokenField) setPublishToken(tokenField);
+    if (!getPublishToken()) {
+      toast("请先点击“🔑 管理员登录”输入令牌", true);
+      openAdminModal();
+      return;
+    }
 
-    const publishOnline = $("#publishOnline").checked;
-
-    if (publishOnline) {
-      // 发布到线上：写入仓库并登记，所有人可见
-      try {
-        const path = await publishResource(rec);
-        const published = {
-          id: rec.id,
-          title: rec.title,
-          desc: rec.desc,
-          chapter: rec.chapter,
-          section: rec.section,
-          url: path,
-          tags: rec.tags,
-          type: "上传",
-        };
-        window.MANIFEST.push(published);
-        await loadAll();
-        closeModal();
-        toast("已发布到线上，其他访客也能看到");
-      } catch (e) {
-        toast("发布失败：" + e.message, true);
-      }
-    } else {
-      // 仅本地预览
-      try {
-        await saveUpload(rec);
-        await loadAll();
-        closeModal();
-        toast("已保存到本浏览器（仅本地可见）");
-      } catch (e) {
-        toast("保存失败：" + e.message, true);
-      }
+    // 只有管理员（有令牌）能上传：发布到线上，写入仓库并登记，所有人可见
+    try {
+      const path = await publishResource(rec);
+      const published = {
+        id: rec.id,
+        title: rec.title,
+        desc: rec.desc,
+        chapter: rec.chapter,
+        section: rec.section,
+        url: path,
+        tags: rec.tags,
+        type: "上传",
+      };
+      window.MANIFEST.push(published);
+      await loadAll();
+      closeModal();
+      toast("已发布到线上，其他访客也能看到");
+    } catch (e) {
+      toast("发布失败：" + e.message, true);
     }
   }
 
@@ -638,18 +662,6 @@
       state.section = null;
       render();
     };
-    $("#manageBtn").onclick = () => {
-      state.onlyUploaded = !state.onlyUploaded;
-      if (state.onlyUploaded) {
-        state.chapter = "all";
-        state.section = null;
-        $("#manageBtn").textContent = "⬅ 查看全部";
-      } else {
-        $("#manageBtn").textContent = "🗂 我上传的资源";
-      }
-      render();
-    };
-
     let debounce;
     $("#search").addEventListener("input", (e) => {
       clearTimeout(debounce);
@@ -660,7 +672,7 @@
     });
 
     $("#uploadBtn").onclick = openModal;
-    $("#publishOnline").addEventListener("change", setPublishUI);
+    $("#adminBtn").onclick = openAdminModal;
     $("#closeModal").onclick = closeModal;
     $("#cancelModal").onclick = closeModal;
     mask.addEventListener("click", (e) => {
@@ -668,6 +680,18 @@
     });
     $("#fChapter").addEventListener("change", populateSectionSelect);
     $("#saveResource").onclick = saveResource;
+
+    // 管理员弹窗
+    $("#closeAdminModal").onclick = closeAdminModal;
+    $("#cancelAdminModal").onclick = closeAdminModal;
+    adminMask.addEventListener("click", (e) => {
+      if (e.target === adminMask) closeAdminModal();
+    });
+    $("#adminSave").onclick = saveAdmin;
+    $("#clearTokenBtn").onclick = clearToken;
+    $("#adminToken").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") saveAdmin();
+    });
 
     const dz = $("#dropzone");
     const fi = $("#fileInput");
@@ -696,6 +720,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     $("#subjectSub").textContent = COURSE.subject || "";
     bindEvents();
+    refreshAdminUI(); // 依据本地令牌决定是否显示“上传资源”按钮
     loadAll()
       .catch((e) => toast("初始化失败：" + e.message, true));
   });

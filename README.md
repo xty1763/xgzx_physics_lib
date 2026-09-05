@@ -41,19 +41,25 @@ python -m http.server 8000
 - **章节分类**：左侧侧栏按「章 → 节」展开。点章名=筛选该章，点小节=精确定位到该节。
 - **搜索**：顶部搜索框，按标题 / 描述 / 标签 / 章节名 / 类型模糊匹配，输入即时过滤。
 - **类型筛选**：顶栏 chips 按资源类型（演示/实验/动画/测试页…）过滤。
-- **上传资源**：右上角「上传资源」按钮 → 选择标题、所属章节/小节、描述、标签、HTML 文件。
-- **发布到线上（所有人可见）**：上传时勾选“☁️ 发布到线上”，资源会通过 GitHub 写入仓库的
-  `pages/`，并自动登记到 `data/resources.js`，push 到 `main` 后 GitHub Pages 自动重建，
-  **所有访客都能看到**。若只是测试，可取消勾选，仅保存在本浏览器（IndexedDB）。
+- **章节分类 / 搜索 / 类型筛选**：同前。
+- **上传资源（仅管理员可见）**：右上角**只有你有「上传资源」按钮**，其它访客看不到，因为他们没有本机令牌。
+  上传即发布到线上：HTML 写入仓库 `pages/`，并自动登记到 `data/resources.js`，push 到 `main` 后
+  GitHub Pages 自动重建，**所有访客都能看到**。
 
-> 🔑 发布到线上需要 GitHub 令牌：在上传面板的输入框填入一个令牌即可（只存在**你这台**浏览器的
-> localStorage，不会写进网页，其他访客看不到）。推荐用**仅限该仓库**的 fine-grained token：
-> GitHub → Developer settings → Fine-grained tokens → Generate → Repository access 选
-> `xgzx_physics_lib` 这个仓库 → Repository permissions 给 **Contents: Read and write** +
-> **Metadata: Read**。
+### 如何登录管理员并上传
+
+1. 第一次在你的浏览器里打开网站，点右上角 **🔑 管理员登录**。
+2. 输入一个 GitHub 令牌（推荐**仅限该仓库**的 fine-grained token）：
+   GitHub → Developer settings → Fine-grained tokens → Generate → Repository access 选
+   `xgzx_physics_lib` → Repository permissions 给 **Contents: Read and write** + **Metadata: Read**。
+3. 点「登录」→ 上传入口出现。令牌只存在**你这台**浏览器的 localStorage，不会写进网页。
+4. 之后每次直接在右上角点 **⬆ 上传资源** 即可（已自动带上令牌）。
+5. 想换设备/退出：点 **⚙ 管理员设置 → 退出/清除本机令牌**。
+
+> ⚠️ 说明：这个“隐藏上传按钮”是**方便性**处理——真正拦住别人不能发布的是 GitHub 令牌。
+> 就算有人手动在浏览器里填一个假令牌让按钮出现，没有有效令牌也无法写入仓库、无法发布。
 >
-> ⚠️ 每次发布成功后，你的**本地**仓库里 `data/resources.js` 还是旧版。下次在本地改动前，
-> 先 `git pull` 一下把线上清单拉回来，避免覆盖别人/自己发布过的新登记记录。
+> ⚠️ 发布成功后，你的**本地**仓库里 `data/resources.js` 会落后于线上。下次在本地改动前，先 `git pull`。
 
 ## 扩充章节
 

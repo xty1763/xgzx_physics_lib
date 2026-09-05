@@ -30,7 +30,7 @@
   <div class="layout">
     <!-- 章节导航 -->
     <aside class="sidebar">
-      <h2>章节导航</h2>
+      <h2>教材 · 章节</h2>
       <button class="nav-all active" data-chapter="all" type="button">📚 全部资源</button>
       <div id="chapterNav"></div>
     </aside>
@@ -57,9 +57,18 @@
           <label for="fTitle">资源名称 *</label>
           <input id="fTitle" type="text" placeholder="例如：匀变速直线运动演示" />
         </div>
+        <div class="field">
+          <label for="fType">资源类型</label>
+          <select id="fType"></select>
+          <p class="hint" id="typeHint" style="display:none;">试卷不挂具体小节（可不选章节/小节）。</p>
+        </div>
+        <div class="field">
+          <label for="fBook">教材</label>
+          <select id="fBook"></select>
+        </div>
         <div class="fieldrow">
           <div class="field">
-            <label for="fChapter">所属章节</label>
+            <label for="fChapter">章节</label>
             <select id="fChapter"></select>
           </div>
           <div class="field">

@@ -63,7 +63,35 @@ python -m http.server 8000
 }
 ```
 
-## 部署到 Surge
+## 已上线（GitHub Pages）
+
+当前站点已部署到：**https://xty1763.github.io/xgzx_physics_lib/**
+
+之后的每次更新，只需在 `physics-lib` 目录里：
+
+```powershell
+git add -A
+git commit -m "更新资源"
+git push
+```
+
+推送到 `main` 分支后，GitHub Pages 会自动重新发布。
+
+## 部署到 GitHub Pages（复现步骤，若换仓库）
+
+1. 在 GitHub 新建一个公开仓库（例如 `xgzx_physics_lib`）。
+2. 在本目录执行：
+   ```powershell
+   git branch -M main
+   git remote add origin https://github.com/<用户名>/<仓库名>.git
+   git push -u origin main
+   ```
+3. 到仓库 **Settings → Pages → Source 选 “Deploy from a branch” → 分支 main / 目录 (root) → Save**。
+   站点地址为 `https://<用户名>.github.io/<仓库名>/`。
+
+> 页面全部用相对路径，所以在 `/仓库名/` 子路径下也能正常打开。
+
+## 部署到 Surge（可选）
 
 先安装 Surge（如果没有）：
 

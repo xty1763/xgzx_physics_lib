@@ -1,0 +1,1685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小船渡河运动仿真 - 运动的合成与分解</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2980, #26d0ce);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 1400px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+        
+        .container {
+            display: flex;
+            width: 100%;
+            max-width: 1400px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+        
+        .control-panel {
+            width: 25%;
+            padding: 25px;
+            background: #f8f9fa;
+            border-right: 1px solid #dee2e6;
+            overflow-y: auto;
+            max-height: 850px;
+        }
+        
+        .control-group {
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .control-group h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .control-group h3 i {
+            margin-right: 10px;
+            color: #3498db;
+        }
+        
+        .slider-container {
+            margin-bottom: 15px;
+        }
+        
+        .slider-container label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #495057;
+        }
+        
+        .slider-container .value {
+            color: #3498db;
+            font-weight: bold;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #dee2e6;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #3498db;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .checkbox-container input {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1);
+        }
+        
+        #startBtn {
+            background: #2ecc71;
+            color: white;
+        }
+        
+        #startBtn:hover {
+            background: #27ae60;
+        }
+        
+        #pauseBtn {
+            background: #f39c12;
+            color: white;
+        }
+        
+        #pauseBtn:hover {
+            background: #d68910;
+        }
+        
+        #resetBtn {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        #resetBtn:hover {
+            background: #c0392b;
+        }
+        
+        .simulation-area {
+            width: 50%;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .canvas-container {
+            position: relative;
+            width: 700px;
+            height: 500px;
+            border: 2px solid #2c3e50;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #e6f7ff;
+        }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .legend {
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 8px;
+            margin-right: 8px;
+            border-radius: 2px;
+        }
+        
+        .data-panel {
+            width: 25%;
+            padding: 25px;
+            background: #f1f8ff;
+            border-left: 1px solid #dee2e6;
+        }
+        
+        .data-group {
+            margin-bottom: 25px;
+        }
+        
+        .data-group h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .data-group h3 i {
+            margin-right: 10px;
+            color: #9b59b6;
+        }
+        
+        .data-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #dee2e6;
+        }
+        
+        .data-label {
+            font-weight: 500;
+            color: #495057;
+        }
+        
+        .data-value {
+            font-weight: 600;
+            color: #2980b9;
+        }
+        
+        .info-box {
+            background: #fff8e1;
+            border-left: 4px solid #f39c12;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .info-box h4 {
+            color: #e67e22;
+            margin-bottom: 8px;
+        }
+        
+        .key-shortcuts {
+            margin-top: 20px;
+            font-size: 0.85rem;
+            color: #7f8c8d;
+        }
+        
+        .key-shortcuts span {
+            display: inline-block;
+            background: #ecf0f1;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin: 0 5px;
+            font-family: monospace;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            color: white;
+            text-align: center;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            max-width: 1400px;
+        }
+        
+        @media (max-width: 1200px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .control-panel, .simulation-area, .data-panel {
+                width: 100%;
+            }
+            
+            .canvas-container {
+                width: 100%;
+                max-width: 700px;
+            }
+        }
+        
+        /* 物理原理说明样式 */
+        .physics-explanation {
+            background: #f0f8ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .physics-explanation h4 {
+            color: #2980b9;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .physics-equation {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            margin: 8px 0;
+            font-size: 0.9rem;
+        }
+        
+        .special-case {
+            background: #fff0f0;
+            border-left: 4px solid #e74c3c;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .predicted-landing {
+            background: #e8f5e8;
+            border-left: 4px solid #2ecc71;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        
+        .predicted-landing h4 {
+            color: #27ae60;
+            margin-bottom: 10px;
+        }
+        
+        .predicted-point {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .position-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .position-btn {
+            padding: 8px;
+            font-size: 0.9rem;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="header">
+        <h1><i class="fas fa-water"></i> 小船渡河运动仿真</h1>
+        <p class="subtitle">运动的合成与分解教学演示 | 调整参数观察小船运动轨迹与速度矢量变化</p>
+    </div>
+    
+    <div class="container">
+        <!-- 左侧控制面板 -->
+        <div class="control-panel">
+            <div class="control-group">
+                <h3><i class="fas fa-river"></i> 河流参数</h3>
+                
+                <div class="slider-container">
+                    <label>
+                        <span>河宽</span>
+                        <span class="value" id="riverWidthValue">300 px</span>
+                    </label>
+                    <input type="range" id="riverWidth" min="100" max="500" value="300" step="10">
+                </div>
+                
+                <div class="slider-container">
+                    <label>
+                        <span>水流速度</span>
+                        <span class="value" id="currentSpeedValue">2.0 px/s</span>
+                    </label>
+                    <input type="range" id="currentSpeed" min="0" max="10" value="2.0" step="0.1">
+                </div>
+                
+                <div class="slider-container">
+                    <label>
+                        <span>水流方向</span>
+                        <span class="value" id="currentDirectionValue">向右</span>
+                    </label>
+                    <input type="range" id="currentDirection" min="-180" max="180" value="0" step="1" disabled>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <h3><i class="fas fa-ship"></i> 小船参数</h3>
+                
+                <div class="slider-container">
+                    <label>
+                        <span>船速 (静水速度)</span>
+                        <span class="value" id="boatSpeedValue">3.0 px/s</span>
+                    </label>
+                    <input type="range" id="boatSpeed" min="1" max="10" value="3.0" step="0.1">
+                </div>
+                
+                <div class="slider-container">
+                    <label>
+                        <span>船头指向角度</span>
+                        <span class="value" id="boatAngleValue">30°</span>
+                    </label>
+                    <input type="range" id="boatAngle" min="-90" max="90" value="30" step="1">
+                </div>
+                
+                <div class="slider-container">
+                    <label>
+                        <span>矢量显示比例</span>
+                        <span class="value" id="vectorScaleValue">2.0x</span>
+                    </label>
+                    <input type="range" id="vectorScale" min="1" max="5" value="2.0" step="0.1">
+                </div>
+                
+                <div class="slider-container">
+                    <label>
+                        <span>小船初始Y位置</span>
+                        <span class="value" id="boatStartYValue">250 px</span>
+                    </label>
+                    <input type="range" id="boatStartY" min="100" max="400" value="250" step="10">
+                </div>
+                
+                <div class="position-controls">
+                    <button id="centerBtn" class="position-btn"><i class="fas fa-align-center"></i> 居中</button>
+                    <button id="topBtn" class="position-btn"><i class="fas fa-arrow-up"></i> 靠上</button>
+                    <button id="bottomBtn" class="position-btn"><i class="fas fa-arrow-down"></i> 靠下</button>
+                    <button id="clearBtn" class="position-btn"><i class="fas fa-eraser"></i> 清除轨迹</button>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <h3><i class="fas fa-eye"></i> 显示选项</h3>
+                
+                <div class="checkbox-group">
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="showVectors" checked>
+                        <label for="showVectors">显示速度矢量</label>
+                    </div>
+                    
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="showTrajectory" checked>
+                        <label for="showTrajectory">显示运动轨迹</label>
+                    </div>
+                    
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="showGrid">
+                        <label for="showGrid">显示参考网格</label>
+                    </div>
+                    
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="showLabels" checked>
+                        <label for="showLabels">显示速度标签</label>
+                    </div>
+                    
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="showPredictedPath" checked>
+                        <label for="showPredictedPath">显示预计路径</label>
+                    </div>
+                    
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="showVelocityCircle" checked>
+                        <label for="showVelocityCircle">显示速度合成辅助圆</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <h3><i class="fas fa-play-circle"></i> 仿真控制</h3>
+                
+                <div class="button-group">
+                    <button id="startBtn"><i class="fas fa-play"></i> 开始</button>
+                    <button id="pauseBtn"><i class="fas fa-pause"></i> 暂停</button>
+                    <button id="resetBtn"><i class="fas fa-redo"></i> 重置</button>
+                </div>
+                
+                <div class="button-group">
+                    <button id="minTimeBtn"><i class="fas fa-bolt"></i> 时间最短</button>
+                    <button id="minDistanceBtn"><i class="fas fa-ruler"></i> 位移最短</button>
+                </div>
+                
+                <div class="key-shortcuts">
+                    快捷键：<span>空格</span>暂停/继续，<span>R</span>重置，<span>+/-</span>调整船速
+                </div>
+            </div>
+            
+            <div class="physics-explanation">
+                <h4><i class="fas fa-lightbulb"></i> 关键物理原理</h4>
+                <p><strong>渡河时间最短：</strong>船头垂直对岸</p>
+                <p class="physics-equation">t_min = 河宽 / 船速</p>
+                <p><strong>位移最短：</strong>合速度垂直河岸</p>
+                <p class="physics-equation">v_船·sinθ = v_水</p>
+                <div class="special-case">
+                    <strong>辅助圆原理：</strong>以水流速度矢量为基准，船速矢量终点位于半径为船速的圆上
+                </div>
+            </div>
+        </div>
+        
+        <!-- 中间仿真区域 -->
+        <div class="simulation-area">
+            <div class="canvas-container">
+                <canvas id="simulationCanvas" width="700" height="500"></canvas>
+            </div>
+            
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #e74c3c;"></div>
+                    <span>船速 (v船)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #3498db;"></div>
+                    <span>水流速度 (v水)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #2ecc71;"></div>
+                    <span>合速度 (v合)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #9b59b6; height: 2px;"></div>
+                    <span>实际轨迹</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #f39c12; height: 2px;"></div>
+                    <span>预计路径</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #7f8c8d; height: 1px;"></div>
+                    <span>辅助圆</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧数据面板 -->
+        <div class="data-panel">
+            <div class="data-group">
+                <h3><i class="fas fa-tachometer-alt"></i> 实时数据</h3>
+                
+                <div class="data-item">
+                    <div class="data-label">小船位置 (x, y):</div>
+                    <div class="data-value" id="boatPosition">(50, 250)</div>
+                </div>
+                
+                <div class="data-item">
+                    <div class="data-label">已航行时间:</div>
+                    <div class="data-value" id="elapsedTime">0.00 s</div>
+                </div>
+                
+                <div class="data-item">
+                    <div class="data-label">合速度大小:</div>
+                    <div class="data-value" id="resultantSpeed">0.00 px/s</div>
+                </div>
+                
+                <div class="data-item">
+                    <div class="data-label">合速度方向:</div>
+                    <div class="data-value" id="resultantAngle">0.00°</div>
+                </div>
+                
+                <div class="data-item">
+                    <div class="data-label">横向偏移:</div>
+                    <div class="data-value" id="horizontalOffset">0.00 px</div>
+                </div>
+            </div>
+            
+            <div class="data-group">
+                <h3><i class="fas fa-calculator"></i> 计算结果</h3>
+                
+                <div class="data-item">
+                    <div class="data-label">预计渡河时间:</div>
+                    <div class="data-value" id="crossingTime">100.00 s</div>
+                </div>
+                
+                <div class="data-item">
+                    <div class="data-label">预计实际航程:</div>
+                    <div class="data-value" id="totalDistance">0.00 px</div>
+                </div>
+                
+                <div class="data-item">
+                    <div class="data-label">船垂直分速度:</div>
+                    <div class="data-value" id="verticalSpeed">0.00 px/s</div>
+                </div>
+                
+                <div class="data-item">
+                    <div class="data-label">船水平分速度:</div>
+                    <div class="data-value" id="horizontalSpeed">0.00 px/s</div>
+                </div>
+            </div>
+            
+            <div class="predicted-landing">
+                <h4><i class="fas fa-bullseye"></i> 预计落点分析</h4>
+                
+                <div class="predicted-point">
+                    <span>预计落点 X 坐标:</span>
+                    <span class="data-value" id="predictedX">0 px</span>
+                </div>
+                
+                <div class="predicted-point">
+                    <span>预计落点 Y 坐标:</span>
+                    <span class="data-value" id="predictedY">0 px</span>
+                </div>
+                
+                <div class="predicted-point">
+                    <span>到达对岸所需时间:</span>
+                    <span class="data-value" id="predictedTime">0 s</span>
+                </div>
+                
+                <div class="predicted-point">
+                    <span>实际渡河位移:</span>
+                    <span class="data-value" id="predictedDisplacement">0 px</span>
+                </div>
+                
+                <div class="predicted-point">
+                    <span>能否垂直渡河:</span>
+                    <span class="data-value" id="canCrossVertically">是</span>
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <h4><i class="fas fa-info-circle"></i> 教学提示</h4>
+                <p>1. 调整小船初始位置以避免箭头重叠</p>
+                <p>2. 开启辅助圆观察速度矢量合成原理</p>
+                <p>3. 比较时间最短和位移最短的区别</p>
+                <p>4. 注意当船速小于水流速度时的情况</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>小船渡河运动仿真 | 适用于高中物理运动合成与分解教学 | 设计：物理教学工具</p>
+        <p>提示：调整小船位置和开启辅助圆以更好地观察速度矢量合成</p>
+    </div>
+
+    <script>
+        // 获取Canvas元素和上下文
+        const canvas = document.getElementById('simulationCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 获取所有控制元素
+        const riverWidthSlider = document.getElementById('riverWidth');
+        const riverWidthValue = document.getElementById('riverWidthValue');
+        const currentSpeedSlider = document.getElementById('currentSpeed');
+        const currentSpeedValue = document.getElementById('currentSpeedValue');
+        const boatSpeedSlider = document.getElementById('boatSpeed');
+        const boatSpeedValue = document.getElementById('boatSpeedValue');
+        const boatAngleSlider = document.getElementById('boatAngle');
+        const boatAngleValue = document.getElementById('boatAngleValue');
+        const vectorScaleSlider = document.getElementById('vectorScale');
+        const vectorScaleValue = document.getElementById('vectorScaleValue');
+        const boatStartYSlider = document.getElementById('boatStartY');
+        const boatStartYValue = document.getElementById('boatStartYValue');
+        
+        const showVectorsCheckbox = document.getElementById('showVectors');
+        const showTrajectoryCheckbox = document.getElementById('showTrajectory');
+        const showGridCheckbox = document.getElementById('showGrid');
+        const showLabelsCheckbox = document.getElementById('showLabels');
+        const showPredictedPathCheckbox = document.getElementById('showPredictedPath');
+        const showVelocityCircleCheckbox = document.getElementById('showVelocityCircle');
+        
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const minTimeBtn = document.getElementById('minTimeBtn');
+        const minDistanceBtn = document.getElementById('minDistanceBtn');
+        const centerBtn = document.getElementById('centerBtn');
+        const topBtn = document.getElementById('topBtn');
+        const bottomBtn = document.getElementById('bottomBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        
+        // 获取数据显示元素
+        const boatPositionElement = document.getElementById('boatPosition');
+        const elapsedTimeElement = document.getElementById('elapsedTime');
+        const resultantSpeedElement = document.getElementById('resultantSpeed');
+        const resultantAngleElement = document.getElementById('resultantAngle');
+        const horizontalOffsetElement = document.getElementById('horizontalOffset');
+        const crossingTimeElement = document.getElementById('crossingTime');
+        const totalDistanceElement = document.getElementById('totalDistance');
+        const verticalSpeedElement = document.getElementById('verticalSpeed');
+        const horizontalSpeedElement = document.getElementById('horizontalSpeed');
+        
+        // 预计落点元素
+        const predictedXElement = document.getElementById('predictedX');
+        const predictedYElement = document.getElementById('predictedY');
+        const predictedTimeElement = document.getElementById('predictedTime');
+        const predictedDisplacementElement = document.getElementById('predictedDisplacement');
+        const canCrossVerticallyElement = document.getElementById('canCrossVertically');
+        
+        // 仿真状态变量
+        let isRunning = false;
+        let startTime = 0;
+        let lastTime = 0;
+        let animationId = null;
+        let vectorScale = parseFloat(vectorScaleSlider.value); // 矢量显示比例
+        
+        // 物理参数变量
+        let riverWidth = parseInt(riverWidthSlider.value);     // 河宽 (px)
+        let currentSpeed = parseFloat(currentSpeedSlider.value); // 水流速度 (px/s)
+        let boatSpeed = parseFloat(boatSpeedSlider.value);     // 船速 (px/s)
+        let boatAngle = parseInt(boatAngleSlider.value);       // 船头指向角度 (度)
+        let initialBoatY = parseInt(boatStartYSlider.value);   // 小船初始Y位置
+        
+        // 小船状态变量
+        let boatX = 50;  // 小船起始X位置（从左侧河岸开始）
+        let boatY = initialBoatY;
+        let trajectory = [];  // 存储小船运动轨迹点
+        let predictedPath = []; // 预计路径点
+        
+        // 初始化显示值
+        updateSliderValues();
+        calculatePredictedLanding();
+        drawStaticScene();
+        
+        // 更新滑块显示值
+        function updateSliderValues() {
+            riverWidthValue.textContent = `${riverWidthSlider.value} px`;
+            currentSpeedValue.textContent = `${currentSpeedSlider.value} px/s`;
+            boatSpeedValue.textContent = `${boatSpeedSlider.value} px/s`;
+            boatAngleValue.textContent = `${boatAngleSlider.value}°`;
+            vectorScaleValue.textContent = `${vectorScaleSlider.value}x`;
+            boatStartYValue.textContent = `${boatStartYSlider.value} px`;
+        }
+        
+        // 绘制河流
+        function drawRiver() {
+            const riverTop = (canvas.height - riverWidth) / 2;
+            const riverBottom = riverTop + riverWidth;
+            
+            // 绘制河岸（加粗显示）
+            ctx.strokeStyle = '#8B4513';
+            ctx.lineWidth = 12;
+            ctx.beginPath();
+            ctx.moveTo(0, riverTop);
+            ctx.lineTo(canvas.width, riverTop);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(0, riverBottom);
+            ctx.lineTo(canvas.width, riverBottom);
+            ctx.stroke();
+            
+            // 绘制河水（带有流动效果）
+            ctx.fillStyle = 'rgba(135, 206, 250, 0.3)';
+            ctx.fillRect(0, riverTop, canvas.width, riverWidth);
+            
+            // 绘制水流纹理
+            if (isRunning) {
+                const time = performance.now() / 1000;
+                const offset = (time * currentSpeed * 5) % 20;
+                
+                ctx.strokeStyle = 'rgba(30, 144, 255, 0.4)';
+                ctx.lineWidth = 1;
+                
+                for (let y = riverTop + 10; y < riverBottom; y += 20) {
+                    ctx.beginPath();
+                    for (let x = 0; x < canvas.width; x += 20) {
+                        const lineX = x + offset;
+                        ctx.moveTo(lineX, y);
+                        ctx.lineTo(lineX + 10, y);
+                    }
+                    ctx.stroke();
+                }
+            }
+            
+            // 标记左侧为起点，右侧为对岸
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('起点', 50, riverTop - 20);
+            ctx.fillText('对岸', canvas.width - 50, riverTop - 20);
+            
+            // 绘制河宽标记
+            ctx.strokeStyle = '#2c3e50';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 3]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width - 100, riverTop);
+            ctx.lineTo(canvas.width - 100, riverBottom);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            ctx.font = '14px Arial';
+            ctx.fillText(`河宽: ${riverWidth}px`, canvas.width - 100, (riverTop + riverBottom) / 2);
+        }
+        
+        // 绘制参考网格
+        function drawGrid() {
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.lineWidth = 0.5;
+            
+            // 垂直网格线
+            for (let x = 0; x <= canvas.width; x += 50) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            
+            // 水平网格线
+            for (let y = 0; y <= canvas.height; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // 绘制坐标标签
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.font = '10px Arial';
+            
+            for (let x = 50; x < canvas.width; x += 50) {
+                ctx.fillText(x, x, 15);
+            }
+            
+            for (let y = 50; y < canvas.height; y += 50) {
+                ctx.fillText(y, 10, y);
+            }
+        }
+        
+        // 绘制小船
+        function drawBoat() {
+            // 计算小船旋转后的顶点
+            const angleRad = boatAngle * Math.PI / 180;
+            const boatLength = 50;
+            const boatWidth = 25;
+            
+            // 小船三角形顶点
+            const noseX = boatX + Math.sin(angleRad) * boatLength / 2;
+            const noseY = boatY - Math.cos(angleRad) * boatLength / 2;
+            
+            const leftX = boatX - Math.cos(angleRad) * boatWidth / 2 - Math.sin(angleRad) * boatLength / 2;
+            const leftY = boatY - Math.sin(angleRad) * boatWidth / 2 + Math.cos(angleRad) * boatLength / 2;
+            
+            const rightX = boatX + Math.cos(angleRad) * boatWidth / 2 - Math.sin(angleRad) * boatLength / 2;
+            const rightY = boatY + Math.sin(angleRad) * boatWidth / 2 + Math.cos(angleRad) * boatLength / 2;
+            
+            // 绘制船体
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.moveTo(noseX, noseY);
+            ctx.lineTo(leftX, leftY);
+            ctx.lineTo(rightX, rightY);
+            ctx.closePath();
+            ctx.fill();
+            
+            // 绘制船体轮廓
+            ctx.strokeStyle = '#c0392b';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // 绘制小船当前位置标记
+            ctx.fillStyle = '#2c3e50';
+            ctx.beginPath();
+            ctx.arc(boatX, boatY, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 绘制小船位置标签
+            if (showLabelsCheckbox.checked) {
+                ctx.fillStyle = '#2c3e50';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(`(${boatX.toFixed(1)}, ${boatY.toFixed(1)})`, boatX + 10, boatY - 10);
+            }
+        }
+        
+        // 绘制速度合成辅助圆
+        function drawVelocityCircle() {
+            const scale = vectorScale * 20; // 放大矢量显示
+            const waterVectorEndX = boatX + currentSpeed * scale;
+            const waterVectorEndY = boatY;
+            
+            // 绘制以水流速度终点为圆心，船速为半径的辅助圆
+            const circleRadius = boatSpeed * scale;
+            
+            ctx.strokeStyle = 'rgba(127, 140, 141, 0.7)'; // 灰色
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 5]); // 虚线
+            
+            ctx.beginPath();
+            ctx.arc(waterVectorEndX, waterVectorEndY, circleRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            ctx.setLineDash([]);
+            
+            // 标记圆心和半径
+            ctx.fillStyle = '#3498db';
+            ctx.beginPath();
+            ctx.arc(waterVectorEndX, waterVectorEndY, 4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 绘制半径标记
+            ctx.strokeStyle = 'rgba(127, 140, 141, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(waterVectorEndX, waterVectorEndY);
+            ctx.lineTo(waterVectorEndX + circleRadius, waterVectorEndY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // 标记半径值
+            if (showLabelsCheckbox.checked) {
+                ctx.fillStyle = '#7f8c8d';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`r = v船 = ${boatSpeed.toFixed(1)}`, 
+                            waterVectorEndX + circleRadius / 2, waterVectorEndY - 10);
+            }
+            
+            // 标记圆心
+            if (showLabelsCheckbox.checked) {
+                ctx.fillStyle = '#3498db';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('水流速度终点', waterVectorEndX, waterVectorEndY - 20);
+            }
+            
+            // 绘制船速可能方向的示意线（从圆心到圆周）
+            const angleRad = boatAngle * Math.PI / 180;
+            const boatVectorEndX = boatX + boatSpeed * Math.sin(angleRad) * scale;
+            const boatVectorEndY = boatY - boatSpeed * Math.cos(angleRad) * scale;
+            
+            // 绘制从圆心到船速矢量终点的线
+            ctx.strokeStyle = 'rgba(231, 76, 60, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(waterVectorEndX, waterVectorEndY);
+            ctx.lineTo(boatVectorEndX, boatVectorEndY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // 标记船速矢量终点在圆周上
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.arc(boatVectorEndX, boatVectorEndY, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // 绘制速度矢量（放大显示）
+        function drawVectors() {
+            const angleRad = boatAngle * Math.PI / 180;
+            const scale = vectorScale * 20; // 放大矢量显示
+            
+            // 计算船速在x和y方向的分量
+            const boatSpeedX = boatSpeed * Math.sin(angleRad);
+            const boatSpeedY = boatSpeed * Math.cos(angleRad);
+            
+            // 计算合速度
+            const resultantSpeedX = currentSpeed + boatSpeedX;
+            const resultantSpeedY = boatSpeedY;
+            
+            // 计算合速度大小和方向
+            const resultantSpeed = Math.sqrt(resultantSpeedX * resultantSpeedX + resultantSpeedY * resultantSpeedY);
+            
+            // 绘制船速矢量 (红色)
+            drawArrow(boatX, boatY, boatX + boatSpeedX * scale, boatY - boatSpeedY * scale, '#e74c3c', `v船 = ${boatSpeed.toFixed(2)}`, true);
+            
+            // 绘制水流速度矢量 (蓝色)
+            drawArrow(boatX, boatY, boatX + currentSpeed * scale, boatY, '#3498db', `v水 = ${currentSpeed.toFixed(2)}`, true);
+            
+            // 绘制合速度矢量 (绿色)
+            drawArrow(boatX, boatY, boatX + resultantSpeedX * scale, boatY - resultantSpeedY * scale, '#2ecc71', `v合 = ${resultantSpeed.toFixed(2)}`, true);
+            
+            // 绘制速度分解示意
+            if (showLabelsCheckbox.checked) {
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.setLineDash([5, 3]);
+                ctx.lineWidth = 1;
+                
+                // 从船速矢量末端到合速度矢量末端
+                ctx.beginPath();
+                ctx.moveTo(boatX + boatSpeedX * scale, boatY - boatSpeedY * scale);
+                ctx.lineTo(boatX + resultantSpeedX * scale, boatY - resultantSpeedY * scale);
+                ctx.stroke();
+                
+                // 从水流矢量末端到合速度矢量末端
+                ctx.beginPath();
+                ctx.moveTo(boatX + currentSpeed * scale, boatY);
+                ctx.lineTo(boatX + resultantSpeedX * scale, boatY - resultantSpeedY * scale);
+                ctx.stroke();
+                
+                ctx.setLineDash([]);
+            }
+            
+            // 绘制速度合成辅助圆
+            if (showVelocityCircleCheckbox.checked) {
+                drawVelocityCircle();
+            }
+        }
+        
+        // 绘制箭头函数（改进版，更清晰）
+        function drawArrow(fromX, fromY, toX, toY, color, label, showLabel = true) {
+            const headLength = 15;
+            const headWidth = 10;
+            const dx = toX - fromX;
+            const dy = toY - fromY;
+            const angle = Math.atan2(dy, dx);
+            const length = Math.sqrt(dx * dx + dy * dy);
+            
+            // 如果长度太小，不绘制箭头
+            if (length < 5) return;
+            
+            // 绘制箭头线
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX, toY);
+            ctx.stroke();
+            
+            // 绘制箭头头部
+            ctx.beginPath();
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(
+                toX - headLength * Math.cos(angle) + headWidth * Math.cos(angle - Math.PI / 2),
+                toY - headLength * Math.sin(angle) + headWidth * Math.sin(angle - Math.PI / 2)
+            );
+            ctx.lineTo(
+                toX - headLength * Math.cos(angle) + headWidth * Math.cos(angle + Math.PI / 2),
+                toY - headLength * Math.sin(angle) + headWidth * Math.sin(angle + Math.PI / 2)
+            );
+            ctx.closePath();
+            ctx.fill();
+            
+            // 绘制标签
+            if (showLabel && showLabelsCheckbox.checked) {
+                ctx.fillStyle = color;
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                
+                // 计算标签位置（在箭头中点偏移一点）
+                const labelX = fromX + dx * 0.5 + Math.cos(angle + Math.PI/2) * 25;
+                const labelY = fromY + dy * 0.5 + Math.sin(angle + Math.PI/2) * 25;
+                
+                ctx.fillText(label, labelX, labelY);
+                
+                // 绘制指向箭头的引线
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.moveTo(labelX, labelY);
+                ctx.lineTo(fromX + dx * 0.5, fromY + dy * 0.5);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+        
+        // 绘制运动轨迹
+        function drawTrajectory() {
+            if (trajectory.length < 2) return;
+            
+            ctx.strokeStyle = '#9b59b6';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(trajectory[0].x, trajectory[0].y);
+            
+            for (let i = 1; i < trajectory.length; i++) {
+                ctx.lineTo(trajectory[i].x, trajectory[i].y);
+            }
+            
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        // 绘制预计路径
+        function drawPredictedPath() {
+            if (predictedPath.length < 2) return;
+            
+            ctx.strokeStyle = '#f39c12';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 5]);
+            ctx.beginPath();
+            ctx.moveTo(predictedPath[0].x, predictedPath[0].y);
+            
+            for (let i = 1; i < predictedPath.length; i++) {
+                ctx.lineTo(predictedPath[i].x, predictedPath[i].y);
+            }
+            
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // 标记预计落点
+            const lastPoint = predictedPath[predictedPath.length - 1];
+            if (lastPoint) {
+                ctx.fillStyle = '#e74c3c';
+                ctx.beginPath();
+                ctx.arc(lastPoint.x, lastPoint.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = '#e74c3c';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(lastPoint.x, lastPoint.y, 12, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // 标记预计落点标签
+                ctx.fillStyle = '#2c3e50';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('预计落点', lastPoint.x, lastPoint.y - 20);
+            }
+        }
+        
+        // 计算预计落点
+        function calculatePredictedLanding() {
+            const angleRad = boatAngle * Math.PI / 180;
+            const riverTop = (canvas.height - riverWidth) / 2;
+            const riverBottom = riverTop + riverWidth;
+            
+            // 计算船速分量
+            const boatSpeedX = boatSpeed * Math.sin(angleRad);
+            const boatSpeedY = boatSpeed * Math.cos(angleRad);
+            
+            // 计算合速度
+            const resultantSpeedX = currentSpeed + boatSpeedX;
+            const resultantSpeedY = boatSpeedY;
+            
+            // 计算合速度大小和方向
+            const resultantSpeed = Math.sqrt(resultantSpeedX * resultantSpeedX + resultantSpeedY * resultantSpeedY);
+            const resultantAngle = Math.atan2(resultantSpeedY, resultantSpeedX);
+            
+            // 计算渡河所需时间（基于当前位置到对岸的距离）
+            let crossingTime = 0;
+            let targetY = boatY;
+            
+            if (boatSpeedY > 0) {
+                // 船头指向下方，计算到达下岸的时间
+                crossingTime = (riverBottom - boatY) / boatSpeedY;
+                targetY = riverBottom;
+            } else if (boatSpeedY < 0) {
+                // 船头指向上方，计算到达上岸的时间
+                crossingTime = (boatY - riverTop) / Math.abs(boatSpeedY);
+                targetY = riverTop;
+            } else {
+                // 船速垂直分量为0，永远无法渡河
+                crossingTime = Infinity;
+            }
+            
+            // 计算预计落点X坐标
+            let predictedX = boatX + resultantSpeedX * crossingTime;
+            
+            // 如果预计落点超出画布，调整到边界
+            if (predictedX > canvas.width - 50) predictedX = canvas.width - 50;
+            if (predictedX < 50) predictedX = 50;
+            
+            // 计算实际渡河位移
+            const displacement = Math.sqrt(Math.pow(predictedX - boatX, 2) + Math.pow(targetY - boatY, 2));
+            
+            // 检查能否垂直渡河（合速度垂直河岸）
+            const canCrossVertically = Math.abs(boatSpeedX + currentSpeed) < 0.1;
+            
+            // 更新预计落点显示
+            if (crossingTime === Infinity) {
+                predictedXElement.textContent = "无法到达";
+                predictedYElement.textContent = "无法到达";
+                predictedTimeElement.textContent = "∞";
+                predictedDisplacementElement.textContent = "∞";
+                canCrossVerticallyElement.textContent = "否";
+            } else {
+                predictedXElement.textContent = `${predictedX.toFixed(1)} px`;
+                predictedYElement.textContent = `${targetY.toFixed(1)} px`;
+                predictedTimeElement.textContent = `${crossingTime.toFixed(2)} s`;
+                predictedDisplacementElement.textContent = `${displacement.toFixed(2)} px`;
+                canCrossVerticallyElement.textContent = canCrossVertically ? "是" : "否";
+            }
+            
+            // 生成预计路径点
+            predictedPath = [];
+            const steps = 50;
+            for (let i = 0; i <= steps; i++) {
+                const t = crossingTime * (i / steps);
+                const x = boatX + resultantSpeedX * t;
+                const y = boatY - boatSpeedY * t; // 注意：Canvas坐标系Y轴向下为正
+                
+                // 确保路径点在河内
+                if (y >= riverTop && y <= riverBottom) {
+                    predictedPath.push({x, y});
+                }
+            }
+            
+            // 更新其他数据显示
+            crossingTimeElement.textContent = crossingTime === Infinity ? "无法渡河" : `${crossingTime.toFixed(2)} s`;
+            totalDistanceElement.textContent = crossingTime === Infinity ? "∞" : `${(resultantSpeed * crossingTime).toFixed(2)} px`;
+            verticalSpeedElement.textContent = `${boatSpeedY.toFixed(2)} px/s`;
+            horizontalSpeedElement.textContent = `${(currentSpeed + boatSpeedX).toFixed(2)} px/s`;
+        }
+        
+        // 计算并显示物理量
+        function calculateAndDisplayPhysics() {
+            const angleRad = boatAngle * Math.PI / 180;
+            
+            // 计算船速在x和y方向的分量
+            const boatSpeedX = boatSpeed * Math.sin(angleRad);
+            const boatSpeedY = boatSpeed * Math.cos(angleRad);
+            
+            // 计算合速度
+            const resultantSpeedX = currentSpeed + boatSpeedX;
+            const resultantSpeedY = boatSpeedY;
+            
+            // 计算合速度大小和方向
+            const resultantSpeed = Math.sqrt(resultantSpeedX * resultantSpeedX + resultantSpeedY * resultantSpeedY);
+            const resultantAngle = Math.atan2(resultantSpeedY, resultantSpeedX) * 180 / Math.PI;
+            
+            // 计算已航行时间
+            const elapsedTime = isRunning ? (performance.now() - startTime) / 1000 : 0;
+            
+            // 更新数据显示
+            boatPositionElement.textContent = `(${boatX.toFixed(1)}, ${boatY.toFixed(1)})`;
+            elapsedTimeElement.textContent = `${elapsedTime.toFixed(2)} s`;
+            resultantSpeedElement.textContent = `${resultantSpeed.toFixed(2)} px/s`;
+            resultantAngleElement.textContent = `${resultantAngle.toFixed(2)}°`;
+            horizontalOffsetElement.textContent = `${(boatX - 50).toFixed(2)} px`;
+            
+            // 检查小船是否到达河岸
+            const riverTop = (canvas.height - riverWidth) / 2;
+            const riverBottom = riverTop + riverWidth;
+            
+            if (boatY <= riverTop || boatY >= riverBottom) {
+                if (isRunning) {
+                    isRunning = false;
+                    cancelAnimationFrame(animationId);
+                    startBtn.innerHTML = '<i class="fas fa-play"></i> 开始';
+                    
+                    // 标记到达对岸
+                    ctx.fillStyle = '#2ecc71';
+                    ctx.font = 'bold 20px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('到达对岸!', canvas.width / 2, 50);
+                }
+                
+                if (boatY <= riverTop) {
+                    boatY = riverTop;
+                } else {
+                    boatY = riverBottom;
+                }
+            }
+        }
+        
+        // 更新物理状态
+        function updatePhysics(deltaTime) {
+            const angleRad = boatAngle * Math.PI / 180;
+            
+            // 计算船速在x和y方向的分量
+            const boatSpeedX = boatSpeed * Math.sin(angleRad);
+            const boatSpeedY = boatSpeed * Math.cos(angleRad);
+            
+            // 更新小船位置
+            boatX += (currentSpeed + boatSpeedX) * deltaTime;
+            boatY -= boatSpeedY * deltaTime;  // 注意：Canvas坐标系Y轴向下为正，所以减去
+            
+            // 记录轨迹点
+            trajectory.push({x: boatX, y: boatY});
+            
+            // 限制轨迹点数量，避免性能问题
+            if (trajectory.length > 500) {
+                trajectory = trajectory.slice(-500);
+            }
+            
+            // 检查小船是否超出画布边界
+            if (boatX < 0) boatX = 0;
+            if (boatX > canvas.width) boatX = canvas.width;
+            
+            // 计算并显示物理量
+            calculateAndDisplayPhysics();
+        }
+        
+        // 绘制静态场景（非运行状态）
+        function drawStaticScene() {
+            // 清除画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制参考网格
+            if (showGridCheckbox.checked) {
+                drawGrid();
+            }
+            
+            // 绘制河流
+            drawRiver();
+            
+            // 绘制预计路径
+            if (showPredictedPathCheckbox.checked) {
+                drawPredictedPath();
+            }
+            
+            // 绘制运动轨迹
+            if (showTrajectoryCheckbox.checked) {
+                drawTrajectory();
+            }
+            
+            // 绘制速度矢量
+            if (showVectorsCheckbox.checked) {
+                drawVectors();
+            }
+            
+            // 绘制小船
+            drawBoat();
+        }
+        
+        // 动画循环
+        function animate(currentTime) {
+            if (!lastTime) lastTime = currentTime;
+            const deltaTime = (currentTime - lastTime) / 1000; // 转换为秒
+            lastTime = currentTime;
+            
+            // 清除画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制参考网格
+            if (showGridCheckbox.checked) {
+                drawGrid();
+            }
+            
+            // 绘制河流
+            drawRiver();
+            
+            // 绘制预计路径
+            if (showPredictedPathCheckbox.checked && !isRunning) {
+                drawPredictedPath();
+            }
+            
+            // 绘制运动轨迹
+            if (showTrajectoryCheckbox.checked) {
+                drawTrajectory();
+            }
+            
+            // 更新物理状态
+            if (isRunning) {
+                updatePhysics(deltaTime);
+            }
+            
+            // 绘制速度矢量
+            if (showVectorsCheckbox.checked) {
+                drawVectors();
+            }
+            
+            // 绘制小船
+            drawBoat();
+            
+            // 继续动画循环
+            if (isRunning) {
+                animationId = requestAnimationFrame(animate);
+            }
+        }
+        
+        // 重置仿真
+        function resetSimulation() {
+            isRunning = false;
+            startTime = 0;
+            lastTime = 0;
+            
+            // 重置小船位置到左侧河岸
+            boatX = 50;
+            boatY = initialBoatY;
+            trajectory = [];
+            
+            startBtn.innerHTML = '<i class="fas fa-play"></i> 开始';
+            
+            // 重新计算预计落点
+            calculatePredictedLanding();
+            
+            // 重新绘制静态场景
+            drawStaticScene();
+        }
+        
+        // 设置小船位置到中央
+        function setBoatToCenter() {
+            const riverTop = (canvas.height - riverWidth) / 2;
+            const riverCenter = riverTop + riverWidth / 2;
+            
+            initialBoatY = riverCenter;
+            boatStartYSlider.value = initialBoatY;
+            boatStartYValue.textContent = `${initialBoatY} px`;
+            
+            boatY = initialBoatY;
+            
+            // 重新计算预计落点
+            calculatePredictedLanding();
+            
+            // 重新绘制静态场景
+            drawStaticScene();
+        }
+        
+        // 设置小船位置靠上
+        function setBoatToTop() {
+            const riverTop = (canvas.height - riverWidth) / 2;
+            
+            initialBoatY = riverTop + 50;
+            boatStartYSlider.value = initialBoatY;
+            boatStartYValue.textContent = `${initialBoatY} px`;
+            
+            boatY = initialBoatY;
+            
+            // 重新计算预计落点
+            calculatePredictedLanding();
+            
+            // 重新绘制静态场景
+            drawStaticScene();
+        }
+        
+        // 设置小船位置靠下
+        function setBoatToBottom() {
+            const riverTop = (canvas.height - riverWidth) / 2;
+            
+            initialBoatY = riverTop + riverWidth - 50;
+            boatStartYSlider.value = initialBoatY;
+            boatStartYValue.textContent = `${initialBoatY} px`;
+            
+            boatY = initialBoatY;
+            
+            // 重新计算预计落点
+            calculatePredictedLanding();
+            
+            // 重新绘制静态场景
+            drawStaticScene();
+        }
+        
+        // 清除轨迹
+        function clearTrajectory() {
+            trajectory = [];
+            
+            // 重新绘制静态场景
+            drawStaticScene();
+        }
+        
+        // 设置时间最短渡河
+        function setMinTimeCrossing() {
+            // 时间最短：船头垂直对岸（角度为0°）
+            boatAngle = 0;
+            boatAngleSlider.value = boatAngle;
+            boatAngleValue.textContent = `${boatAngle}°`;
+            
+            // 重新计算预计落点
+            calculatePredictedLanding();
+            
+            // 如果不是运行状态，重新绘制
+            if (!isRunning) {
+                drawStaticScene();
+            }
+        }
+        
+        // 设置位移最短渡河
+        function setMinDistanceCrossing() {
+            // 位移最短：合速度垂直河岸
+            // 需要 v船·sinθ = v水
+            if (boatSpeed > Math.abs(currentSpeed)) {
+                boatAngle = Math.asin(currentSpeed / boatSpeed) * 180 / Math.PI;
+            } else {
+                // 如果船速小于水流速度，无法垂直渡河，设置一个接近垂直的角度
+                boatAngle = 90 * Math.sign(currentSpeed);
+            }
+            
+            boatAngleSlider.value = boatAngle;
+            boatAngleValue.textContent = `${boatAngle.toFixed(1)}°`;
+            
+            // 重新计算预计落点
+            calculatePredictedLanding();
+            
+            // 如果不是运行状态，重新绘制
+            if (!isRunning) {
+                drawStaticScene();
+            }
+        }
+        
+        // 开始仿真
+        function startSimulation() {
+            if (!isRunning) {
+                isRunning = true;
+                startTime = performance.now();
+                lastTime = startTime;
+                startBtn.innerHTML = '<i class="fas fa-play"></i> 继续';
+                
+                // 开始动画循环
+                animationId = requestAnimationFrame(animate);
+            }
+        }
+        
+        // 暂停仿真
+        function pauseSimulation() {
+            if (isRunning) {
+                isRunning = false;
+                cancelAnimationFrame(animationId);
+                startBtn.innerHTML = '<i class="fas fa-play"></i> 继续';
+            }
+        }
+        
+        // 事件监听器
+        riverWidthSlider.addEventListener('input', function() {
+            riverWidth = parseInt(this.value);
+            updateSliderValues();
+            
+            // 调整小船位置，使其保持在河内
+            const riverTop = (canvas.height - riverWidth) / 2;
+            const riverCenter = riverTop + riverWidth / 2;
+            
+            // 如果当前小船位置超出新的河范围，调整到河中央
+            if (boatY < riverTop || boatY > riverTop + riverWidth) {
+                initialBoatY = riverCenter;
+                boatStartYSlider.value = initialBoatY;
+                boatStartYValue.textContent = `${initialBoatY} px`;
+                boatY = initialBoatY;
+            }
+            
+            // 重新计算预计落点
+            calculatePredictedLanding();
+            
+            // 重新绘制静态场景
+            drawStaticScene();
+        });
+        
+        currentSpeedSlider.addEventListener('input', function() {
+            currentSpeed = parseFloat(this.value);
+            updateSliderValues();
+            
+            // 重新计算预计落点
+            calculatePredictedLanding();
+            
+            // 重新绘制静态场景
+            drawStaticScene();
+        });
+        
+        boatSpeedSlider.addEventListener('input', function() {
+            boatSpeed = parseFloat(this.value);
+            updateSliderValues();
+            
+            // 重新计算预计落点
+            calculatePredictedLanding();
+            
+            // 重新绘制静态场景
+            drawStaticScene();
+        });
+        
+        boatAngleSlider.addEventListener('input', function() {
+            boatAngle = parseInt(this.value);
+            updateSliderValues();
+            
+            // 重新计算预计落点
+            calculatePredictedLanding();
+            
+            // 重新绘制静态场景
+            drawStaticScene();
+        });
+        
+        vectorScaleSlider.addEventListener('input', function() {
+            vectorScale = parseFloat(this.value);
+            updateSliderValues();
+            
+            // 重新绘制静态场景
+            drawStaticScene();
+        });
+        
+        boatStartYSlider.addEventListener('input', function() {
+            initialBoatY = parseInt(this.value);
+            updateSliderValues();
+            
+            // 如果仿真没有运行，更新小船位置
+            if (!isRunning) {
+                boatY = initialBoatY;
+                
+                // 重新计算预计落点
+                calculatePredictedLanding();
+                
+                // 重新绘制静态场景
+                drawStaticScene();
+            }
+        });
+        
+        // 显示选项变化时重新绘制
+        showVectorsCheckbox.addEventListener('change', drawStaticScene);
+        showTrajectoryCheckbox.addEventListener('change', drawStaticScene);
+        showGridCheckbox.addEventListener('change', drawStaticScene);
+        showLabelsCheckbox.addEventListener('change', drawStaticScene);
+        showPredictedPathCheckbox.addEventListener('change', drawStaticScene);
+        showVelocityCircleCheckbox.addEventListener('change', drawStaticScene);
+        
+        startBtn.addEventListener('click', startSimulation);
+        pauseBtn.addEventListener('click', pauseSimulation);
+        resetBtn.addEventListener('click', resetSimulation);
+        minTimeBtn.addEventListener('click', setMinTimeCrossing);
+        minDistanceBtn.addEventListener('click', setMinDistanceCrossing);
+        centerBtn.addEventListener('click', setBoatToCenter);
+        topBtn.addEventListener('click', setBoatToTop);
+        bottomBtn.addEventListener('click', setBoatToBottom);
+        clearBtn.addEventListener('click', clearTrajectory);
+        
+        // 键盘快捷键
+        document.addEventListener('keydown', function(event) {
+            // 空格键：暂停/继续
+            if (event.code === 'Space') {
+                event.preventDefault();
+                if (isRunning) {
+                    pauseSimulation();
+                } else {
+                    startSimulation();
+                }
+            }
+            
+            // R键：重置
+            if (event.code === 'KeyR') {
+                event.preventDefault();
+                resetSimulation();
+            }
+            
+            // C键：居中
+            if (event.code === 'KeyC') {
+                event.preventDefault();
+                setBoatToCenter();
+            }
+            
+            // +键：增加船速
+            if (event.code === 'Equal' || event.code === 'NumpadAdd') {
+                event.preventDefault();
+                if (boatSpeed < 10) {
+                    boatSpeed = Math.min(10, boatSpeed + 0.1);
+                    boatSpeedSlider.value = boatSpeed;
+                    updateSliderValues();
+                    
+                    // 重新计算预计落点
+                    calculatePredictedLanding();
+                    
+                    // 重新绘制静态场景
+                    drawStaticScene();
+                }
+            }
+            
+            // -键：减少船速
+            if (event.code === 'Minus' || event.code === 'NumpadSubtract') {
+                event.preventDefault();
+                if (boatSpeed > 1) {
+                    boatSpeed = Math.max(1, boatSpeed - 0.1);
+                    boatSpeedSlider.value = boatSpeed;
+                    updateSliderValues();
+                    
+                    // 重新计算预计落点
+                    calculatePredictedLanding();
+                    
+                    // 重新绘制静态场景
+                    drawStaticScene();
+                }
+            }
+        });
+        
+        // 初始绘制
+        drawStaticScene();
+    </script>
+</body>
+</html>

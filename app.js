@@ -419,6 +419,16 @@
   function fromB64(b) {
     return decodeURIComponent(escape(atob(b.replace(/\n/g, ""))));
   }
+  // 把文件 byte 数组转成 base64（供 GitHub Contents API 上传二进制文件）
+  function bufToBase64(buf) {
+    const bytes = new Uint8Array(buf);
+    let bin = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(bin);
+  }
 
   function esc(s) {
     return String(s == null ? "" : s)
@@ -428,18 +438,19 @@
       .replace(/\n/g, "\\n");
   }
 
-  // 生成安全的 ASCII 文件名
-  function slugPath(name) {
+  // 生成安全的 ASCII 文件名（保留真实扩展名，便于 GitHub Pages 正确响应）
+  function slugPath(name, ext) {
+    const fileExt = ext && /^\.[a-z0-9]+$/i.test(ext) ? ext.toLowerCase() : ".html";
     const base =
       String(name || "")
-        .replace(/\.(html?|htm)$/i, "")
+        .replace(/\.[a-zA-Z0-9]+$/, "")
         .replace(/[^a-z0-9]+/gi, "-")
         .replace(/^-+|-+$/g, "")
         .replace(/-+/g, "-")
         .toLowerCase()
         .slice(0, 40) || "resource";
     const rand = Math.random().toString(36).slice(2, 7);
-    return "res-" + base + "-" + rand + ".html";
+    return "res-" + base + "-" + rand + fileExt;
   }
 
   async function ghGetContents(token, path) {
@@ -452,8 +463,9 @@
     return { sha: data.sha, text: fromB64(data.content) };
   }
 
-  async function ghPutFile(token, path, text, message, sha) {
-    const body = { message: message, branch: PUBLISH_BRANCH, content: b64(text) };
+  // contentB64 为文件字节的 base64（HTML/二进制均适用）
+  async function ghPutFile(token, path, contentB64, message, sha) {
+    const body = { message: message, branch: PUBLISH_BRANCH, content: contentB64 };
     if (sha) body.sha = sha;
     const res = await fetch(
       "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO +
@@ -507,15 +519,23 @@
   async function publishResource(rec) {
     const token = getPublishToken();
     if (!token) throw new Error("请先填写 GitHub 访问令牌");
-    const path = "pages/" + slugPath(rec.title);
+    const path = "pages/" + slugPath(rec.title, rec.fileExt);
     const message = "新增资源：" + rec.title;
-    // 1) 把 HTML 写入仓库 pages/
-    await ghPutFile(token, path, rec.content, message);
-    // 2) 更新 data/resources.js 并登记该资源
-    const mf = await ghGetContents(token, "data/resources.js");
-    const newSource = manifestInsert(mf.text, buildEntryText(rec, path));
-    await ghPutFile(token, "data/resources.js", newSource, "登记资源：" + rec.title, mf.sha);
-    return path;
+    // 1) 上传文件（HTML / PDF / DOCX 等二进制均可）
+    await ghPutFile(token, path, rec.contentB64, message);
+    // 2) 更新 data/resources.js 登记（并发冲突时自动重读取并重试）
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const mf = await ghGetContents(token, "data/resources.js");
+        const newSource = manifestInsert(mf.text, buildEntryText(rec, path));
+        await ghPutFile(token, "data/resources.js", b64(newSource), "登记资源：" + rec.title, mf.sha);
+        return path;
+      } catch (e) {
+        if (e.message && /409|does not match/i.test(e.message)) continue;
+        throw e;
+      }
+    }
+    throw new Error("多次冲突，请稍后重试");
   }
 
   // ---------- 上传弹窗 ----------
@@ -643,18 +663,19 @@
     toast("已退出，上传入口已隐藏");
   }
 
+  const FILE_RE = /\.(html?|htm|pdf|docx?|pptx?|xlsx?|txt|md|png|jpe?g|webp|gif|mp4|zip)$/i;
+
   function setPendingFile(file) {
     if (!file) return clearPendingFile();
-    const ok = /\.(html?|htm)$/i.test(file.name);
-    if (!ok) {
-      toast("请选择 .html 或 .htm 文件", true);
+    if (!FILE_RE.test(file.name)) {
+      toast("不支持的文件类型（支持 HTML/PDF/Word/PPT/Excel/图片/视频/压缩包等）", true);
       return;
     }
     pendingFile = file;
     $("#fileName").textContent = file.name + "（" + (file.size / 1024).toFixed(1) + " KB）";
     $("#filePill").style.display = "flex";
     if (!$("#fTitle").value) {
-      $("#fTitle").value = file.name.replace(/\.(html?|htm)$/i, "");
+      $("#fTitle").value = file.name.replace(/\.[^.]+$/, "");
     }
   }
 
@@ -676,16 +697,18 @@
       return;
     }
 
-    const content = await new Promise((resolve, reject) => {
+    // 读取文件字节并转 base64（HTML 与二进制统一处理）
+    const contentB64 = await new Promise((resolve, reject) => {
       const fr = new FileReader();
-      fr.onload = () => resolve(fr.result);
+      fr.onload = () => resolve(bufToBase64(fr.result));
       fr.onerror = () => reject(fr.error);
-      fr.readAsText(pendingFile, "utf-8");
+      fr.readAsArrayBuffer(pendingFile);
     }).catch((e) => {
       toast("读取文件失败：" + (e && e.message), true);
     });
-    if (content === undefined) return;
+    if (!contentB64) return;
 
+    const fileExt = (/\.[^.]*$/.exec(pendingFile.name) || [null, ".html"])[1].toLowerCase();
     const isPaper = isPaperType();
     const rec = {
       id: "r" + Date.now() + Math.random().toString(36).slice(2, 7),
@@ -700,7 +723,8 @@
         .map((s) => s.trim())
         .filter(Boolean),
       type: isPaper ? "试卷" : $("#fType").value,
-      content,
+      fileExt,
+      contentB64,
       createdAt: Date.now(),
     };
 

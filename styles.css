@@ -116,6 +116,26 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: .6px;
   color: var(--text-soft);
 }
+/* 教材（一级） */
+.book { margin-bottom: 4px; border-radius: 10px; overflow: hidden; }
+.book-head {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 12px 12px; border: none; background: transparent;
+  cursor: pointer; text-align: left; font-size: 14px; font-weight: 800;
+  color: var(--text); border-radius: 10px;
+}
+.book-head:hover { background: var(--brand-soft); }
+.book.is-open .book-head { background: var(--brand-soft); color: var(--brand); }
+.book-head .count {
+  margin-left: auto; font-size: 11px; font-weight: 700; color: var(--text-soft);
+  background: var(--bg); border-radius: 999px; padding: 2px 8px;
+}
+.book-head .chev { font-size: 12px; opacity: .7; transition: transform .2s; }
+.book.is-open .book-head .chev { transform: rotate(90deg); }
+.chapters { display: none; padding: 2px 4px 8px 4px; }
+.book.is-open .chapters { display: block; }
+
+/* 章节（二级） */
 .chapter {
   margin-bottom: 4px; border-radius: 10px; overflow: hidden;
 }
@@ -127,6 +147,7 @@ a { color: inherit; text-decoration: none; }
 }
 .chapter-head:hover { background: var(--brand-soft); }
 .chapter.is-open .chapter-head { background: var(--brand-soft); color: var(--brand); }
+.chapter.active .chapter-head { background: var(--brand-soft); color: var(--brand); }
 .chapter-head .chev {
   margin-left: auto; transition: transform .2s; font-size: 12px; color: inherit; opacity: .7;
 }

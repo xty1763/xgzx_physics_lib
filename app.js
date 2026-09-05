@@ -8,14 +8,15 @@
 
   // ---------- 状态 ----------
   const state = {
-    chapter: "all",      // "all" 或章节 id
-    section: null,       // 小节 id 或 null
+    book: null,      // null=全部教材，或教材 id
+    chapter: null,   // null 或章节 id
+    section: null,   // null 或小节 id
     search: "",
-    type: "all",         // 类型筛选项
-    onlyUploaded: false  // 只看“我上传的资源”
+    type: "all"      // "all" 或资源类型
   };
 
-  const openChapters = new Set(COURSE.chapters.map((c) => c.id));
+  const openBooks = new Set();       // 展开的教材
+  const openChapters = new Set();    // 展开的章节
   let baseList = [];                 // 预置清单 + 本地上传
   const objUrlCache = {};            // id -> objectURL（只在上传资源用）
   let pendingFile = null;            // 当前选中的待上传文件
@@ -23,16 +24,22 @@
   const $ = (sel) => document.querySelector(sel);
 
   // ---------- 工具 ----------
-  const chapterOf = (id) => COURSE.chapters.find((c) => c.id === id);
+  const bookOf = (id) => COURSE.books.find((b) => b.id === id);
+  const allChapters = COURSE.books.reduce((acc, b) => acc.concat(b.chapters), []);
+  const chapterOf = (id) => allChapters.find((c) => c.id === id);
   const sectionOf = (id) => {
-    for (const c of COURSE.chapters) {
-      const s = c.sections.find((x) => x.id === id);
-      if (s) return s;
+    for (const b of COURSE.books) {
+      for (const c of b.chapters) {
+        const s = c.sections.find((x) => x.id === id);
+        if (s) return s;
+      }
     }
     return null;
   };
+  const bookTitle = (id) => (bookOf(id) || {}).title || "";
   const chapterTitle = (id) => (chapterOf(id) || {}).title || "";
   const sectionTitle = (id) => (sectionOf(id) || {}).title || "";
+  const chaptersOfBook = (bookId) => (bookOf(bookId) || {}).chapters || [];
 
   function toast(msg, bad) {
     const t = $("#toast");
@@ -123,8 +130,8 @@
 
   function visible() {
     let list = baseList;
-    if (state.onlyUploaded) list = list.filter(isUploaded);
-    if (state.chapter !== "all") list = list.filter((r) => r.chapter === state.chapter);
+    if (state.book) list = list.filter((r) => r.book === state.book);
+    if (state.chapter) list = list.filter((r) => r.chapter === state.chapter);
     if (state.section) list = list.filter((r) => r.section === state.section);
     if (state.type !== "all") list = list.filter((r) => r.type === state.type);
 
@@ -135,6 +142,7 @@
           r.title,
           r.desc,
           (r.tags || []).join(" "),
+          bookTitle(r.book),
           chapterTitle(r.chapter),
           sectionTitle(r.section),
           r.type || "",
@@ -148,18 +156,9 @@
     return list;
   }
 
-  // 类型筛选项（忽略搜索与类型本身）
+  // 类型筛选项（全部类型 + COURSE.resourceTypes）
   function typeOptions() {
-    let list = baseList;
-    if (state.onlyUploaded) list = list.filter(isUploaded);
-    if (state.chapter !== "all") list = list.filter((r) => r.chapter === state.chapter);
-    if (state.section) list = list.filter((r) => r.section === state.section);
-    const set = new Set();
-    list.forEach((r) => {
-      if (r.type) set.add(r.type);
-      else set.add("其他");
-    });
-    return ["all", ...set];
+    return ["all"].concat(COURSE.resourceTypes || []);
   }
 
   // ---------- 渲染 ----------
@@ -167,66 +166,100 @@
     const wrap = $("#chapterNav");
     wrap.innerHTML = "";
 
-    COURSE.chapters.forEach((ch) => {
-      const count = baseList.filter((r) => r.chapter === ch.id).length;
-      const isOpen = openChapters.has(ch.id);
-      const el = document.createElement("div");
-      el.className = "chapter" + (isOpen ? " is-open" : "");
+    COURSE.books.forEach((book) => {
+      const bookCount = baseList.filter((r) => r.book === book.id).length;
+      const bookOpen = openBooks.has(book.id);
+      const bwrap = document.createElement("div");
+      bwrap.className = "book" + (bookOpen ? " is-open" : "");
 
-      const head = document.createElement("button");
-      head.className = "chapter-head";
-      head.type = "button";
-      head.innerHTML =
-        "<span>" +
-        (ch.id === state.chapter ? "📖 " : "") +
-        ch.title +
-        "</span><span class='count'>" +
-        count +
-        "</span><span class='chev'>▶</span>";
-      head.onclick = () => {
-        if (openChapters.has(ch.id)) openChapters.delete(ch.id);
-        else openChapters.add(ch.id);
-        if (state.chapter !== ch.id) {
-          state.chapter = ch.id;
+      const bhead = document.createElement("button");
+      bhead.className = "book-head";
+      bhead.type = "button";
+      bhead.innerHTML =
+        "<span>" + book.title + "</span>" +
+        "<span class='count'>" + bookCount + "</span>" +
+        "<span class='chev'>▶</span>";
+      bhead.onclick = () => {
+        if (openBooks.has(book.id)) openBooks.delete(book.id);
+        else openBooks.add(book.id);
+        if (state.book !== book.id) {
+          state.book = book.id;
+          state.chapter = null;
           state.section = null;
         }
         render();
       };
-      el.appendChild(head);
+      bwrap.appendChild(bhead);
 
-      const sec = document.createElement("div");
-      sec.className = "sections";
-      ch.sections.forEach((s) => {
-        const b = document.createElement("button");
-        b.className = "section" + (state.section === s.id ? " active" : "");
-        b.type = "button";
-        b.textContent = s.title;
-        b.onclick = () => {
-          state.chapter = ch.id;
-          state.section = s.id;
+      const chWrap = document.createElement("div");
+      chWrap.className = "chapters";
+      book.chapters.forEach((ch) => {
+        const chCount = baseList.filter((r) => r.chapter === ch.id).length;
+        const chOpen = openChapters.has(ch.id);
+        const cwrap = document.createElement("div");
+        cwrap.className =
+          "chapter" + (state.chapter === ch.id ? " active" : "") + (chOpen ? " is-open" : "");
+
+        const chead = document.createElement("button");
+        chead.className = "chapter-head";
+        chead.type = "button";
+        chead.innerHTML =
+          "<span>" + (state.chapter === ch.id ? "📖 " : "") + ch.title + "</span>" +
+          "<span class='count'>" + chCount + "</span>" +
+          "<span class='chev'>▶</span>";
+        chead.onclick = () => {
+          if (openChapters.has(ch.id)) openChapters.delete(ch.id);
+          else openChapters.add(ch.id);
+          if (state.chapter !== ch.id) {
+            state.chapter = ch.id;
+            state.section = null;
+            state.book = book.id;
+          }
           render();
         };
-        sec.appendChild(b);
+        cwrap.appendChild(chead);
+
+        const sec = document.createElement("div");
+        sec.className = "sections";
+        ch.sections.forEach((s) => {
+          const sbtn = document.createElement("button");
+          sbtn.className = "section" + (state.section === s.id ? " active" : "");
+          sbtn.type = "button";
+          sbtn.textContent = s.title;
+          sbtn.onclick = () => {
+            state.book = book.id;
+            state.chapter = ch.id;
+            state.section = s.id;
+            render();
+          };
+          sec.appendChild(sbtn);
+        });
+        cwrap.appendChild(sec);
+        chWrap.appendChild(cwrap);
       });
-      el.appendChild(sec);
-      wrap.appendChild(el);
+
+      bwrap.appendChild(chWrap);
+      wrap.appendChild(bwrap);
     });
 
-    $(".nav-all").classList.toggle("active", state.chapter === "all");
+    $(".nav-all").classList.toggle("active", !state.book && !state.chapter);
   }
 
   function renderCrumb() {
     const n = visible().length;
     $("#count").textContent = n + " 个资源";
 
-    let title;
-    if (state.onlyUploaded) title = "我上传的资源";
-    else if (state.chapter === "all") title = "全部资源";
-    else title = chapterTitle(state.chapter);
-
-    const sec = state.section ? sectionTitle(state.section) : null;
+    const parts = [];
+    if (state.book) {
+      parts.push(bookTitle(state.book));
+      if (state.chapter) {
+        parts.push(chapterTitle(state.chapter));
+        if (state.section) parts.push(sectionTitle(state.section));
+      }
+    }
+    const title = parts.length ? parts.shift() : "全部资源";
     $("#crumb").innerHTML =
-      title + (sec ? " <small>/ " + sec + "</small>" : "");
+      title + (parts.length ? " <small>/ " + parts.join(" / ") + "</small>" : "");
   }
 
   function renderTypeFilters() {
@@ -271,13 +304,15 @@
         (r.type || "资源") +
         "</span>";
 
+      const metaParts = [];
+      if (bookTitle(r.book)) metaParts.push(bookTitle(r.book));
+      if (chapterTitle(r.chapter)) metaParts.push(chapterTitle(r.chapter));
+      if (r.section && sectionTitle(r.section)) metaParts.push(sectionTitle(r.section));
       const meta =
-        '<div class="meta"><b>' +
-        (chapterTitle(r.chapter) || "未分章") +
-        "</b>" +
-        (sectionTitle(r.section)
-          ? " · <b>" + sectionTitle(r.section) + "</b>"
-          : "") +
+        '<div class="meta">' +
+        (metaParts.length
+          ? metaParts.map((p) => "<b>" + p + "</b>").join(" · ")
+          : "<b>未分教材</b>") +
         "</div>";
 
       const tags =
@@ -459,11 +494,12 @@
       '    id: "' + esc(rec.id) + '",',
       '    title: "' + esc(rec.title) + '",',
       '    desc: "' + esc(rec.desc) + '",',
-      '    chapter: "' + esc(rec.chapter) + '",',
-      '    section: "' + esc(rec.section) + '",',
+      '    book: "' + esc(rec.book || "") + '",',
+      '    chapter: "' + esc(rec.chapter || "") + '",',
+      '    section: "' + esc(rec.section || "") + '",',
       '    url: "' + esc(path) + '",',
       "    tags: [" + tags + "],",
-      '    type: "上传"',
+      '    type: "' + esc(rec.type || "练习") + '"',
       "  }",
     ].join("\n");
   }
@@ -485,20 +521,56 @@
   // ---------- 上传弹窗 ----------
   const mask = $("#modalMask");
 
+  const isPaperType = () => $("#fType").value === "试卷";
+
+  function populateTypeSelect() {
+    const sel = $("#fType");
+    sel.innerHTML = "";
+    COURSE.resourceTypes.forEach((t) => {
+      const o = document.createElement("option");
+      o.value = t;
+      o.textContent = t;
+      sel.appendChild(o);
+    });
+    refreshTypeUI();
+  }
+
+  function refreshTypeUI() {
+    const paper = isPaperType();
+    $("#typeHint").style.display = paper ? "block" : "none";
+    $("#fSection").disabled = paper;
+  }
+
+  function populateBookSelect() {
+    const sel = $("#fBook");
+    sel.innerHTML = '<option value="">暂不分教材</option>';
+    COURSE.books.forEach((b) => {
+      const o = document.createElement("option");
+      o.value = b.id;
+      o.textContent = b.title;
+      sel.appendChild(o);
+    });
+  }
+
   function populateChapterSelect() {
     const sel = $("#fChapter");
-    sel.innerHTML = '<option value="">暂不分章</option>';
-    COURSE.chapters.forEach((c) => {
+    sel.innerHTML = '<option value="">暂不选章</option>';
+    chaptersOfBook($("#fBook").value).forEach((c) => {
       const o = document.createElement("option");
       o.value = c.id;
       o.textContent = c.title;
       sel.appendChild(o);
     });
+    populateSectionSelect();
   }
 
   function populateSectionSelect() {
     const sel = $("#fSection");
     sel.innerHTML = '<option value="">未指定小节</option>';
+    if (isPaperType()) {
+      sel.disabled = true;
+      return;
+    }
     const ch = chapterOf($("#fChapter").value);
     if (ch) {
       ch.sections.forEach((s) => {
@@ -519,6 +591,8 @@
   }
 
   function openModal() {
+    populateTypeSelect();
+    populateBookSelect();
     populateChapterSelect();
     populateSectionSelect();
     $("#fTitle").value = "";
@@ -612,17 +686,20 @@
     });
     if (content === undefined) return;
 
+    const isPaper = isPaperType();
     const rec = {
       id: "r" + Date.now() + Math.random().toString(36).slice(2, 7),
       title,
+      book: $("#fBook").value,
       chapter: $("#fChapter").value,
-      section: $("#fSection").value,
+      // 试卷不挂小节
+      section: isPaper ? "" : $("#fSection").value,
       desc: $("#fDesc").value.trim(),
       tags: $("#fTags")
         .value.split(/[,，\s]+/)
         .map((s) => s.trim())
         .filter(Boolean),
-      type: "上传",
+      type: isPaper ? "试卷" : $("#fType").value,
       content,
       createdAt: Date.now(),
     };
@@ -640,11 +717,12 @@
         id: rec.id,
         title: rec.title,
         desc: rec.desc,
+        book: rec.book,
         chapter: rec.chapter,
         section: rec.section,
         url: path,
         tags: rec.tags,
-        type: "上传",
+        type: rec.type,
       };
       window.MANIFEST.push(published);
       await loadAll();
@@ -658,7 +736,8 @@
   // ---------- 事件绑定 ----------
   function bindEvents() {
     $(".nav-all").onclick = () => {
-      state.chapter = "all";
+      state.book = null;
+      state.chapter = null;
       state.section = null;
       render();
     };
@@ -677,6 +756,13 @@
     $("#cancelModal").onclick = closeModal;
     mask.addEventListener("click", (e) => {
       if (e.target === mask) closeModal();
+    });
+    $("#fType").addEventListener("change", () => {
+      refreshTypeUI();
+      populateSectionSelect();
+    });
+    $("#fBook").addEventListener("change", () => {
+      populateChapterSelect();
     });
     $("#fChapter").addEventListener("change", populateSectionSelect);
     $("#saveResource").onclick = saveResource;

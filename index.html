@@ -89,10 +89,22 @@
             <button class="x" id="clearFile" type="button" aria-label="移除">✕</button>
           </div>
         </div>
-        <p style="margin:0;font-size:12px;color:var(--text-soft);">
-          💡 提示：<b>永久上线</b>的资源建议把 HTML 放进 <code>pages/</code> 目录，并在 <code>data/resources.js</code> 里登记；
-          上传按钮主要用于快速测试，数据只存在当前浏览器。
-        </p>
+
+        <div class="field">
+          <label class="publish-opt" id="publishOpt">
+            <input type="checkbox" id="publishOnline" checked />
+            <span>
+              <span class="t">☁️ 发布到线上（所有人可见）</span>
+              <span class="s">把资源写入 GitHub 仓库的 pages/ 并自动登记到资源清单，其他访客即可看到</span>
+            </span>
+          </label>
+          <div class="tokenRow" id="tokenRow">
+            <label for="fToken">GitHub 访问令牌（只保存于本浏览器，用于写入仓库）</label>
+            <input id="fToken" type="password" placeholder="ghp_… 或 github_pat_…" autocomplete="off" />
+            <p class="hint">令牌只存在你这份浏览器里，不会写进网页，其他访客拿不到。若不勾选“发布到线上”，则仅本地预览。</p>
+          </div>
+          <p class="hint">发布成功后约 1 分钟内 GitHub Pages 会重新构建，所有人即可访问。</p>
+        </div>
       </div>
       <footer>
         <button class="btn" id="cancelModal" type="button">取消</button>

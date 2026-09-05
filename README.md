@@ -42,11 +42,18 @@ python -m http.server 8000
 - **搜索**：顶部搜索框，按标题 / 描述 / 标签 / 章节名 / 类型模糊匹配，输入即时过滤。
 - **类型筛选**：顶栏 chips 按资源类型（演示/实验/动画/测试页…）过滤。
 - **上传资源**：右上角「上传资源」按钮 → 选择标题、所属章节/小节、描述、标签、HTML 文件。
-  上传结果保存在**当前浏览器**（IndexedDB），并即时出现在列表里，点击即可在新标签打开。
+- **发布到线上（所有人可见）**：上传时勾选“☁️ 发布到线上”，资源会通过 GitHub 写入仓库的
+  `pages/`，并自动登记到 `data/resources.js`，push 到 `main` 后 GitHub Pages 自动重建，
+  **所有访客都能看到**。若只是测试，可取消勾选，仅保存在本浏览器（IndexedDB）。
 
-> ⚠️ 关于“上传”的持久化：由于这是静态站点（Surge 没有后端），上传的资源只存在
-> **你这台设备的这个浏览器**。若要**永久上线**让所有访问者都能看到某份资源，
-> 请把 HTML 文件放进 `pages/` 目录，并在 `data/resources.js` 里加一条记录（指向该文件）。
+> 🔑 发布到线上需要 GitHub 令牌：在上传面板的输入框填入一个令牌即可（只存在**你这台**浏览器的
+> localStorage，不会写进网页，其他访客看不到）。推荐用**仅限该仓库**的 fine-grained token：
+> GitHub → Developer settings → Fine-grained tokens → Generate → Repository access 选
+> `xgzx_physics_lib` 这个仓库 → Repository permissions 给 **Contents: Read and write** +
+> **Metadata: Read**。
+>
+> ⚠️ 每次发布成功后，你的**本地**仓库里 `data/resources.js` 还是旧版。下次在本地改动前，
+> 先 `git pull` 一下把线上清单拉回来，避免覆盖别人/自己发布过的新登记记录。
 
 ## 扩充章节
 

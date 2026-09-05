@@ -274,6 +274,27 @@ a { color: inherit; text-decoration: none; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.bad { background: #c0392b; }
 
+/* ===== 在线发布 ===== */
+.publish-opt {
+  display: flex; align-items: flex-start; gap: 10px;
+  border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+  cursor: pointer; transition: border-color .16s, background .16s;
+}
+.publish-opt:hover { border-color: #cfe0ff; }
+.publish-opt.on { border-color: var(--brand); background: var(--brand-soft); }
+.publish-opt input { margin-top: 3px; accent-color: var(--brand); width: 16px; height: 16px; }
+.publish-opt .t { font-weight: 700; font-size: 14px; }
+.publish-opt .s { font-size: 12px; color: var(--text-soft); margin-top: 3px; }
+.hint { margin: 8px 0 0; font-size: 12px; color: var(--text-soft); line-height: 1.6; }
+.tokenRow { margin-top: 12px; border-left: 3px solid var(--brand); padding: 2px 0 2px 12px; }
+.tokenRow label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.tokenRow input {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 9px; font-size: 13px; color: var(--text); background: #fff; outline: none;
+  font-family: ui-monospace, monospace;
+}
+.tokenRow input:focus { border-color: var(--brand); }
+
 /* ===== 响应式 ===== */
 @media (max-width: 860px) {
   .layout { grid-template-columns: 1fr; }

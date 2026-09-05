@@ -351,6 +351,137 @@
     }
   }
 
+  // ---------- 在线发布（GitHub Contents API） ----------
+  const PUBLISH_OWNER = "xty1763";
+  const PUBLISH_REPO = "xgzx_physics_lib";
+  const PUBLISH_BRANCH = "main";
+  const TOKEN_KEY = "gh_publish_token";
+
+  function getPublishToken() {
+    try {
+      return localStorage.getItem(TOKEN_KEY) || "";
+    } catch (e) {
+      return "";
+    }
+  }
+  function setPublishToken(t) {
+    try {
+      localStorage.setItem(TOKEN_KEY, t);
+    } catch (e) {}
+  }
+
+  function ghHeaders(token) {
+    return {
+      Authorization: "Bearer " + token,
+      "User-Agent": "physics-lib",
+      Accept: "application/vnd.github+json",
+    };
+  }
+
+  function b64(text) {
+    return btoa(unescape(encodeURIComponent(text)));
+  }
+  function fromB64(b) {
+    return decodeURIComponent(escape(atob(b.replace(/\n/g, ""))));
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/\r/g, "")
+      .replace(/\n/g, "\\n");
+  }
+
+  // 生成安全的 ASCII 文件名
+  function slugPath(name) {
+    const base =
+      String(name || "")
+        .replace(/\.(html?|htm)$/i, "")
+        .replace(/[^a-z0-9]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .replace(/-+/g, "-")
+        .toLowerCase()
+        .slice(0, 40) || "resource";
+    const rand = Math.random().toString(36).slice(2, 7);
+    return "res-" + base + "-" + rand + ".html";
+  }
+
+  async function ghGetContents(token, path) {
+    const url =
+      "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO +
+      "/contents/" + path + "?ref=" + PUBLISH_BRANCH;
+    const res = await fetch(url, { headers: ghHeaders(token) });
+    if (!res.ok) throw new Error("读取仓库文件失败（" + res.status + "）");
+    const data = await res.json();
+    return { sha: data.sha, text: fromB64(data.content) };
+  }
+
+  async function ghPutFile(token, path, text, message, sha) {
+    const body = { message: message, branch: PUBLISH_BRANCH, content: b64(text) };
+    if (sha) body.sha = sha;
+    const res = await fetch(
+      "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO +
+        "/contents/" + path,
+      {
+        method: "PUT",
+        headers: Object.assign({}, ghHeaders(token), {
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify(body),
+      }
+    );
+    if (!res.ok) {
+      let msg = "";
+      try {
+        msg = (await res.json()).message || "";
+      } catch (e) {}
+      throw new Error("写入失败（" + res.status + (msg ? " " + msg : "") + "）");
+    }
+    return await res.json();
+  }
+
+  // 在清单源文件中追加一条资源对象
+  function manifestInsert(source, entryText) {
+    const idx = source.lastIndexOf("];");
+    if (idx === -1) throw new Error("无法定位资源清单");
+    const head = source.slice(0, idx).replace(/\s+$/, "");
+    const tail = source.slice(idx);
+    const hasEntries = /}\s*$/.test(head);
+    const sep = hasEntries ? ",\n  " : "\n  ";
+    return head + sep + entryText + "\n" + tail;
+  }
+
+  function buildEntryText(rec, path) {
+    const tags = (rec.tags || []).map((t) => '"' + esc(t) + '"').join(", ");
+    return [
+      "{",
+      '    id: "' + esc(rec.id) + '",',
+      '    title: "' + esc(rec.title) + '",',
+      '    desc: "' + esc(rec.desc) + '",',
+      '    chapter: "' + esc(rec.chapter) + '",',
+      '    section: "' + esc(rec.section) + '",',
+      '    url: "' + esc(path) + '",',
+      "    tags: [" + tags + "],",
+      '    type: "上传"',
+      "  }",
+    ].join("\n");
+  }
+
+  async function publishResource(rec) {
+    const token = getPublishToken();
+    if (!token) throw new Error("请先填写 GitHub 访问令牌");
+    const path = "pages/" + slugPath(rec.title);
+    const message = "新增资源：" + rec.title;
+    // 1) 把 HTML 写入仓库 pages/
+    await ghPutFile(token, path, rec.content, message);
+    // 2) 更新 data/resources.js 并登记该资源
+    const mf = await ghGetContents(token, "data/resources.js");
+    const newSource = manifestInsert(mf.text, buildEntryText(rec, path));
+    await ghPutFile(token, "data/resources.js", newSource, "登记资源：" + rec.title, mf.sha);
+    return path;
+  }
+
   // ---------- 上传弹窗 ----------
   const mask = $("#modalMask");
 
@@ -379,13 +510,21 @@
     }
   }
 
+  function setPublishUI() {
+    const on = $("#publishOnline").checked;
+    $("#publishOpt").classList.toggle("on", on);
+    $("#tokenRow").style.display = on ? "block" : "none";
+  }
+
   function openModal() {
     populateChapterSelect();
     populateSectionSelect();
     $("#fTitle").value = "";
     $("#fDesc").value = "";
     $("#fTags").value = "";
+    $("#fToken").value = getPublishToken();
     clearPendingFile();
+    setPublishUI();
     mask.classList.add("show");
     setTimeout(() => $("#fTitle").focus(), 50);
   }
@@ -438,7 +577,7 @@
     if (content === undefined) return;
 
     const rec = {
-      id: "u" + Date.now() + Math.random().toString(36).slice(2, 7),
+      id: "r" + Date.now() + Math.random().toString(36).slice(2, 7),
       title,
       chapter: $("#fChapter").value,
       section: $("#fSection").value,
@@ -452,13 +591,43 @@
       createdAt: Date.now(),
     };
 
-    try {
-      await saveUpload(rec);
-      await loadAll();
-      closeModal();
-      toast("已上传「" + title + "」");
-    } catch (e) {
-      toast("保存失败：" + e.message, true);
+    // 记住填过的令牌（仅存本浏览器）
+    const tokenField = $("#fToken").value.trim();
+    if (tokenField) setPublishToken(tokenField);
+
+    const publishOnline = $("#publishOnline").checked;
+
+    if (publishOnline) {
+      // 发布到线上：写入仓库并登记，所有人可见
+      try {
+        const path = await publishResource(rec);
+        const published = {
+          id: rec.id,
+          title: rec.title,
+          desc: rec.desc,
+          chapter: rec.chapter,
+          section: rec.section,
+          url: path,
+          tags: rec.tags,
+          type: "上传",
+        };
+        window.MANIFEST.push(published);
+        await loadAll();
+        closeModal();
+        toast("已发布到线上，其他访客也能看到");
+      } catch (e) {
+        toast("发布失败：" + e.message, true);
+      }
+    } else {
+      // 仅本地预览
+      try {
+        await saveUpload(rec);
+        await loadAll();
+        closeModal();
+        toast("已保存到本浏览器（仅本地可见）");
+      } catch (e) {
+        toast("保存失败：" + e.message, true);
+      }
     }
   }
 
@@ -491,6 +660,7 @@
     });
 
     $("#uploadBtn").onclick = openModal;
+    $("#publishOnline").addEventListener("change", setPublishUI);
     $("#closeModal").onclick = closeModal;
     $("#cancelModal").onclick = closeModal;
     mask.addEventListener("click", (e) => {

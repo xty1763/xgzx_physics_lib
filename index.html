@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>高中物理教学资源库</title>
+  <meta name="description" content="高中物理教学资源库 —— 按章节分类、支持搜索与上传的导航页面。" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%232f6fed'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle' fill='white' font-family='Arial'%3E%E7%89%A9%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">物</div>
+      <div>
+        <div class="name">高中物理教学资源库</div>
+        <div class="sub" id="subjectSub"></div>
+      </div>
+    </div>
+
+    <div class="searchwrap">
+      <span class="icon">🔍</span>
+      <input id="search" type="search" placeholder="搜索标题、描述、标签或章节…" autocomplete="off" />
+    </div>
+
+    <button class="btn primary" id="uploadBtn" type="button">⬆ 上传资源</button>
+  </header>
+
+  <div class="layout">
+    <!-- 章节导航 -->
+    <aside class="sidebar">
+      <h2>章节导航</h2>
+      <button class="nav-all active" data-chapter="all" type="button">📚 全部资源</button>
+      <div id="chapterNav"></div>
+      <div class="nav-sep"></div>
+      <button class="btn ghost" id="manageBtn" type="button" style="width:100%;justify-content:center;">🗂 我上传的资源</button>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="content">
+      <div class="toolbar">
+        <div class="crumb" id="crumb">全部资源 <small id="count"></small></div>
+        <div class="filterrow" id="typeFilter"></div>
+      </div>
+      <div class="grid" id="grid"></div>
+    </main>
+  </div>
+
+  <!-- 上传弹窗 -->
+  <div class="modal-mask" id="modalMask">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header>
+        <h3 id="modalTitle">上传资源</h3>
+        <button class="close" id="closeModal" type="button" aria-label="关闭">✕</button>
+      </header>
+      <div class="body">
+        <div class="field">
+          <label for="fTitle">资源名称 *</label>
+          <input id="fTitle" type="text" placeholder="例如：匀变速直线运动演示" />
+        </div>
+        <div class="fieldrow">
+          <div class="field">
+            <label for="fChapter">所属章节</label>
+            <select id="fChapter"></select>
+          </div>
+          <div class="field">
+            <label for="fSection">小节</label>
+            <select id="fSection"></select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="fDesc">一句话描述</label>
+          <textarea id="fDesc" placeholder="简单说明这个资源的内容/用法（可选）"></textarea>
+        </div>
+        <div class="field">
+          <label for="fTags">标签（用逗号或空格分隔）</label>
+          <input id="fTags" type="text" placeholder="例如：演示 实验 动画" />
+        </div>
+        <div class="field">
+          <label>选择 HTML 文件</label>
+          <div class="dropzone" id="dropzone">
+            <div class="big">📄</div>
+            <div>点击选择，或把 <b>.html</b> 文件拖到这里</div>
+            <small>文件内容会保存在当前浏览器（本地测试用）</small>
+            <input id="fileInput" type="file" accept=".html,.htm" hidden />
+          </div>
+          <div class="filepill" id="filePill" style="display:none;">
+            <span id="fileName"></span>
+            <button class="x" id="clearFile" type="button" aria-label="移除">✕</button>
+          </div>
+        </div>
+        <p style="margin:0;font-size:12px;color:var(--text-soft);">
+          💡 提示：<b>永久上线</b>的资源建议把 HTML 放进 <code>pages/</code> 目录，并在 <code>data/resources.js</code> 里登记；
+          上传按钮主要用于快速测试，数据只存在当前浏览器。
+        </p>
+      </div>
+      <footer>
+        <button class="btn" id="cancelModal" type="button">取消</button>
+        <button class="btn primary" id="saveResource" type="button">保存资源</button>
+      </footer>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- 数据与逻辑 -->
+  <script src="data/course-data.js"></script>
+  <script src="data/resources.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -87,6 +87,14 @@ a { color: inherit; text-decoration: none; }
 .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
 .btn.primary:hover { background: #2459cc; }
 .btn.ghost:hover { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); }
+.btn.danger { color: #c0392b; }
+.btn.danger:hover { background: #fdecea; border-color: #e6a8a0; color: #c0392b; }
+
+.card-actions {
+  display: flex; gap: 8px; margin-top: 6px;
+  border-top: 1px solid var(--line); padding-top: 10px;
+}
+.card-actions .btn { font-size: 12px; padding: 5px 10px; }
 
 /* ===== 布局 ===== */
 .layout {

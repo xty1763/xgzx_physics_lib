@@ -15,7 +15,7 @@
     type: "all"      // "all" 或资源类型
   };
 
-  const openBooks = new Set(COURSE.books.map((b) => b.id)); // 默认展开全部教材，便于直接点章节
+  const openBooks = new Set();       // 默认收起教材，点开后才展开，便于选择
   const openChapters = new Set();    // 展开的章节
   let baseList = [];                 // 预置清单 + 本地上传
   const objUrlCache = {};            // id -> objectURL（只在上传资源用）
@@ -244,7 +244,6 @@
 
   function renderCrumb() {
     const n = visible().length;
-    $("#count").textContent = n + " 个资源";
 
     const parts = [];
     if (state.book) {
@@ -255,8 +254,10 @@
       }
     }
     const title = parts.length ? parts.shift() : "全部资源";
+    const sub = parts.length ? " <small>/ " + parts.join(" / ") + "</small>" : "";
+    // 一并输出数量，避免依赖会被覆盖的 #count 元素
     $("#crumb").innerHTML =
-      title + (parts.length ? " <small>/ " + parts.join(" / ") + "</small>" : "");
+      title + sub + ' <small class="crumb-count">' + n + " 个资源</small>";
   }
 
   function renderTypeFilters() {

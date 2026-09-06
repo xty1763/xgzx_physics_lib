@@ -884,9 +884,8 @@
       return;
     }
     const isPaper = isPaperType();
-    const fileExt = pendingFile
-      ? (/\.[^.]*$/.exec(pendingFile.name) || [null, ".html"])[1].toLowerCase()
-      : undefined;
+    const extMatch = pendingFile && /\.[^.]*$/.exec(pendingFile.name);
+    const fileExt = pendingFile ? (extMatch ? extMatch[0].toLowerCase() : ".html") : undefined;
 
     const rec = {
       id: editingId || ("r" + Date.now() + Math.random().toString(36).slice(2, 7)),

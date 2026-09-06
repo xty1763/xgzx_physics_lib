@@ -1,21 +1,6 @@
 /*
  * 高中物理教学资源库 —— 预置资源清单（manifest）
- *
- * 每个资源为一个对象：
- *   id        唯一标识（必填）
- *   title     资源标题（必填）
- *   desc      一句话描述（可选）
- *   book      所属教材 id   （对应 course-data.js 中的 books[].id）
- *   chapter   所属章 id     （corresponds chapters[].id）
- *   section   所属节 id     （corresponds sections[].id）；试卷资源可为 ""（不挂小节）
- *   url       资源地址（相对本网站的路径）。上传型资源不用填。
- *   tags      标签数组，用于搜索
- *   type      资源类型，取 COURSE.resourceTypes 之一：练习/试卷/课件/教案/仿真资源
- *
- * 说明：
- *   - 永久挂载资源：把 HTML 放进 pages/ 目录，在这里加一条记录，url 指到对应文件即可。
- *   - 管理员通过网页“上传资源”发布的内容，会自动写入这个文件（并同步到仓库）。
- *   - type 为 “试卷” 的资源可不填 section。
+ * 由“资源发布/编辑/删除”自动维护，请勿手工改这份再被覆盖。
  */
 window.MANIFEST = [
   {
@@ -50,16 +35,5 @@ window.MANIFEST = [
     url: "pages/res-resource-wjr3u.html",
     tags: [],
     type: "仿真资源"
-  },
-  {
-    id: "r17886866758680dg9w",
-    title: "电话手表申请单",
-    desc: "",
-    book: "",
-    chapter: "",
-    section: "",
-    url: "pages/res-resource-mp778.docx",
-    tags: [],
-    type: "练习"
   }
 ];

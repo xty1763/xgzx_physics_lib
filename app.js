@@ -18,8 +18,10 @@
   const openBooks = new Set();       // 默认收起教材，点开后才展开，便于选择
   const openChapters = new Set();    // 展开的章节
   let baseList = [];                 // 预置清单 + 本地上传
+  let uploadedList = [];             // 本地上传（历史遗留，仅本地可见）
   const objUrlCache = {};            // id -> objectURL（只在上传资源用）
   let pendingFile = null;            // 当前选中的待上传文件
+  let editingId = null;              // 正在编辑的资源 id（null = 新增）
 
   const $ = (sel) => document.querySelector(sel);
   const NAV_KEY = "nav_collapsed";
@@ -117,7 +119,8 @@
       uploaded = [];
     }
     // 合并预置与上传，上传的放在后面
-    baseList = [...MANIFEST, ...uploaded];
+    uploadedList = uploaded;
+    baseList = [...(window.MANIFEST || []), ...uploaded];
     render();
   }
 
@@ -341,22 +344,41 @@
 
     card.onclick = () => openResource(r);
 
-    if (isUploaded(r)) {
+    // 仅管理员可见：编辑 / 删除
+    if (getPublishToken()) {
+      const actions = document.createElement("div");
+      actions.className = "card-actions";
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "btn ghost";
+      edit.textContent = "✏️ 编辑";
+      edit.onclick = (e) => {
+        e.stopPropagation();
+        openModal(r);
+      };
       const del = document.createElement("button");
-      del.className = "close";
       del.type = "button";
-      del.setAttribute("aria-label", "删除");
-      del.style.cssText =
-        "position:absolute;top:12px;left:12px;background:none;border:none;font-size:14px;cursor:pointer;color:var(--text-soft);";
-      del.textContent = "🗑";
-      del.title = "删除该上传资源";
+      del.className = "btn ghost danger";
+      del.textContent = "🗑 删除";
       del.onclick = (e) => {
         e.stopPropagation();
-        removeUpload(r);
+        handleDelete(r);
       };
-      card.appendChild(del);
+      actions.appendChild(edit);
+      actions.appendChild(del);
+      card.appendChild(actions);
     }
     return card;
+  }
+
+  async function handleDelete(r) {
+    if (!window.confirm("确定要删除资源「" + r.title + "」吗？这会从线上仓库移除。")) return;
+    try {
+      await deleteResource(r);
+      toast("已删除");
+    } catch (e) {
+      toast("删除失败：" + e.message, true);
+    }
   }
 
   // 平铺渲染资源卡片；范围由左侧栏/类型/搜索决定（选择章节后只显示该章节内容）
@@ -555,7 +577,122 @@
         throw e;
       }
     }
-    throw new Error("多次冲突，请稍后重试");
+    throw new Error("多人同时修改冲突，请稍后重试");
+  }
+
+  // ---------- 清单序列化 / 编辑 / 删除 ----------
+  function entryToJs(e) {
+    const tags = (e.tags || []).map((t) => '"' + esc(t) + '"').join(", ");
+    return (
+      "{\n" +
+      '    id: "' + esc(e.id) + '",\n' +
+      '    title: "' + esc(e.title || "") + '",\n' +
+      '    desc: "' + esc(e.desc || "") + '",\n' +
+      '    book: "' + esc(e.book || "") + '",\n' +
+      '    chapter: "' + esc(e.chapter || "") + '",\n' +
+      '    section: "' + esc(e.section || "") + '",\n' +
+      '    url: "' + esc(e.url || "") + '",\n' +
+      "    tags: [" + tags + "],\n" +
+      '    type: "' + esc(e.type || "练习") + '"\n' +
+      "  }"
+    );
+  }
+
+  // 用当前 window.MANIFEST 重新生成完整的 data/resources.js
+  function serializeManifest() {
+    const list = window.MANIFEST || [];
+    return (
+      "/*\n" +
+      " * 高中物理教学资源库 —— 预置资源清单（manifest）\n" +
+      " * 由“资源发布/编辑/删除”自动维护，请勿手工改这份再被覆盖。\n" +
+      " */\n" +
+      "window.MANIFEST = [\n" +
+      list.map((e) => "  " + entryToJs(e)).join(",\n") +
+      "\n];\n"
+    );
+  }
+
+  async function saveManifest(token, message) {
+    const newSource = serializeManifest();
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const mf = await ghGetContents(token, "data/resources.js");
+        await ghPutFile(token, "data/resources.js", b64(newSource), message, mf.sha);
+        return;
+      } catch (e) {
+        if (e.message && /409|does not match/i.test(e.message)) continue;
+        throw e;
+      }
+    }
+    throw new Error("保存清单冲突，请稍后重试");
+  }
+
+  async function ghDeleteFile(token, path, message) {
+    const cur = await ghGetContents(token, path);
+    const res = await fetch(
+      "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO + "/contents/" + path,
+      {
+        method: "DELETE",
+        headers: Object.assign({}, ghHeaders(token), { "Content-Type": "application/json" }),
+        body: JSON.stringify({ message: message, sha: cur.sha, branch: PUBLISH_BRANCH }),
+      }
+    );
+    if (!res.ok) throw new Error("删除文件失败（" + res.status + "）");
+    return await res.json();
+  }
+
+  // 删除资源：从清单移除并删除 pages/ 下的文件
+  async function deleteResource(res) {
+    const token = getPublishToken();
+    if (!token) throw new Error("请先登录管理员");
+    // 尝试删除文件（若文件不存在则跳过）
+    if (res.url && res.url.indexOf("pages/") === 0) {
+      try {
+        await ghDeleteFile(token, res.url, "删除资源：" + res.title);
+      } catch (e) {
+        if (!/404|422|失败/.test(e.message)) throw e;
+      }
+    }
+    window.MANIFEST = window.MANIFEST.filter((e) => e.id !== res.id);
+    await saveManifest(token, "删除资源：" + res.title);
+    baseList = [...(window.MANIFEST || []), ...uploadedList];
+    render();
+  }
+
+  // 编辑资源：更新清单里的字段，并可选换新文件
+  async function updateResource(rec) {
+    const token = getPublishToken();
+    if (!token) throw new Error("请先登录管理员");
+    const idx = window.MANIFEST.findIndex((e) => e.id === rec.id);
+    const old = window.MANIFEST[idx];
+    if (!old) throw new Error("找不到要编辑的资源");
+
+    // 若上传了新文件，则写入并更新 url
+    let url = old.url || "";
+    if (rec.contentB64) {
+      const path = "pages/" + slugPath(rec.title, rec.fileExt);
+      await ghPutFile(token, path, rec.contentB64, "更新资源文件：" + rec.title);
+      url = path;
+      // 文件路径变了则删旧文件
+      if (old.url && old.url !== path && old.url.indexOf("pages/") === 0) {
+        try { await ghDeleteFile(token, old.url, "移除旧文件：" + rec.title); } catch (e) {}
+      }
+    }
+
+    window.MANIFEST[idx] = {
+      id: old.id,
+      title: rec.title,
+      desc: rec.desc || "",
+      book: rec.book || "",
+      chapter: rec.chapter || "",
+      section: rec.section || "",
+      url: url,
+      tags: rec.tags || [],
+      type: rec.type || "练习",
+    };
+    await saveManifest(token, "编辑资源：" + rec.title);
+    baseList = [...(window.MANIFEST || []), ...uploadedList];
+    render();
   }
 
   // ---------- 上传弹窗 ----------
@@ -630,14 +767,37 @@
     $("#adminLoggedInRow").style.display = has ? "block" : "none";
   }
 
-  function openModal() {
+  function openModal(res) {
+    editingId = res ? res.id : null;
     populateTypeSelect();
     populateBookSelect();
-    populateChapterSelect();
-    populateSectionSelect();
-    $("#fTitle").value = "";
-    $("#fDesc").value = "";
-    $("#fTags").value = "";
+
+    if (res) {
+      // 编辑模式：回填现有字段
+      $("#fTitle").value = res.title || "";
+      $("#fDesc").value = res.desc || "";
+      $("#fTags").value = (res.tags || []).join(" ");
+      if (res.type) $("#fType").value = res.type;
+      refreshTypeUI();
+      if (res.book) $("#fBook").value = res.book;
+      populateChapterSelect();
+      if (res.chapter) $("#fChapter").value = res.chapter;
+      populateSectionSelect();
+      if (res.section) $("#fSection").value = res.section;
+      var dzSmall = $("#dropzone small");
+      if (dzSmall) dzSmall.textContent = "选新文件可替换内容（不选则保留原文件）";
+      $("#modalTitle").textContent = "编辑资源";
+      $("#saveResource").textContent = "保存修改";
+    } else {
+      // 新增
+      $("#fTitle").value = "";
+      $("#fDesc").value = "";
+      $("#fTags").value = "";
+      $("#modalTitle").textContent = "上传资源";
+      $("#saveResource").textContent = "保存资源";
+      var dzSmall2 = $("#dropzone small");
+      if (dzSmall2) dzSmall2.textContent = "支持 HTML / PDF / Word / PPT / Excel / 图片 / 视频 / 压缩包等";
+    }
     clearPendingFile();
     mask.classList.add("show");
     setTimeout(() => $("#fTitle").focus(), 50);
@@ -706,32 +866,28 @@
     $("#fileName").textContent = "";
   }
 
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(bufToBase64(fr.result));
+      fr.onerror = () => reject(fr.error);
+      fr.readAsArrayBuffer(file);
+    });
+  }
+
   async function saveResource() {
     const title = $("#fTitle").value.trim();
     if (!title) {
       toast("请填写资源名称", true);
       return;
     }
-    if (!pendingFile) {
-      toast("请先选择一个 HTML 文件", true);
-      return;
-    }
-
-    // 读取文件字节并转 base64（HTML 与二进制统一处理）
-    const contentB64 = await new Promise((resolve, reject) => {
-      const fr = new FileReader();
-      fr.onload = () => resolve(bufToBase64(fr.result));
-      fr.onerror = () => reject(fr.error);
-      fr.readAsArrayBuffer(pendingFile);
-    }).catch((e) => {
-      toast("读取文件失败：" + (e && e.message), true);
-    });
-    if (!contentB64) return;
-
-    const fileExt = (/\.[^.]*$/.exec(pendingFile.name) || [null, ".html"])[1].toLowerCase();
     const isPaper = isPaperType();
+    const fileExt = pendingFile
+      ? (/\.[^.]*$/.exec(pendingFile.name) || [null, ".html"])[1].toLowerCase()
+      : undefined;
+
     const rec = {
-      id: "r" + Date.now() + Math.random().toString(36).slice(2, 7),
+      id: editingId || ("r" + Date.now() + Math.random().toString(36).slice(2, 7)),
       title,
       book: $("#fBook").value,
       chapter: $("#fChapter").value,
@@ -744,9 +900,19 @@
         .filter(Boolean),
       type: isPaper ? "试卷" : $("#fType").value,
       fileExt,
-      contentB64,
+      contentB64: null,
       createdAt: Date.now(),
     };
+
+    // 若选择了新文件，读取其字节
+    if (pendingFile) {
+      const contentB64 = await readFileAsBase64(pendingFile).catch((e) => {
+        toast("读取文件失败：" + (e && e.message), true);
+        return null;
+      });
+      if (!contentB64) return;
+      rec.contentB64 = contentB64;
+    }
 
     if (!getPublishToken()) {
       toast("请先点击“🔑 管理员登录”输入令牌", true);
@@ -754,7 +920,24 @@
       return;
     }
 
-    // 只有管理员（有令牌）能上传：发布到线上，写入仓库并登记，所有人可见
+    if (editingId) {
+      // 编辑：更新线上清单（可选替换文件）
+      try {
+        await updateResource(rec);
+        await loadAll();
+        closeModal();
+        toast("已保存修改");
+      } catch (e) {
+        toast("保存失败：" + e.message, true);
+      }
+      return;
+    }
+
+    // 新增：发布到线上
+    if (!pendingFile) {
+      toast("请先选择一个文件", true);
+      return;
+    }
     try {
       const path = await publishResource(rec);
       const published = {
@@ -802,7 +985,7 @@
     };
     applyNavState();
 
-    $("#uploadBtn").onclick = openModal;
+    $("#uploadBtn").onclick = () => openModal();
     $("#adminBtn").onclick = openAdminModal;
     $("#closeModal").onclick = closeModal;
     $("#cancelModal").onclick = closeModal;

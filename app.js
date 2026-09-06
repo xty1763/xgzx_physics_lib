@@ -480,19 +480,18 @@
       .replace(/\n/g, "\\n");
   }
 
-  // 生成安全的 ASCII 文件名（保留真实扩展名，便于 GitHub Pages 正确响应）
+  // 用资源标题生成文件名（保留中文，下载时按标题显示；只替换非法字符）
   function slugPath(name, ext) {
     const fileExt = ext && /^\.[a-z0-9]+$/i.test(ext) ? ext.toLowerCase() : ".html";
     const base =
       String(name || "")
-        .replace(/\.[a-zA-Z0-9]+$/, "")
-        .replace(/[^a-z0-9]+/gi, "-")
-        .replace(/^-+|-+$/g, "")
+        .replace(/\.[a-zA-Z0-9]+$/, "")     // 去掉已有扩展名
+        .replace(/[\\/:*?"<>|]/g, "-")      // 非法文件名字符
+        .replace(/\s+/g, "-")               // 空格 -> -
         .replace(/-+/g, "-")
-        .toLowerCase()
-        .slice(0, 40) || "resource";
-    const rand = Math.random().toString(36).slice(2, 7);
-    return "res-" + base + "-" + rand + fileExt;
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 50) || "resource";
+    return base + fileExt;
   }
 
   async function ghGetContents(token, path) {
@@ -561,10 +560,24 @@
   async function publishResource(rec) {
     const token = getPublishToken();
     if (!token) throw new Error("请先填写 GitHub 访问令牌");
-    const path = "pages/" + slugPath(rec.title, rec.fileExt);
     const message = "新增资源：" + rec.title;
-    // 1) 上传文件（HTML / PDF / DOCX 等二进制均可）
-    await ghPutFile(token, path, rec.contentB64, message);
+    // 1) 上传文件（HTML / PDF / DOCX 等二进制均可）；同名标题撞名时加序号
+    let path = "pages/" + slugPath(rec.title, rec.fileExt);
+    for (let dup = 0; dup < 30; dup++) {
+      try {
+        await ghPutFile(token, path, rec.contentB64, message);
+        break;
+      } catch (e) {
+        if (/409|422|already exists|sha was not supplied|does not match/i.test(e.message) && dup < 29) {
+          const dot = path.lastIndexOf(".");
+          const stem = dot > -1 ? path.slice(0, dot) : path;
+          const dotExt = dot > -1 ? path.slice(dot) : "";
+          path = stem + "-" + (dup + 2) + dotExt;
+        } else {
+          throw e;
+        }
+      }
+    }
     // 2) 更新 data/resources.js 登记（并发冲突时自动重读取并重试）
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
@@ -627,14 +640,25 @@
     throw new Error("保存清单冲突，请稍后重试");
   }
 
+  // 只取文件的 sha，不解码内容（二进制文件解码会抛错）
+  async function ghGetSha(token, path) {
+    const url =
+      "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO +
+      "/contents/" + path + "?ref=" + PUBLISH_BRANCH;
+    const res = await fetch(url, { headers: ghHeaders(token) });
+    if (!res.ok) throw new Error("读取文件失败（" + res.status + "）");
+    const data = await res.json();
+    return data.sha;
+  }
+
   async function ghDeleteFile(token, path, message) {
-    const cur = await ghGetContents(token, path);
+    const sha = await ghGetSha(token, path);
     const res = await fetch(
       "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO + "/contents/" + path,
       {
         method: "DELETE",
         headers: Object.assign({}, ghHeaders(token), { "Content-Type": "application/json" }),
-        body: JSON.stringify({ message: message, sha: cur.sha, branch: PUBLISH_BRANCH }),
+        body: JSON.stringify({ message: message, sha: sha, branch: PUBLISH_BRANCH }),
       }
     );
     if (!res.ok) throw new Error("删除文件失败（" + res.status + "）");

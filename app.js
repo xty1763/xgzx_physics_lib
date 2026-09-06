@@ -22,6 +22,17 @@
   let pendingFile = null;            // 当前选中的待上传文件
 
   const $ = (sel) => document.querySelector(sel);
+  const NAV_KEY = "nav_collapsed";
+
+  // 收起/展开左侧导航栏（记住偏好）
+  function applyNavState() {
+    const hidden = (function () {
+      try { return localStorage.getItem(NAV_KEY) === "1"; } catch (e) { return false; }
+    })();
+    document.querySelector(".layout").classList.toggle("no-sidebar", hidden);
+    const btn = $("#navToggle");
+    if (btn) btn.textContent = hidden ? "☰ 导航" : "☰";
+  }
 
   // ---------- 工具 ----------
   const bookOf = (id) => COURSE.books.find((b) => b.id === id);
@@ -782,6 +793,14 @@
         render();
       }, 150);
     });
+
+    $("#navToggle").onclick = () => {
+      const layout = document.querySelector(".layout");
+      const hidden = layout.classList.toggle("no-sidebar");
+      try { localStorage.setItem(NAV_KEY, hidden ? "1" : "0"); } catch (e) {}
+      applyNavState();
+    };
+    applyNavState();
 
     $("#uploadBtn").onclick = openModal;
     $("#adminBtn").onclick = openAdminModal;

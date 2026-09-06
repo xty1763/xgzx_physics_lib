@@ -99,6 +99,12 @@ a { color: inherit; text-decoration: none; }
   align-items: start;
 }
 
+/* 收起左侧导航：内容区占满 */
+.layout.no-sidebar { grid-template-columns: 1fr; }
+.layout.no-sidebar .sidebar { display: none; }
+
+.iconbtn { width: 40px; justify-content: center; padding: 10px 0; font-size: 17px; }
+
 /** 侧栏导航 */
 .sidebar {
   position: sticky;

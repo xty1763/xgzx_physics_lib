@@ -15,7 +15,7 @@
     type: "all"      // "all" 或资源类型
   };
 
-  const openBooks = new Set();       // 展开的教材
+  const openBooks = new Set(COURSE.books.map((b) => b.id)); // 默认展开全部教材，便于直接点章节
   const openChapters = new Set();    // 展开的章节
   let baseList = [];                 // 预置清单 + 本地上传
   const objUrlCache = {};            // id -> objectURL（只在上传资源用）
@@ -180,13 +180,11 @@
         "<span class='count'>" + bookCount + "</span>" +
         "<span class='chev'>▶</span>";
       bhead.onclick = () => {
-        if (openBooks.has(book.id)) openBooks.delete(book.id);
-        else openBooks.add(book.id);
-        if (state.book !== book.id) {
-          state.book = book.id;
-          state.chapter = null;
-          state.section = null;
-        }
+        // 点教材 = 选中该教材并展开其章节
+        openBooks.add(book.id);
+        state.book = book.id;
+        state.chapter = null;
+        state.section = null;
         render();
       };
       bwrap.appendChild(bhead);
@@ -208,13 +206,12 @@
           "<span class='count'>" + chCount + "</span>" +
           "<span class='chev'>▶</span>";
         chead.onclick = () => {
-          if (openChapters.has(ch.id)) openChapters.delete(ch.id);
-          else openChapters.add(ch.id);
-          if (state.chapter !== ch.id) {
-            state.chapter = ch.id;
-            state.section = null;
-            state.book = book.id;
-          }
+          // 点章节 = 选中该书章节并展开其小节
+          openBooks.add(book.id);
+          openChapters.add(ch.id);
+          state.book = book.id;
+          state.chapter = ch.id;
+          state.section = null;
           render();
         };
         cwrap.appendChild(chead);
@@ -338,7 +335,7 @@
     return card;
   }
 
-  // 按“教材 · 章节”分组渲染资源卡片（保持课程顺序）
+  // 平铺渲染资源卡片；范围由左侧栏/类型/搜索决定（选择章节后只显示该章节内容）
   function renderGrid() {
     const grid = $("#grid");
     const list = visible();
@@ -352,50 +349,7 @@
       return;
     }
 
-    // 先按章节分组（未分章归为一组）
-    const groupMap = new Map();
-    const groupOrder = [];
-    list.forEach((raw) => {
-      const cid = raw.chapter || "";
-      if (!groupMap.has(cid)) {
-        groupMap.set(cid, []);
-        groupOrder.push(cid);
-      }
-      groupMap.get(cid).push(raw);
-    });
-
-    // 重组顺序：优先按课程里的教材→章节顺序，其余（旧数据/未分章）放最后
-    const ordered = [];
-    const seen = new Set();
-    COURSE.books.forEach((b) =>
-      b.chapters.forEach((c) => {
-        if (groupMap.has(c.id)) {
-          ordered.push(c.id);
-          seen.add(c.id);
-        }
-      })
-    );
-    groupOrder.forEach((cid) => {
-      if (cid !== "" && !seen.has(cid)) {
-        ordered.push(cid);
-        seen.add(cid);
-      }
-    });
-    if (groupMap.has("")) ordered.push("");
-
-    ordered.forEach((cid) => {
-      const items = groupMap.get(cid);
-      let label;
-      if (cid) label = (bookTitle(items[0].book) || "") + " · " + chapterTitle(cid);
-      else label = "未分章节";
-      const head = document.createElement("div");
-      head.className = "group-head";
-      head.innerHTML =
-        "<span class='g-title'>" + label + "</span>" +
-        "<span class='g-count'>" + items.length + "</span>";
-      grid.appendChild(head);
-      items.forEach((raw) => grid.appendChild(buildCard(raw)));
-    });
+    list.forEach((raw) => grid.appendChild(buildCard(raw)));
   }
 
   function render() {

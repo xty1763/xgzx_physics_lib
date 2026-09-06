@@ -180,11 +180,17 @@
         "<span class='count'>" + bookCount + "</span>" +
         "<span class='chev'>▶</span>";
       bhead.onclick = () => {
-        // 点教材 = 选中该教材并展开其章节
-        openBooks.add(book.id);
-        state.book = book.id;
-        state.chapter = null;
-        state.section = null;
+        // 点未选中的教材：选中它并展开章节；点已选中的教材：切换章节列表展开/收起
+        if (state.book !== book.id) {
+          state.book = book.id;
+          state.chapter = null;
+          state.section = null;
+          openBooks.add(book.id);
+        } else if (openBooks.has(book.id)) {
+          openBooks.delete(book.id);
+        } else {
+          openBooks.add(book.id);
+        }
         render();
       };
       bwrap.appendChild(bhead);
@@ -206,12 +212,18 @@
           "<span class='count'>" + chCount + "</span>" +
           "<span class='chev'>▶</span>";
         chead.onclick = () => {
-          // 点章节 = 选中该书章节并展开其小节
-          openBooks.add(book.id);
-          openChapters.add(ch.id);
-          state.book = book.id;
-          state.chapter = ch.id;
-          state.section = null;
+          // 点未选中的章节：选中它并展开小节；点已选中的章节：切换小节展开/收起
+          if (state.chapter !== ch.id) {
+            state.chapter = ch.id;
+            state.section = null;
+            if (state.book !== book.id) state.book = book.id;
+            openBooks.add(book.id);
+            openChapters.add(ch.id);
+          } else if (openChapters.has(ch.id)) {
+            openChapters.delete(ch.id);
+          } else {
+            openChapters.add(ch.id);
+          }
           render();
         };
         cwrap.appendChild(chead);

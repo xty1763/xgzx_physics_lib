@@ -1040,6 +1040,8 @@
   // ---------- 启动 ----------
   document.addEventListener("DOMContentLoaded", () => {
     $("#subjectSub").textContent = COURSE.subject || "";
+    const yearEl = $("#year");
+    if (yearEl) yearEl.textContent = new Date().getFullYear();
     bindEvents();
     refreshAdminUI(); // 依据本地令牌决定是否显示“上传资源”按钮
     loadAll()

@@ -50,5 +50,16 @@ window.MANIFEST = [
     url: "pages/res-resource-wjr3u.html",
     tags: [],
     type: "仿真资源"
+  },
+  {
+    id: "r17886866758680dg9w",
+    title: "电话手表申请单",
+    desc: "",
+    book: "",
+    chapter: "",
+    section: "",
+    url: "pages/res-resource-mp778.docx",
+    tags: [],
+    type: "练习"
   }
 ];

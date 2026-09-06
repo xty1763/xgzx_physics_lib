@@ -280,6 +280,65 @@
     });
   }
 
+  function buildCard(raw) {
+    const r = openable(raw);
+    const card = document.createElement("article");
+    card.className = "card";
+
+    const typeBadge =
+      '<span class="type' + (isUploaded(r) ? " uploaded" : "") + '">' +
+      (r.type || "资源") +
+      "</span>";
+
+    const metaParts = [];
+    if (bookTitle(r.book)) metaParts.push(bookTitle(r.book));
+    if (chapterTitle(r.chapter)) metaParts.push(chapterTitle(r.chapter));
+    if (r.section && sectionTitle(r.section)) metaParts.push(sectionTitle(r.section));
+    const meta =
+      '<div class="meta">' +
+      (metaParts.length
+        ? metaParts.map((p) => "<b>" + p + "</b>").join(" · ")
+        : "<b>未分教材</b>") +
+      "</div>";
+
+    const tags =
+      r.tags && r.tags.length
+        ? '<div class="tags">' +
+          r.tags.map((t) => '<span class="tag">' + t + "</span>").join("") +
+          "</div>"
+        : "";
+
+    card.innerHTML =
+      typeBadge +
+      "<h3>" +
+      (r.title || "未命名资源") +
+      "</h3>" +
+      (r.desc ? "<p>" + r.desc + "</p>" : "<p></p>") +
+      meta +
+      tags +
+      '<div class="open">↗ 打开资源</div>';
+
+    card.onclick = () => openResource(r);
+
+    if (isUploaded(r)) {
+      const del = document.createElement("button");
+      del.className = "close";
+      del.type = "button";
+      del.setAttribute("aria-label", "删除");
+      del.style.cssText =
+        "position:absolute;top:12px;left:12px;background:none;border:none;font-size:14px;cursor:pointer;color:var(--text-soft);";
+      del.textContent = "🗑";
+      del.title = "删除该上传资源";
+      del.onclick = (e) => {
+        e.stopPropagation();
+        removeUpload(r);
+      };
+      card.appendChild(del);
+    }
+    return card;
+  }
+
+  // 按“教材 · 章节”分组渲染资源卡片（保持课程顺序）
   function renderGrid() {
     const grid = $("#grid");
     const list = visible();
@@ -288,71 +347,54 @@
     if (!list.length) {
       const e = document.createElement("div");
       e.className = "empty";
-      e.innerHTML =
-        "<b>暂无匹配的资源</b><br/>试试调整搜索关键词或分类筛选。";
+      e.innerHTML = "<b>暂无匹配的资源</b><br/>试试调整搜索关键词或分类筛选。";
       grid.appendChild(e);
       return;
     }
 
+    // 先按章节分组（未分章归为一组）
+    const groupMap = new Map();
+    const groupOrder = [];
     list.forEach((raw) => {
-      const r = openable(raw);
-      const card = document.createElement("article");
-      card.className = "card";
-
-      const typeBadge =
-        '<span class="type' + (isUploaded(r) ? " uploaded" : "") + '">' +
-        (r.type || "资源") +
-        "</span>";
-
-      const metaParts = [];
-      if (bookTitle(r.book)) metaParts.push(bookTitle(r.book));
-      if (chapterTitle(r.chapter)) metaParts.push(chapterTitle(r.chapter));
-      if (r.section && sectionTitle(r.section)) metaParts.push(sectionTitle(r.section));
-      const meta =
-        '<div class="meta">' +
-        (metaParts.length
-          ? metaParts.map((p) => "<b>" + p + "</b>").join(" · ")
-          : "<b>未分教材</b>") +
-        "</div>";
-
-      const tags =
-        (r.tags && r.tags.length
-          ? '<div class="tags">' +
-            r.tags
-              .map((t) => '<span class="tag">' + t + "</span>")
-              .join("") +
-            "</div>"
-          : "");
-
-      card.innerHTML =
-        typeBadge +
-        "<h3>" +
-        (r.title || "未命名资源") +
-        "</h3>" +
-        (r.desc ? "<p>" + r.desc + "</p>" : "<p></p>") +
-        meta +
-        tags +
-        '<div class="open">↗ 打开资源</div>';
-
-      card.onclick = () => openResource(r);
-
-      if (isUploaded(r)) {
-        const del = document.createElement("button");
-        del.className = "close";
-        del.type = "button";
-        del.setAttribute("aria-label", "删除");
-        del.style.cssText =
-          "position:absolute;top:12px;left:12px;background:none;border:none;font-size:14px;cursor:pointer;color:var(--text-soft);";
-        del.textContent = "🗑";
-        del.title = "删除该上传资源";
-        del.onclick = (e) => {
-          e.stopPropagation();
-          removeUpload(r);
-        };
-        card.appendChild(del);
+      const cid = raw.chapter || "";
+      if (!groupMap.has(cid)) {
+        groupMap.set(cid, []);
+        groupOrder.push(cid);
       }
+      groupMap.get(cid).push(raw);
+    });
 
-      grid.appendChild(card);
+    // 重组顺序：优先按课程里的教材→章节顺序，其余（旧数据/未分章）放最后
+    const ordered = [];
+    const seen = new Set();
+    COURSE.books.forEach((b) =>
+      b.chapters.forEach((c) => {
+        if (groupMap.has(c.id)) {
+          ordered.push(c.id);
+          seen.add(c.id);
+        }
+      })
+    );
+    groupOrder.forEach((cid) => {
+      if (cid !== "" && !seen.has(cid)) {
+        ordered.push(cid);
+        seen.add(cid);
+      }
+    });
+    if (groupMap.has("")) ordered.push("");
+
+    ordered.forEach((cid) => {
+      const items = groupMap.get(cid);
+      let label;
+      if (cid) label = (bookTitle(items[0].book) || "") + " · " + chapterTitle(cid);
+      else label = "未分章节";
+      const head = document.createElement("div");
+      head.className = "group-head";
+      head.innerHTML =
+        "<span class='g-title'>" + label + "</span>" +
+        "<span class='g-count'>" + items.length + "</span>";
+      grid.appendChild(head);
+      items.forEach((raw) => grid.appendChild(buildCard(raw)));
     });
   }
 

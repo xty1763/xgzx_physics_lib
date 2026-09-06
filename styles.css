@@ -14,9 +14,14 @@
 
 * { box-sizing: border-box; }
 
-html, body {
-  margin: 0;
+html {
   height: 100%;
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", Roboto, Helvetica, Arial, sans-serif;
@@ -102,9 +107,11 @@ a { color: inherit; text-decoration: none; }
   grid-template-columns: 260px 1fr;
   gap: 22px;
   max-width: 1280px;
+  width: 100%;
   margin: 0 auto;
   padding: 22px;
   align-items: start;
+  flex: 1 0 auto; /* 撑开中间内容，把页脚压到底部 */
 }
 
 /* 收起左侧导航：内容区占满 */
@@ -309,30 +316,37 @@ a { color: inherit; text-decoration: none; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.bad { background: #c0392b; }
 
-/* ===== 页脚 ===== */
+/* ===== 页脚（贴底 + 居中） ===== */
 .footer {
-  margin-top: 30px;
+  margin-top: auto;
   border-top: 1px solid var(--line);
   background: #fff;
 }
 .footer-inner {
   max-width: 1280px;
+  width: 100%;
   margin: 0 auto;
   padding: 26px 22px 30px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
+  text-align: center;
   color: var(--text-soft);
   font-size: 13px;
 }
-.footer-meta { min-width: 0; }
-.footer-name { font-weight: 800; font-size: 15px; color: var(--text); }
-.footer-school { margin-top: 3px; }
+.footer-name { font-weight: 800; font-size: 16px; color: var(--text); }
+.footer-school { color: var(--text); }
 .footer-contacts a { color: var(--brand); text-decoration: none; font-weight: 600; }
 .footer-contacts a:hover { text-decoration: underline; }
-.footer-copy { width: 100%; border-top: 1px dashed var(--line); padding-top: 12px; text-align: center; color: var(--text-soft); }
+.footer-copy {
+  margin-top: 6px;
+  border-top: 1px dashed var(--line);
+  padding-top: 12px;
+  width: 100%;
+  text-align: center;
+  color: var(--text-soft);
+}
 
 /* ===== 在线发布 ===== */
 .publish-opt {

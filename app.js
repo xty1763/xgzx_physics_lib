@@ -830,7 +830,8 @@
     setPublishToken(t);
     closeAdminModal();
     refreshAdminUI();
-    toast("已登录，上传入口已开启");
+    render(); // 立即让卡片出现“编辑/删除”
+    toast("已登录，上传与编辑入口已开启");
   }
 
   function clearToken() {
@@ -840,6 +841,7 @@
     } catch (e) {}
     closeAdminModal();
     refreshAdminUI();
+    render(); // 移除卡片上的“编辑/删除”
     toast("已退出，上传入口已隐藏");
   }
 

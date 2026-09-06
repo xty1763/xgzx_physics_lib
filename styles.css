@@ -309,6 +309,31 @@ a { color: inherit; text-decoration: none; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.bad { background: #c0392b; }
 
+/* ===== 页脚 ===== */
+.footer {
+  margin-top: 30px;
+  border-top: 1px solid var(--line);
+  background: #fff;
+}
+.footer-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 26px 22px 30px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+.footer-meta { min-width: 0; }
+.footer-name { font-weight: 800; font-size: 15px; color: var(--text); }
+.footer-school { margin-top: 3px; }
+.footer-contacts a { color: var(--brand); text-decoration: none; font-weight: 600; }
+.footer-contacts a:hover { text-decoration: underline; }
+.footer-copy { width: 100%; border-top: 1px dashed var(--line); padding-top: 12px; text-align: center; color: var(--text-soft); }
+
 /* ===== 在线发布 ===== */
 .publish-opt {
   display: flex; align-items: flex-start; gap: 10px;

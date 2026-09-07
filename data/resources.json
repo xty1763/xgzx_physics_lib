@@ -35,33 +35,17 @@
     "type": "仿真资源"
   },
   {
-    "id": "r1788784482171jyir6",
-    "title": "一维碰撞",
+    "id": "r1788784692089aevjx",
+    "title": "小车追击",
     "desc": "",
-    "book": "b4",
-    "chapter": "b4c1",
+    "book": "b1",
+    "chapter": "b1c2",
     "section": "",
-    "url": "pages/一维碰撞.html",
+    "url": "pages/小车追击.html",
     "tags": [
-      "一维碰撞",
-      "动量",
+      "小车追击",
       "仿真资源"
     ],
-    "type": "练习"
-  },
-  {
-    "id": "r1788784531551lx368",
-    "title": "一维碰撞",
-    "desc": "",
-    "book": "b4",
-    "chapter": "b4c1",
-    "section": "",
-    "url": "pages/一维碰撞-2.html",
-    "tags": [
-      "一维碰撞",
-      "动量",
-      "仿真资源"
-    ],
-    "type": "练习"
+    "type": "仿真资源"
   }
 ]

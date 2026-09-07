@@ -985,6 +985,193 @@
     }
   }
 
+  // ---------- 资源助手 ----------
+  const CN = {
+    "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8,
+    "九": 9, "十": 10, "十一": 11, "十二": 12, "十三": 13,
+  };
+  function cnNum(w) {
+    if (CN[w] != null) return CN[w];
+    if (w.charAt(0) === "十") return 10 + (CN[w.slice(1)] || 0);
+    return null;
+  }
+  function parseChapterNum(s) {
+    const m = s.match(/第([一二三四五六七八九十]+|\d{1,2})章/);
+    if (!m) return null;
+    const w = m[1];
+    return /^\d+$/.test(w) ? parseInt(w, 10) : cnNum(w);
+  }
+
+  const BOOK_ALIASES = [
+    { id: "b1", names: ["必修第一册", "必修一", "必修1", "高一上"] },
+    { id: "b2", names: ["必修第二册", "必修二", "必修2", "高一下"] },
+    { id: "b3", names: ["必修第三册", "必修三", "必修3", "高二上"] },
+    { id: "b4", names: ["选择性必修第一册", "选择性必修一", "选必一", "选必1", "选修一"] },
+    { id: "b5", names: ["选择性必修第二册", "选择性必修二", "选必二", "选必2", "选修二"] },
+    { id: "b6", names: ["选择性必修第三册", "选择性必修三", "选必三", "选必3", "选修三"] },
+  ];
+  function detectBook(s) {
+    for (const b of BOOK_ALIASES) for (const n of b.names) if (s.indexOf(n) > -1) return b.id;
+    return null;
+  }
+
+  function detectType(s) {
+    if (/仿真|模拟|动画|交互|演示/.test(s)) return "仿真资源";
+    if (/教案|教学设计|导学案/.test(s)) return "教案";
+    if (/课件|幻灯片|演示文稿|\bppt\b/i.test(s)) return "课件";
+    if (/试卷|试题|卷子|考试|测验/.test(s)) return "试卷";
+    if (/练习|习题|作业|题目/.test(s)) return "练习";
+    return null;
+  }
+
+  function detectLoc(s, bookId) {
+    const wantNum = parseChapterNum(s);
+    const books = COURSE.books.filter((b) => !bookId || b.id === bookId);
+    let chapter = null, section = null;
+    if (wantNum) {
+      for (const b of books)
+        for (const c of b.chapters)
+          if (parseChapterNum(c.title) === wantNum) { chapter = c.id; break; }
+    }
+    if (!chapter) {
+      for (const b of books)
+        for (const c of b.chapters)
+          for (const sec of c.sections) {
+            const phrase = sec.title.replace(/^\s*\d+(\.\d+)*\s*/, "");
+            if (phrase.length >= 3 && s.indexOf(phrase) > -1) { chapter = c.id; section = sec.id; break; }
+          }
+    }
+    if (!chapter) {
+      for (const b of books)
+        for (const c of b.chapters) {
+          const phrase = c.title.replace(/第[一二三四五六七八九十]+章\s*/, "");
+          if (phrase.length >= 3 && s.indexOf(phrase) > -1) { chapter = c.id; break; }
+        }
+    }
+    return { chapter: chapter, section: section };
+  }
+
+  function searchAssistant(s) {
+    const bookId = detectBook(s);
+    const type = detectType(s);
+    const loc = detectLoc(s, bookId);
+
+    let pool = baseList.slice();
+    if (bookId) pool = pool.filter((r) => r.book === bookId);
+    if (type) pool = pool.filter((r) => r.type === type);
+    if (loc && loc.section) pool = pool.filter((r) => r.section === loc.section);
+    else if (loc && loc.chapter) pool = pool.filter((r) => r.chapter === loc.chapter);
+
+    const drop = /必修第?[一二三0-9]|选择性必修|选必|选修|高一上|高一下|高二上|练习|习题|作业|试卷|试题|课件|教案|教学设计|导学案|仿真|模拟|动画|演示|交互/;
+    const words = s.split(/[,\s，。、]+/).filter((w) => w.length >= 2 && !drop.test(w));
+    if (words.length) {
+      pool = pool.filter((r) => {
+        const hay = [
+          r.title, r.desc, (r.tags || []).join(" "),
+          bookTitle(r.book), chapterTitle(r.chapter), sectionTitle(r.section),
+        ].join(" ").toLowerCase();
+        return words.every((w) => hay.indexOf(w) > -1);
+      });
+    }
+    return { pool: pool, book: bookId, type: type, loc: loc, keywords: words };
+  }
+
+  function htmlEscape(s) {
+    return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function resLabel(r) {
+    const parts = [];
+    if (bookTitle(r.book)) parts.push(bookTitle(r.book));
+    if (chapterTitle(r.chapter)) parts.push(chapterTitle(r.chapter).replace(/第[一二三四五六七八九十]+章\s*/, ""));
+    if (r.section && sectionTitle(r.section)) parts.push(sectionTitle(r.section).replace(/^\s*\d+(\.\d+)*\s*/, ""));
+    return parts.join(" · ");
+  }
+
+  function assistantReply(q) {
+    const res = searchAssistant(q);
+    const list = res.pool;
+    const filter = { book: res.book, chapter: res.loc && res.loc.chapter, section: res.loc && res.loc.section, type: res.type };
+    if (list.length === 0) {
+      if (res.loc && res.loc.chapter)
+        return { text: "这个范围（" + (res.loc.section ? sectionTitle(res.loc.section) : chapterTitle(res.loc.chapter)) + "）暂时还没有已上传的资源。换个关键词或去对应章节看看。", resources: [], filter: filter };
+      return {
+        text: "没找到相关资源。试试这样问：\n• 必修一 第二章 自由落体 课件\n• 仿真资源\n• 小船过河 ",
+        resources: [], filter: filter,
+      };
+    }
+    let text = "为你找到 " + list.length + " 个相关资源：";
+    if (res.loc && res.loc.chapter)
+      text += "（已定位到 " + (res.loc.section ? sectionTitle(res.loc.section) : chapterTitle(res.loc.chapter)) + "）";
+    return { text: text, resources: list, filter: filter };
+  }
+
+  function addMsg(html, who) {
+    const body = $("#assistMessages");
+    const el = document.createElement("div");
+    el.className = "assist-msg " + who;
+    el.innerHTML = html;
+    body.appendChild(el);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function applyFilterFromReply(filter) {
+    state.book = filter.book || null;
+    state.chapter = filter.chapter || null;
+    state.section = filter.section || null;
+    state.type = filter.type || "all";
+    state.search = "";
+    render();
+    closeAssist();
+    const c = document.querySelector(".content");
+    if (c && typeof c.scrollIntoView === "function") c.scrollIntoView({ behavior: "smooth" });
+  }
+
+  function assistantSend() {
+    const input = $("#assistInput");
+    const q = input.value.trim();
+    if (!q) return;
+    input.value = "";
+    addMsg(htmlEscape(q), "user");
+    const reply = assistantReply(q);
+    const hitList = reply.resources.length
+      ? "<ul>" +
+        reply.resources
+          .map(
+            (r) =>
+              "<li><span class='assist-hit' data-id='" + r.id + "'>" + htmlEscape(r.title) + "</span> <small>" + htmlEscape(resLabel(r)) + "</small></li>"
+          )
+          .join("") +
+        "</ul>"
+      : "";
+    const btn = reply.resources.length
+      ? "<div class='assist-btnrow'><button class='btn ghost' type='button' data-applyfilter='1'>筛选到右侧</button></div>"
+      : "";
+    addMsg(reply.text.replace(/\n/g, "<br/>") + hitList + btn, "bot");
+
+    Array.prototype.forEach.call(document.querySelectorAll("#assistMessages .assist-hit"), (el) => {
+      el.onclick = () => {
+        const r = baseList.find((x) => x.id === el.getAttribute("data-id"));
+        if (r) openResource(r);
+      };
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("#assistMessages [data-applyfilter]"), (b) => {
+      b.onclick = () => applyFilterFromReply(reply.filter);
+    });
+  }
+
+  function openAssist() {
+    const p = $("#assistPanel");
+    p.hidden = false;
+    if ($("#assistMessages").childElementCount === 0) {
+      addMsg("你好！我是资源助手。告诉我你想找的教材/章节/类型或关键词，例如“必修一 自由落体 课件”。", "bot");
+    }
+    setTimeout(() => $("#assistInput").focus(), 50);
+  }
+  function closeAssist() {
+    $("#assistPanel").hidden = true;
+  }
+
   // ---------- 事件绑定 ----------
   function bindEvents() {
     $(".nav-all").onclick = () => {
@@ -1026,6 +1213,14 @@
     });
     $("#fChapter").addEventListener("change", populateSectionSelect);
     $("#saveResource").onclick = saveResource;
+
+    // 资源助手
+    $("#assistFab").onclick = openAssist;
+    $("#assistClose").onclick = closeAssist;
+    $("#assistSend").onclick = assistantSend;
+    $("#assistInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") assistantSend();
+    });
 
     // 管理员弹窗
     $("#closeAdminModal").onclick = closeAdminModal;

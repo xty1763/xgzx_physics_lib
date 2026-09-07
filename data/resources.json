@@ -14,13 +14,11 @@
     "id": "r1788762640995prpgs",
     "title": "波的干涉",
     "desc": "",
-    "book": "b4",
-    "chapter": "b4c3",
-    "section": "b4c3s4",
+    "book": "",
+    "chapter": "",
+    "section": "",
     "url": "pages/波的干涉.html",
-    "tags": [
-      "波的干涉"
-    ],
+    "tags": [],
     "type": "仿真资源"
   },
   {
@@ -46,6 +44,76 @@
     "url": "pages/小车追击.html",
     "tags": [
       "小车追击",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r17887851877392kphy",
+    "title": "螺旋测微",
+    "desc": "",
+    "book": "",
+    "chapter": "",
+    "section": "",
+    "url": "pages/螺旋测微.html",
+    "tags": [
+      "螺旋测微",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788785344273ceoth",
+    "title": "游标卡尺",
+    "desc": "",
+    "book": "",
+    "chapter": "",
+    "section": "",
+    "url": "pages/游标卡尺.html",
+    "tags": [
+      "游标卡尺",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788785350445sbhfh",
+    "title": "游标卡尺",
+    "desc": "",
+    "book": "",
+    "chapter": "",
+    "section": "",
+    "url": "pages/游标卡尺-2.html",
+    "tags": [
+      "游标卡尺",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r17887853570526z3wg",
+    "title": "游标卡尺",
+    "desc": "",
+    "book": "",
+    "chapter": "",
+    "section": "",
+    "url": "pages/游标卡尺-2-3.html",
+    "tags": [
+      "游标卡尺",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788785375451ratw9",
+    "title": "游标卡尺",
+    "desc": "",
+    "book": "",
+    "chapter": "",
+    "section": "",
+    "url": "pages/游标卡尺-2-3-4.html",
+    "tags": [
+      "游标卡尺",
       "仿真资源"
     ],
     "type": "仿真资源"

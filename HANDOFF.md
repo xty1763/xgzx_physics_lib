@@ -33,7 +33,7 @@
 
 ## 关键常量（app.js 顶部）
 - `WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"` （**目前指向 Cloudflare Worker，国内连不通，最终应改为腾讯云云函数的 HTTP 触发地址**）
-- `ASSET_V = 14`（静态资源版本号，改 app.js/index.html 后需 +1）
+- `ASSET_V = 15`（静态资源版本号，改 app.js/index.html 后需 +1）
 - 身份：`gh_publish_token`（站长 GitHub 令牌，走直连 GitHub，国内可用）；`worker_token`（授权老师走 Worker/云函数，暂不可用）
 
 ## 当前进度 / 待办
@@ -53,7 +53,7 @@
 ### ✅ 本轮收尾已完成（非腾讯云）
 - 清理废弃文件：`data/resources.js`（旧 `window.MANIFEST` 清单）已删除；`_live_resources.js` 未提交的过期副本已删除。
 - `data/resources.json` 为唯一资源清单，站点用它渲染与维护。
-- 版本号已升至 `ASSET_V = 14`（`index.html` 的 `?v=14` 同步）。
+- 版本号已升至 `ASSET_V = 15`（`index.html` 的 `?v=15` 同步）。
 - `README.md` 已更新，纠正了旧资料中对 `data/resources.js`/Cloudflare Worker 的过时表述。
 - **自动识别填表已强化**：读取文本类文件头部约 100KB 内容辅助判断；HTML 默认→仿真，PPT→课件；标题类型词优先；
   `detectBook` 改“最长匹配”（避免“必修一”误中“选择性必修一”），`detectLoc` 增加“内容含章节/小节标题反查章节”。
@@ -61,6 +61,10 @@
   `resources.json`，把内存里的 `resources` 覆盖成旧清单，导致刚存的资源消失、后续上传基于旧清单不断覆盖 GitHub（丢失较早资源）。
   现改为：发布后直接用内存 `resources` 渲染（不再重复 fetch）；`resources.json` 请求加 `cache:"no-store"`；上传弹窗每次全新重置；
   并加 `saving` 锁防止重复点击“保存”造成重复发布。
+- **编辑/删除/速度已优化**：修复“编辑换文件但标题未变时 PUT 到已存在文件报错（sha 冲突）”的 bug（现会先取目标 sha 覆盖，
+  且与其它资源重名时自动加序号）；`readFileAsBase64` 改用原生 `readAsDataURL`（更快、省内存），并对超大文件给出提示/拦截；
+  所有 GitHub API 调用加 30s 超时，避免网络卡住导致“保存/删除一直无反应”；会话内刚保存/编辑的文件提供“本地预览”，
+  管理员**立刻能打开**，无需等 GitHub Pages 部署。
 
 ### 其它可做的（非腾讯云，按需）
 - 打磨资源助手（更准、更多示例问法）、补充更多章节/示例资源、优化界面/页脚等。

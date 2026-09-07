@@ -128,7 +128,7 @@ python -m http.server 8000
 ### 版本号说明
 
 改动 `app.js` / `index.html` 后，请把 `app.js` 顶部 `ASSET_V` 和 `index.html` 里的 `?v=` **同步 +1**，
-用于破缓存。当前版本号 `ASSET_V = 14`。
+用于破缓存。当前版本号 `ASSET_V = 15`。
 
 ## 部署到 GitHub Pages（复现步骤，若换仓库）
 

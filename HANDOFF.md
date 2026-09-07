@@ -33,7 +33,7 @@
 
 ## 关键常量（app.js 顶部）
 - `WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"` （**目前指向 Cloudflare Worker，国内连不通，最终应改为腾讯云云函数的 HTTP 触发地址**）
-- `ASSET_V = 12`（静态资源版本号，改 app.js/index.html 后需 +1）
+- `ASSET_V = 13`（静态资源版本号，改 app.js/index.html 后需 +1）
 - 身份：`gh_publish_token`（站长 GitHub 令牌，走直连 GitHub，国内可用）；`worker_token`（授权老师走 Worker/云函数，暂不可用）
 
 ## 当前进度 / 待办
@@ -53,8 +53,10 @@
 ### ✅ 本轮收尾已完成（非腾讯云）
 - 清理废弃文件：`data/resources.js`（旧 `window.MANIFEST` 清单）已删除；`_live_resources.js` 未提交的过期副本已删除。
 - `data/resources.json` 为唯一资源清单，站点用它渲染与维护。
-- 版本号已升至 `ASSET_V = 12`（`index.html` 的 `?v=12` 同步）。
+- 版本号已升至 `ASSET_V = 13`（`index.html` 的 `?v=13` 同步）。
 - `README.md` 已更新，纠正了旧资料中对 `data/resources.js`/Cloudflare Worker 的过时表述。
+- **自动识别填表已强化**：读取文本类文件头部约 100KB 内容辅助判断；HTML 默认→仿真，PPT→课件；标题类型词优先；
+  `detectBook` 改“最长匹配”（避免“必修一”误中“选择性必修一”），`detectLoc` 增加“内容含章节/小节标题反查章节”。
 
 ### 其它可做的（非腾讯云，按需）
 - 打磨资源助手（更准、更多示例问法）、补充更多章节/示例资源、优化界面/页脚等。

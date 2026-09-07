@@ -46,5 +46,16 @@ window.MANIFEST = [
     url: "pages/波的叠加.html",
     tags: [],
     type: "仿真资源"
+  },
+  {
+    id: "r1788762640995prpgs",
+    title: "波的干涉",
+    desc: "",
+    book: "",
+    chapter: "",
+    section: "",
+    url: "pages/波的干涉.html",
+    tags: [],
+    type: "仿真资源"
   }
 ];

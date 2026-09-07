@@ -1,0 +1,14 @@
+name = "physics-lib"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# 普通变量（可在 .dev.vars 或 Dashboard 配置）
+[vars]
+GITHUB_OWNER = "xty1763"
+GITHUB_REPO = "xgzx_physics_lib"
+GITHUB_BRANCH = "main"
+USERS_JSON = '[{"u":"teacherA","p":"passA"}]'
+
+# Secrets 请用 wrangler 或 Dashboard 设置（不要写进文件）：
+#   GITHUB_TOKEN   GitHub 令牌（对该仓库有 Contents 读写）
+#   AUTH_SECRET    用于签名会话的随机字符串

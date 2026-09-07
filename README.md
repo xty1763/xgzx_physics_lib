@@ -19,10 +19,9 @@
 ├── publish-local.ps1        # 一键同步本地修改到线上（pull+commit+push）
 ├── data/
 │   ├── course-data.js       # 章节、小节定义（改这里扩充章节）
-│   └── resources.js         # 预置资源清单（改这里永久挂资源）
-└── pages/
-    ├── ch1-s1.html          # 第一章空白测试页
-    └── ch2-s1.html          # 第二章空白测试页
+│   └── resources.json       # 资源清单（前端与 Cloudflare Worker 共用，加资源由系统写入）
+├── pages/                   # 资源文件（HTML/PDF/Word/PPT…）
+└── worker/                  # 方案A 后端：多用户授权上传的 Cloudflare Worker
 ```
 
 ## 本地预览

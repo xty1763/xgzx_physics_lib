@@ -23,7 +23,7 @@
   const objUrlCache = {};            // id -> objectURL（只在上传资源用）
   let pendingFile = null;            // 当前选中的待上传文件
   let editingId = null;              // 正在编辑的资源 id（null = 新增）
-  const ASSET_V = 10;                // 资源版本号（缓存破）
+  const ASSET_V = 11;                // 资源版本号（缓存破）
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"; // 方案A 后端（Cloudflare Worker）
   const WORKER_TOKEN_KEY = "worker_token";
   const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
@@ -399,8 +399,10 @@
   async function handleDelete(r) {
     if (!window.confirm("确定要删除资源「" + r.title + "」吗？这会从线上仓库移除。")) return;
     try {
-      if (getWorkerToken()) await workerDelete(r);
-      else await deleteResource(r);
+      // 优先用站长 GitHub 令牌直连（国内可达、可靠）；仅授权老师(只有 Worker 令牌)才走 Worker
+      if (getPublishToken()) await deleteResource(r);
+      else if (getWorkerToken()) await workerDelete(r);
+      else throw new Error("请先登录（管理员或授权登录）");
       toast("已删除");
     } catch (e) {
       toast("删除失败：" + e.message, true);
@@ -717,14 +719,24 @@
   async function workerPost(action, payload) {
     const token = getWorkerToken();
     if (!token) throw new Error("请先通过“授权登录”");
-    const res = await fetch(WORKER_URL + "/" + action, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(Object.assign({ token: token }, payload)),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || ("请求失败（" + res.status + "）"));
-    return data;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    try {
+      const res = await fetch(WORKER_URL + "/" + action, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.assign({ token: token }, payload)),
+        signal: ctrl.signal,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ("请求失败（" + res.status + "）"));
+      return data;
+    } catch (e) {
+      if (e.name === "AbortError") throw new Error("连接后端超时（请检查 Workers 连接）");
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
   }
   async function workerDelete(res) {
     await workerPost("delete", { id: res.id, url: res.url, title: res.title });
@@ -1033,7 +1045,8 @@
       rec.contentB64 = contentB64;
     }
 
-    const isWorker = !!getWorkerToken();
+    // 站长有 GitHub 令牌则直连（可靠）；仅授权老师(只有 Worker 令牌)才走 Worker
+    const isWorker = !!getWorkerToken() && !getPublishToken();
     if (!isWorker && !getPublishToken()) {
       toast("请先登录（管理员或授权登录）", true);
       openAdminModal();

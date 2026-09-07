@@ -393,6 +393,7 @@ a { color: inherit; text-decoration: none; }
   box-shadow: 0 20px 60px rgba(0,0,0,.2);
   display: flex; flex-direction: column; overflow: hidden;
 }
+.assist-panel[hidden] { display: none; }
 .assist-panel header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 18px; border-bottom: 1px solid var(--line);

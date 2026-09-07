@@ -1,0 +1,7 @@
+{
+  "name": "physics-lib-backend",
+  "version": "1.0.0",
+  "description": "高中物理教学资源库 方案A后端（腾讯云开发云函数）",
+  "main": "index.js",
+  "engines": { "node": ">=18" }
+}

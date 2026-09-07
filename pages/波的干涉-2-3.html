@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>波的叠加效应 · 无衰减 · 振幅变化可视化</title>
+    <style>
+        :root {
+            --bg: #f5f0e8;
+            --panel-bg: #ffffff;
+            --border: #d0c8b8;
+            --text: #3a3226;
+            --accent1: #e74c3c;
+            --accent2: #3498db;
+            --shadow: 0 2px 12px rgba(0,0,0,0.08);
+            --radius: 10px;
+            --font: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            background: linear-gradient(135deg, #ece4d5 0%, #f0ebe0 30%, #e8e0d0 100%);
+            font-family: var(--font);
+            color: var(--text);
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; padding: 20px;
+            user-select: none; -webkit-user-select: none;
+        }
+        .main-container {
+            display: flex; gap:20px; background: var(--panel-bg);
+            border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            padding:20px; flex-wrap: wrap; max-width:1150px; width:100%;
+        }
+        .canvas-section { display:flex; flex-direction:column; gap:12px; flex:1 1 700px; min-width:600px; }
+        .formula-bar {
+            background: #faf9f5; border:2px solid var(--border);
+            border-radius: var(--radius); padding:12px 18px;
+            display:flex; flex-wrap:wrap; align-items:center; gap:24px;
+            font-size:14px; font-weight:500; letter-spacing:0.3px;
+            background: linear-gradient(to bottom, #ffffff, #f8f5ef);
+        }
+        .formula-bar .eq { display:flex; align-items:center; gap:4px; white-space:nowrap; }
+        .formula-bar .fn { font-style:italic; font-weight:600; }
+        .formula-bar .hl { color:#c0392b; font-weight:700; }
+        .formula-bar .hl2 { color:#2980b9; font-weight:700; }
+        .formula-bar .sym { font-family:'Times New Roman', serif; font-style:italic; }
+        .canvas-wrapper {
+            position:relative; background:#fdfdfb; border-radius:var(--radius);
+            border:2px solid var(--border); cursor:crosshair; overflow:hidden;
+            aspect-ratio:7/5; min-height:420px;
+        }
+        .canvas-wrapper.dragging { cursor:grabbing; }
+        .source-hint {
+            position:absolute; pointer-events:none; font-size:11px; color:#888;
+            bottom:8px; left:50%; transform:translateX(-50%);
+            background:rgba(255,255,255,0.85); padding:3px 10px;
+            border-radius:10px; opacity:0; transition:opacity 0.3s;
+        }
+        .canvas-wrapper:hover .source-hint { opacity:1; }
+        canvas { display:block; width:100%; height:100%; border-radius:var(--radius); }
+        .profile-wrapper {
+            background:#fdfdfb; border-radius:var(--radius);
+            border:2px solid var(--border); overflow:hidden; height:110px; flex-shrink:0;
+        }
+        .profile-wrapper canvas { width:100%; height:100%; border-radius:var(--radius); }
+        .time-bar {
+            display:flex; align-items:center; gap:12px;
+            background:#fdfdfb; border-radius:var(--radius); border:2px solid var(--border);
+            padding:10px 16px; flex-shrink:0;
+        }
+        .time-bar label { font-weight:600; font-size:13px; }
+        .time-bar input[type="range"] { flex:1; accent-color:#5b7c99; height:6px; }
+        .time-bar .time-display { font-weight:700; font-size:14px; color:#5b7c99; min-width:48px; text-align:center; }
+        .btn {
+            padding:7px 14px; border:2px solid #c0b8a5; border-radius:20px;
+            background:#fff; cursor:pointer; font-weight:600; font-size:12px;
+            transition:all 0.2s; white-space:nowrap; font-family:var(--font);
+        }
+        .btn:hover { background:#f5f0e5; border-color:#a09080; }
+        .btn.active { background:#5b7c99; color:#fff; border-color:#5b7c99; }
+        .btn.play-btn { width:40px; height:34px; border-radius:50%; padding:0; display:flex; align-items:center; justify-content:center; font-size:16px; }
+        .speed-select {
+            padding:5px 10px; border-radius:14px; border:2px solid #c0b8a5;
+            font-size:12px; font-weight:600; background:#fff; cursor:pointer;
+        }
+        .control-panel { flex:0 0 280px; display:flex; flex-direction:column; gap:14px; min-width:250px; }
+        .panel-card {
+            background:#fdfdfb; border-radius:var(--radius); border:2px solid var(--border);
+            padding:14px 16px; box-shadow:0 1px 4px rgba(0,0,0,0.04);
+        }
+        .panel-card h3 { font-size:14px; font-weight:700; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+        .dot-indicator { width:14px; height:14px; border-radius:50%; }
+        .dot-s1 { background:#e74c3c; }
+        .dot-s2 { background:#3498db; }
+        .param-row {
+            display:flex; align-items:center; justify-content:space-between;
+            margin-bottom:7px; font-size:12px; gap:6px;
+        }
+        .param-row label { font-weight:500; min-width:50px; }
+        .param-row input[type="range"] { flex:1; accent-color:#5b7c99; }
+        .param-row .val { min-width:32px; text-align:right; font-weight:600; font-size:11px; color:#5b7c99; }
+        .btn-sm {
+            padding:4px 10px; border-radius:12px; border:1.5px solid #c0b8a5;
+            background:#fff; cursor:pointer; font-size:11px; font-weight:600;
+            transition:all 0.15s; font-family:var(--font);
+        }
+        .btn-sm:hover { background:#f5f0e5; }
+        .btn-sm.selected { background:#5b7c99; color:#fff; border-color:#5b7c99; }
+        .legend-mini { display:flex; align-items:center; gap:6px; font-size:10px; color:#888; margin-top:4px; }
+        .legend-bar {
+            width:80px; height:10px; border-radius:5px;
+            background: linear-gradient(to right, #2471c5, #b8d4f0, #fdfdfb, #f5c6c2, #d93030);
+        }
+        .note { font-size:10px; color:#888; margin-top:6px; }
+        @media (max-width:960px) {
+            .main-container { flex-direction:column; }
+            .canvas-section { min-width:auto; }
+            .canvas-wrapper { aspect-ratio:auto; height:380px; }
+            .control-panel { flex-direction:row; flex-wrap:wrap; }
+            .formula-bar { flex-direction:column; align-items:flex-start; gap:6px; }
+        }
+    </style>
+</head>
+<body>
+<div class="main-container">
+    <div class="canvas-section">
+        <div class="formula-bar" id="formulaBar">
+            <div class="eq">
+                <span class="fn" style="color:#c0392b;">u₁</span><span>(r₁, t) = </span>
+                <span class="hl" id="formulaA1">1.00</span>
+                <span> · sin( </span>
+                <span class="sym" id="formulaK1">3.93</span><span> r₁ − </span>
+                <span class="sym" id="formulaOmega1">3.93</span><span> t + </span>
+                <span class="sym" id="formulaPhi1">π</span>
+                <span> )</span>
+            </div>
+            <div style="color:#aaa;">|</div>
+            <div class="eq">
+                <span class="fn" style="color:#2980b9;">u₂</span><span>(r₂, t) = </span>
+                <span class="hl2" id="formulaA2">1.00</span>
+                <span> · sin( </span>
+                <span class="sym" id="formulaK2">3.93</span><span> r₂ − </span>
+                <span class="sym" id="formulaOmega2">3.93</span><span> t + </span>
+                <span class="sym" id="formulaPhi2">π</span>
+                <span> )</span>
+            </div>
+            <span style="font-size:11px; color:#777; margin-left:auto;">波速 v = 180 px/s · 无衰减</span>
+        </div>
+
+        <div class="canvas-wrapper" id="canvasWrapper">
+            <canvas id="mainCanvas"></canvas>
+            <div class="source-hint">🖱 拖动波源 | 滚轮微调时间</div>
+        </div>
+
+        <div class="profile-wrapper">
+            <canvas id="profileCanvas"></canvas>
+        </div>
+
+        <div class="time-bar">
+            <button class="btn play-btn" id="btnPlay">▶</button>
+            <label>⏱ 时间轴</label>
+            <input type="range" id="timeSlider" min="0" max="1000" value="0">
+            <span class="time-display" id="timeDisplay">0.00 s</span>
+            <select class="speed-select" id="speedSelect">
+                <option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+                <option value="1" selected>1×</option><option value="1.5">1.5×</option>
+                <option value="2">2×</option><option value="3">3×</option>
+            </select>
+            <button class="btn" id="btnReset">↺ 重置</button>
+        </div>
+    </div>
+
+    <div class="control-panel">
+        <div class="panel-card">
+            <h3><span class="dot-indicator dot-s1"></span> 波源 1</h3>
+            <div class="param-row"><label>振幅 A₁</label><input type="range" id="amp1" min="0.1" max="2.5" value="1.0" step="0.05"><span class="val" id="valAmp1">1.00</span></div>
+            <div class="param-row"><label>周期 T₁</label><input type="range" id="period1" min="0.4" max="5" value="1.6" step="0.05"><span class="val" id="valPeriod1">1.60 s</span></div>
+            <div class="param-row"><label>初相位 φ₁</label><input type="range" id="phase1" min="0" max="360" value="180" step="1"><span class="val" id="valPhase1">180°</span></div>
+            <div style="display:flex; gap:6px; margin-top:4px;">
+                <button class="btn-sm selected" id="btnDir1Up" onclick="setDirection(1,'up')">↑ 向上起振</button>
+                <button class="btn-sm" id="btnDir1Down" onclick="setDirection(1,'down')">↓ 向下起振</button>
+            </div>
+            <div class="toggle-row"><input type="checkbox" id="enableSource1" checked> 启用波源1</div>
+        </div>
+        <div class="panel-card">
+            <h3><span class="dot-indicator dot-s2"></span> 波源 2</h3>
+            <div class="param-row"><label>振幅 A₂</label><input type="range" id="amp2" min="0.1" max="2.5" value="1.0" step="0.05"><span class="val" id="valAmp2">1.00</span></div>
+            <div class="param-row"><label>周期 T₂</label><input type="range" id="period2" min="0.4" max="5" value="1.6" step="0.05"><span class="val" id="valPeriod2">1.60 s</span></div>
+            <div class="param-row"><label>初相位 φ₂</label><input type="range" id="phase2" min="0" max="360" value="180" step="1"><span class="val" id="valPhase2">180°</span></div>
+            <div style="display:flex; gap:6px; margin-top:4px;">
+                <button class="btn-sm selected" id="btnDir2Up" onclick="setDirection(2,'up')">↑ 向上起振</button>
+                <button class="btn-sm" id="btnDir2Down" onclick="setDirection(2,'down')">↓ 向下起振</button>
+            </div>
+            <div class="toggle-row"><input type="checkbox" id="enableSource2" checked> 启用波源2</div>
+        </div>
+        <div class="panel-card">
+            <h3>📐 图例与说明</h3>
+            <div class="legend-mini"><span>波谷(-)</span><div class="legend-bar"></div><span>波峰(+)</span></div>
+            <div class="note">波速 v = 180 px/s（恒定）</div>
+            <div class="note">波长 λ = v·T = <span id="lambdaDisplay">288.0</span> px</div>
+            <div class="note" style="color:#c0392b;">★ 无距离衰减 · 叠加振幅填充显示</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const mainCanvas = document.getElementById('mainCanvas');
+        const mainCtx = mainCanvas.getContext('2d');
+        const profileCanvas = document.getElementById('profileCanvas');
+        const profileCtx = profileCanvas.getContext('2d');
+        const canvasWrapper = document.getElementById('canvasWrapper');
+        const btnPlay = document.getElementById('btnPlay');
+        const timeSlider = document.getElementById('timeSlider');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const speedSelect = document.getElementById('speedSelect');
+        const btnReset = document.getElementById('btnReset');
+
+        const amp1Slider = document.getElementById('amp1');
+        const period1Slider = document.getElementById('period1');
+        const phase1Slider = document.getElementById('phase1');
+        const valAmp1 = document.getElementById('valAmp1');
+        const valPeriod1 = document.getElementById('valPeriod1');
+        const valPhase1 = document.getElementById('valPhase1');
+        const enableSource1 = document.getElementById('enableSource1');
+        const btnDir1Up = document.getElementById('btnDir1Up');
+        const btnDir1Down = document.getElementById('btnDir1Down');
+
+        const amp2Slider = document.getElementById('amp2');
+        const period2Slider = document.getElementById('period2');
+        const phase2Slider = document.getElementById('phase2');
+        const valAmp2 = document.getElementById('valAmp2');
+        const valPeriod2 = document.getElementById('valPeriod2');
+        const valPhase2 = document.getElementById('valPhase2');
+        const enableSource2 = document.getElementById('enableSource2');
+        const btnDir2Up = document.getElementById('btnDir2Up');
+        const btnDir2Down = document.getElementById('btnDir2Down');
+
+        const formulaA1 = document.getElementById('formulaA1');
+        const formulaK1 = document.getElementById('formulaK1');
+        const formulaOmega1 = document.getElementById('formulaOmega1');
+        const formulaPhi1 = document.getElementById('formulaPhi1');
+        const formulaA2 = document.getElementById('formulaA2');
+        const formulaK2 = document.getElementById('formulaK2');
+        const formulaOmega2 = document.getElementById('formulaOmega2');
+        const formulaPhi2 = document.getElementById('formulaPhi2');
+        const lambdaDisplay = document.getElementById('lambdaDisplay');
+
+        const waveSpeed = 180;
+        let source1 = { x:220, y:250, amp:1.0, period:1.6, phaseDeg:180, enabled:true };
+        let source2 = { x:480, y:250, amp:1.0, period:1.6, phaseDeg:180, enabled:true };
+        let currentTime = 0;
+        const maxTime = 12;
+        let isPlaying = true;
+        let playSpeed = 1.0;
+        let lastFrameTime = null;
+        let draggingSource = null;
+        let dragOffsetX = 0, dragOffsetY = 0;
+        let isDraggingTimeSlider = false;
+        let mainW, mainH, profileW, profileH;
+        let mainPixelW, mainPixelH;
+
+        function resizeCanvases() {
+            const wrapperRect = canvasWrapper.getBoundingClientRect();
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            mainW = wrapperRect.width;
+            mainH = wrapperRect.height;
+            mainPixelW = Math.floor(mainW * dpr);
+            mainPixelH = Math.floor(mainH * dpr);
+            if (mainCanvas.width !== mainPixelW || mainCanvas.height !== mainPixelH) {
+                mainCanvas.width = mainPixelW;
+                mainCanvas.height = mainPixelH;
+                mainCanvas.style.width = mainW + 'px';
+                mainCanvas.style.height = mainH + 'px';
+            }
+            const oldW = mainCanvas._lastW || mainW;
+            const oldH = mainCanvas._lastH || mainH;
+            if (oldW>0 && oldH>0 && (Math.abs(oldW-mainW)>1 || Math.abs(oldH-mainH)>1)) {
+                source1.x = (source1.x/oldW)*mainW;
+                source1.y = (source1.y/oldH)*mainH;
+                source2.x = (source2.x/oldW)*mainW;
+                source2.y = (source2.y/oldH)*mainH;
+            }
+            mainCanvas._lastW = mainW;
+            mainCanvas._lastH = mainH;
+            const profileRect = profileCanvas.parentElement.getBoundingClientRect();
+            profileW = profileRect.width;
+            profileH = profileRect.height;
+            const pW = Math.floor(profileW*dpr);
+            const pH = Math.floor(profileH*dpr);
+            if (profileCanvas.width !== pW || profileCanvas.height !== pH) {
+                profileCanvas.width = pW;
+                profileCanvas.height = pH;
+                profileCanvas.style.width = profileW+'px';
+                profileCanvas.style.height = profileH+'px';
+            }
+        }
+
+        function getOmega(p) { return (2*Math.PI)/p; }
+        function getK(p) { return (2*Math.PI)/(waveSpeed*p); }
+        function getPhaseRad(d) { return d*Math.PI/180; }
+
+        function computeTotal(px, py, t) {
+            let v = 0;
+            if (source1.enabled) {
+                const dx = px-source1.x, dy = py-source1.y;
+                const r = Math.sqrt(dx*dx+dy*dy);
+                v += source1.amp * Math.sin(getK(source1.period)*r - getOmega(source1.period)*t + getPhaseRad(source1.phaseDeg));
+            }
+            if (source2.enabled) {
+                const dx = px-source2.x, dy = py-source2.y;
+                const r = Math.sqrt(dx*dx+dy*dy);
+                v += source2.amp * Math.sin(getK(source2.period)*r - getOmega(source2.period)*t + getPhaseRad(source2.phaseDeg));
+            }
+            return v;
+        }
+
+        function amplitudeToColor(amp, maxRef) {
+            const m = Math.max(maxRef,0.3);
+            let r = amp/m;
+            r = Math.max(-1,Math.min(1,r));
+            const t = Math.abs(r);
+            if (r>=0) return { r:255, g:Math.round(255-t*210), b:Math.round(255-t*225) };
+            else return { r:Math.round(255-t*230), g:Math.round(255-t*210), b:255 };
+        }
+
+        function drawMain() {
+            const ctx = mainCtx;
+            const w = mainPixelW, h = mainPixelH;
+            const sx = w/mainW, sy = h/mainH;
+            ctx.clearRect(0,0,w,h);
+            ctx.fillStyle='#fdfdfb'; ctx.fillRect(0,0,w,h);
+            const gs = 20;
+            ctx.strokeStyle='rgba(180,170,155,0.25)'; ctx.lineWidth=0.6*Math.min(sx,sy);
+            ctx.beginPath();
+            for(let x=0;x<=mainW;x+=gs) { ctx.moveTo(x*sx,0); ctx.lineTo(x*sx,h); }
+            for(let y=0;y<=mainH;y+=gs) { ctx.moveTo(0,y*sy); ctx.lineTo(w,y*sy); }
+            ctx.stroke();
+            ctx.strokeStyle='rgba(160,148,130,0.4)'; ctx.lineWidth=1*Math.min(sx,sy);
+            ctx.beginPath();
+            for(let x=0;x<=mainW;x+=gs*5) { ctx.moveTo(x*sx,0); ctx.lineTo(x*sx,h); }
+            for(let y=0;y<=mainH;y+=gs*5) { ctx.moveTo(0,y*sy); ctx.lineTo(w,y*sy); }
+            ctx.stroke();
+
+            const step = Math.max(2, Math.floor(3/Math.min(sx,sy)));
+            const maxAmp = (source1.enabled?source1.amp:0)+(source2.enabled?source2.amp:0);
+            const img = ctx.createImageData(w,h);
+            const d = img.data;
+            const s1e=source1.enabled, s2e=source2.enabled;
+            const k1=s1e?getK(source1.period):0, o1=s1e?getOmega(source1.period):0, p1=s1e?getPhaseRad(source1.phaseDeg):0;
+            const k2=s2e?getK(source2.period):0, o2=s2e?getOmega(source2.period):0, p2=s2e?getPhaseRad(source2.phaseDeg):0;
+            const a1=s1e?source1.amp:0, a2=s2e?source2.amp:0;
+            const t=currentTime;
+            for(let py=0; py<mainH; py+=step) {
+                for(let px=0; px<mainW; px+=step) {
+                    let v=0;
+                    if(s1e){ const dx=px-source1.x, dy=py-source1.y; v+=a1*Math.sin(k1*Math.sqrt(dx*dx+dy*dy)-o1*t+p1); }
+                    if(s2e){ const dx=px-source2.x, dy=py-source2.y; v+=a2*Math.sin(k2*Math.sqrt(dx*dx+dy*dy)-o2*t+p2); }
+                    const c=amplitudeToColor(v,maxAmp);
+                    const xs=Math.round(px*sx), ys=Math.round(py*sy);
+                    const xe=Math.min(w,Math.round((px+step)*sx)), ye=Math.min(h,Math.round((py+step)*sy));
+                    for(let sy2=ys; sy2<ye; sy2++) {
+                        for(let sx2=xs; sx2<xe; sx2++) {
+                            const i=(sy2*w+sx2)*4;
+                            d[i]=c.r; d[i+1]=c.g; d[i+2]=c.b; d[i+3]=255;
+                        }
+                    }
+                }
+            }
+            ctx.putImageData(img,0,0);
+
+            const cx=mainW/2, cy=mainH/2;
+            ctx.strokeStyle='rgba(140,125,105,0.55)'; ctx.lineWidth=1.2*Math.min(sx,sy);
+            ctx.setLineDash([6,10]);
+            ctx.beginPath(); ctx.moveTo(cx*sx,0); ctx.lineTo(cx*sx,h); ctx.moveTo(0,cy*sy); ctx.lineTo(w,cy*sy); ctx.stroke();
+            ctx.setLineDash([]);
+
+            function drawSrc(sx2,sy2,color,amp,period,phase,label) {
+                const px=sx2*sx, py=sy2*sy;
+                const osc = amp*Math.sin(-getOmega(period)*t+getPhaseRad(phase));
+                const rad = Math.max(5, (11+osc*5)*Math.min(sx,sy));
+                const grad = ctx.createRadialGradient(px,py,rad*0.3,px,py,rad*1.8);
+                grad.addColorStop(0,color.replace(')',',0.7)').replace('rgb','rgba'));
+                grad.addColorStop(1,'rgba(255,255,255,0)');
+                ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(px,py,rad*1.8,0,Math.PI*2); ctx.fill();
+                const bgrad = ctx.createRadialGradient(px-rad*0.25,py-rad*0.25,rad*0.1,px,py,rad);
+                bgrad.addColorStop(0,'#fff'); bgrad.addColorStop(0.4,color); bgrad.addColorStop(1,'rgba(0,0,0,0.35)');
+                ctx.fillStyle=bgrad; ctx.beginPath(); ctx.arc(px,py,rad,0,Math.PI*2); ctx.fill();
+                ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=1.5*Math.min(sx,sy); ctx.stroke();
+                ctx.fillStyle='#2c2416'; ctx.font=`bold ${12*Math.min(sx,sy)}px "Segoe UI","PingFang SC"`; ctx.textAlign='center';
+                ctx.fillText(label, px, py-rad-10*Math.min(sx,sy));
+            }
+            if(source1.enabled) drawSrc(source1.x,source1.y,'rgb(220,60,50)',source1.amp,source1.period,source1.phaseDeg,'波源1');
+            if(source2.enabled) drawSrc(source2.x,source2.y,'rgb(50,130,220)',source2.amp,source2.period,source2.phaseDeg,'波源2');
+        }
+
+        function drawProfile() {
+            const ctx = profileCtx;
+            const w = profileCanvas.width, h = profileCanvas.height;
+            const dpr = w/profileW;
+            const ml=45*dpr, mr=15*dpr, mt=12*dpr, mb=12*dpr;
+            const pw = w-ml-mr, ph = h-mt-mb;
+            const baseY = mt+ph/2;
+            const profileY = mainH/2;
+            ctx.clearRect(0,0,w,h);
+            ctx.fillStyle='#fdfdfb'; ctx.fillRect(0,0,w,h);
+            ctx.strokeStyle='rgba(180,170,155,0.2)'; ctx.lineWidth=0.5*dpr;
+            for(let x=ml; x<=w-mr; x+=15*dpr){ ctx.beginPath(); ctx.moveTo(x,mt); ctx.lineTo(x,h-mb); ctx.stroke(); }
+            for(let y=mt; y<=h-mb; y+=15*dpr){ ctx.beginPath(); ctx.moveTo(ml,y); ctx.lineTo(w-mr,y); ctx.stroke(); }
+            ctx.strokeStyle='rgba(140,125,105,0.5)'; ctx.lineWidth=1*dpr;
+            ctx.beginPath(); ctx.moveTo(ml,baseY); ctx.lineTo(w-mr,baseY); ctx.stroke();
+
+            const maxAmp = (source1.enabled?source1.amp:0)+(source2.enabled?source2.amp:0);
+            const ampScale = ph/(2*Math.max(maxAmp,0.4));
+            function toX(px) { return ml + (px/mainW)*pw; }
+            function toY(amp) { return baseY - amp*ampScale; }
+
+            // 绘制单波虚线
+            if(source1.enabled){
+                ctx.strokeStyle='rgba(220,80,65,0.5)'; ctx.lineWidth=2*dpr; ctx.setLineDash([8*dpr,4*dpr]);
+                ctx.beginPath();
+                const k1=getK(source1.period), o1=getOmega(source1.period), p1=getPhaseRad(source1.phaseDeg);
+                for(let px=0;px<=mainW;px+=1.5){
+                    const dx=px-source1.x, dy=profileY-source1.y;
+                    const r=Math.sqrt(dx*dx+dy*dy);
+                    const amp=source1.amp*Math.sin(k1*r-o1*currentTime+p1);
+                    const sx=toX(px), sy=toY(amp);
+                    if(px===0) ctx.moveTo(sx,sy); else ctx.lineTo(sx,sy);
+                }
+                ctx.stroke(); ctx.setLineDash([]);
+            }
+            if(source2.enabled){
+                ctx.strokeStyle='rgba(50,140,225,0.5)'; ctx.lineWidth=2*dpr; ctx.setLineDash([3*dpr,5*dpr]);
+                ctx.beginPath();
+                const k2=getK(source2.period), o2=getOmega(source2.period), p2=getPhaseRad(source2.phaseDeg);
+                for(let px=0;px<=mainW;px+=1.5){
+                    const dx=px-source2.x, dy=profileY-source2.y;
+                    const r=Math.sqrt(dx*dx+dy*dy);
+                    const amp=source2.amp*Math.sin(k2*r-o2*currentTime+p2);
+                    const sx=toX(px), sy=toY(amp);
+                    if(px===0) ctx.moveTo(sx,sy); else ctx.lineTo(sx,sy);
+                }
+                ctx.stroke(); ctx.setLineDash([]);
+            }
+
+            // 叠加波形采样
+            const points = [];
+            for(let px=0; px<=mainW; px+=1.5){
+                const total = computeTotal(px, profileY, currentTime);
+                points.push({x: toX(px), y: toY(total), amp: total});
+            }
+
+            // 振幅填充 (叠加波与零线之间)
+            if(points.length>1){
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, baseY);
+                for(let i=0;i<points.length;i++) ctx.lineTo(points[i].x, points[i].y);
+                ctx.lineTo(points[points.length-1].x, baseY);
+                ctx.closePath();
+                const fillGrad = ctx.createLinearGradient(0, mt, 0, h-mb);
+                fillGrad.addColorStop(0, 'rgba(200,50,50,0.25)');
+                fillGrad.addColorStop(0.5, 'rgba(255,255,255,0.05)');
+                fillGrad.addColorStop(1, 'rgba(50,50,200,0.25)');
+                ctx.fillStyle = fillGrad;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 叠加波实线
+            ctx.strokeStyle='rgba(30,30,30,0.95)'; ctx.lineWidth=3*dpr;
+            ctx.beginPath();
+            for(let i=0;i<points.length;i++){
+                if(i===0) ctx.moveTo(points[i].x, points[i].y);
+                else ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.stroke();
+
+            // 标记振幅峰值点
+            const peakThreshold = 0.15;
+            for(let i=1; i<points.length-1; i++){
+                const prev = points[i-1].amp, curr = points[i].amp, next = points[i+1].amp;
+                if((curr>prev && curr>next) || (curr<prev && curr<next)){
+                    if(Math.abs(curr) > peakThreshold){
+                        const px = points[i].x, py = points[i].y;
+                        ctx.fillStyle = '#f39c12';
+                        ctx.beginPath();
+                        ctx.arc(px, py, 4.5*dpr, 0, 2*Math.PI);
+                        ctx.fill();
+                        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1*dpr; ctx.stroke();
+                        ctx.fillStyle = '#1e1e1e';
+                        ctx.font = `bold ${9*dpr}px "Segoe UI"`;
+                        ctx.textAlign = 'center';
+                        ctx.fillText(curr.toFixed(2), px, py - 10*dpr);
+                    }
+                }
+            }
+
+            // 波源位置标记
+            function markSrc(sxPx, color, label){
+                const sx = toX(sxPx);
+                ctx.fillStyle=color; ctx.beginPath(); ctx.arc(sx,baseY,5*dpr,0,2*Math.PI); ctx.fill();
+                ctx.strokeStyle='#000'; ctx.lineWidth=1*dpr; ctx.stroke();
+                ctx.fillStyle='#2c2416'; ctx.font=`bold ${9*dpr}px "Segoe UI"`; ctx.textAlign='center';
+                ctx.fillText(label, sx, baseY-16*dpr);
+            }
+            if(source1.enabled) markSrc(source1.x, 'rgb(220,60,50)', 'S1');
+            if(source2.enabled) markSrc(source2.x, 'rgb(50,130,220)', 'S2');
+        }
+
+        function updateFormulas() {
+            const s1=source1, s2=source2;
+            const o1=getOmega(s1.period), k1=getK(s1.period);
+            const o2=getOmega(s2.period), k2=getK(s2.period);
+            const p1=getPhaseRad(s1.phaseDeg), p2=getPhaseRad(s2.phaseDeg);
+            const fmt = r => { const m=r/Math.PI; if(Math.abs(m)<0.01)return'0'; if(Math.abs(m-1)<0.01)return'π'; if(Math.abs(m+1)<0.01)return'−π'; return m.toFixed(2)+'π'; };
+            formulaA1.textContent=s1.amp.toFixed(2);
+            formulaK1.textContent=k1.toFixed(2);
+            formulaOmega1.textContent=o1.toFixed(2);
+            formulaPhi1.textContent=fmt(p1);
+            formulaA2.textContent=s2.amp.toFixed(2);
+            formulaK2.textContent=k2.toFixed(2);
+            formulaOmega2.textContent=o2.toFixed(2);
+            formulaPhi2.textContent=fmt(p2);
+            lambdaDisplay.textContent = (waveSpeed*s1.period).toFixed(1);
+        }
+
+        function animate(ts) {
+            if(isPlaying && !isDraggingTimeSlider){
+                if(lastFrameTime!==null){
+                    currentTime += (ts-lastFrameTime)/1000*playSpeed;
+                    if(currentTime>maxTime) currentTime%=maxTime;
+                }
+                lastFrameTime=ts;
+                timeSlider.value = Math.round((currentTime/maxTime)*1000);
+                timeDisplay.textContent = currentTime.toFixed(2)+' s';
+            } else if(!isPlaying) lastFrameTime=null;
+            drawMain();
+            drawProfile();
+            requestAnimationFrame(animate);
+        }
+
+        function getPos(e){ const r=mainCanvas.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+        function nearSrc(p, s){ return Math.hypot(p.x-s.x, p.y-s.y)<22; }
+
+        canvasWrapper.addEventListener('mousedown', e=>{
+            const p=getPos(e);
+            if(source2.enabled&&nearSrc(p,source2)&&source1.enabled&&nearSrc(p,source1)){
+                draggingSource = Math.hypot(p.x-source1.x,p.y-source1.y)<=Math.hypot(p.x-source2.x,p.y-source2.y)?1:2;
+            }else if(source1.enabled&&nearSrc(p,source1)) draggingSource=1;
+            else if(source2.enabled&&nearSrc(p,source2)) draggingSource=2;
+            else draggingSource=null;
+            if(draggingSource===1){ dragOffsetX=source1.x-p.x; dragOffsetY=source1.y-p.y; }
+            else if(draggingSource===2){ dragOffsetX=source2.x-p.x; dragOffsetY=source2.y-p.y; }
+            if(draggingSource) canvasWrapper.classList.add('dragging');
+        });
+        window.addEventListener('mousemove', e=>{
+            if(!draggingSource) return;
+            const p=getPos(e);
+            const nx=Math.max(5,Math.min(mainW-5,p.x+dragOffsetX));
+            const ny=Math.max(5,Math.min(mainH-5,p.y+dragOffsetY));
+            if(draggingSource===1){ source1.x=nx; source1.y=ny; }
+            else{ source2.x=nx; source2.y=ny; }
+        });
+        window.addEventListener('mouseup', ()=>{ draggingSource=null; canvasWrapper.classList.remove('dragging'); });
+        canvasWrapper.addEventListener('wheel', e=>{
+            e.preventDefault();
+            currentTime = Math.max(0,Math.min(maxTime, currentTime+(e.deltaY>0?0.15:-0.15)));
+            timeSlider.value=Math.round((currentTime/maxTime)*1000);
+            timeDisplay.textContent=currentTime.toFixed(2)+' s';
+            if(isPlaying) lastFrameTime=null;
+        },{passive:false});
+        timeSlider.addEventListener('input', ()=>{ isDraggingTimeSlider=true; currentTime=(+timeSlider.value/1000)*maxTime; timeDisplay.textContent=currentTime.toFixed(2)+' s'; });
+        timeSlider.addEventListener('change', ()=>{ isDraggingTimeSlider=false; });
+        btnPlay.addEventListener('click', ()=>{ isPlaying=!isPlaying; btnPlay.textContent=isPlaying?'⏸':'▶'; btnPlay.classList.toggle('active',isPlaying); });
+        btnReset.addEventListener('click', ()=>{ currentTime=0; timeSlider.value=0; timeDisplay.textContent='0.00 s'; });
+        speedSelect.addEventListener('change', ()=> playSpeed=+speedSelect.value);
+
+        function bind(slider, display, setter, fmt){
+            slider.addEventListener('input', ()=>{
+                const v=+slider.value; setter(v); display.textContent=fmt(v); updateFormulas();
+            });
+        }
+        bind(amp1Slider,valAmp1,v=>{source1.amp=v;},v=>v.toFixed(2));
+        bind(period1Slider,valPeriod1,v=>{source1.period=v;},v=>v.toFixed(2)+' s');
+        bind(phase1Slider,valPhase1,v=>{source1.phaseDeg=v;updateDirBtns(1);},v=>Math.round(v)+'°');
+        bind(amp2Slider,valAmp2,v=>{source2.amp=v;},v=>v.toFixed(2));
+        bind(period2Slider,valPeriod2,v=>{source2.period=v;},v=>v.toFixed(2)+' s');
+        bind(phase2Slider,valPhase2,v=>{source2.phaseDeg=v;updateDirBtns(2);},v=>Math.round(v)+'°');
+        enableSource1.onchange=()=>source1.enabled=enableSource1.checked;
+        enableSource2.onchange=()=>source2.enabled=enableSource2.checked;
+
+        window.setDirection=(num,dir)=>{
+            const deg=dir==='up'?180:0;
+            if(num===1){ source1.phaseDeg=deg; phase1Slider.value=deg; valPhase1.textContent=deg+'°'; updateDirBtns(1); }
+            else{ source2.phaseDeg=deg; phase2Slider.value=deg; valPhase2.textContent=deg+'°'; updateDirBtns(2); }
+            updateFormulas();
+        };
+        function updateDirBtns(n){
+            const deg=n===1?source1.phaseDeg:source2.phaseDeg;
+            const up=((deg%360+360)%360)>90&&((deg%360+360)%360)<270;
+            if(n===1){ btnDir1Up.classList.toggle('selected',up); btnDir1Down.classList.toggle('selected',!up); }
+            else{ btnDir2Up.classList.toggle('selected',up); btnDir2Down.classList.toggle('selected',!up); }
+        }
+        window.addEventListener('keydown', e=>{
+            if(e.key===' '){ e.preventDefault(); isPlaying=!isPlaying; btnPlay.textContent=isPlaying?'⏸':'▶'; btnPlay.classList.toggle('active',isPlaying); }
+            if(e.key==='ArrowLeft'){ currentTime=Math.max(0,currentTime-0.1); timeSlider.value=Math.round(currentTime/maxTime*1000); timeDisplay.textContent=currentTime.toFixed(2)+' s'; }
+            if(e.key==='ArrowRight'){ currentTime=Math.min(maxTime,currentTime+0.1); timeSlider.value=Math.round(currentTime/maxTime*1000); timeDisplay.textContent=currentTime.toFixed(2)+' s'; }
+        });
+        function init(){
+            resizeCanvases();
+            updateFormulas();
+            btnPlay.textContent='⏸'; btnPlay.classList.add('active');
+            updateDirBtns(1); updateDirBtns(2);
+            requestAnimationFrame(animate);
+        }
+        window.addEventListener('resize', ()=>{ resizeCanvases(); });
+        init();
+    })();
+</script>
+</body>
+</html>

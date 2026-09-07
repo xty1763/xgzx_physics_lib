@@ -2,3 +2,5 @@
 Thumbs.db
 *.log
 node_modules/
+# 本机 wrangler 缓存/凭据，不要提交
+worker/.wrangler/

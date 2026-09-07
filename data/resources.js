@@ -51,11 +51,11 @@ window.MANIFEST = [
     id: "r1788762640995prpgs",
     title: "波的干涉",
     desc: "",
-    book: "",
-    chapter: "",
-    section: "",
+    book: "b4",
+    chapter: "b4c3",
+    section: "b4c3s4",
     url: "pages/波的干涉.html",
-    tags: [],
+    tags: ["仿真"],
     type: "仿真资源"
   }
 ];

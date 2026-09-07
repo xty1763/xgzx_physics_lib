@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wave Superposition Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        input[type="number"], input[type="text"], select {
+            -webkit-user-select: auto;
+            user-select: auto;
+        }
+        /* Custom scrollbar for settings panel */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; 
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; 
+        }
+        input[type=range] {
+            accent-color: #3b82f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 h-screen w-screen overflow-hidden flex flex-col font-sans">
+
+    <!-- Top Equations Display -->
+    <div class="bg-gray-900 border-b border-gray-800 p-3 shadow-md z-10 flex flex-col items-center justify-center min-h-[80px]">
+        <h1 class="text-sm text-gray-400 font-semibold mb-1 tracking-wider uppercase">Wave Equations</h1>
+        <div id="eq1" class="text-cyan-400 font-mono text-sm md:text-base font-medium"></div>
+        <div id="eq2" class="text-fuchsia-400 font-mono text-sm md:text-base font-medium mt-1"></div>
+        <div id="eqSum" class="text-yellow-400 font-mono text-xs md:text-sm mt-1 opacity-80">y_sum = y₁ + y₂</div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+        
+        <!-- Canvas and Timeline Area -->
+        <div class="flex-1 flex flex-col relative p-2 md:p-4 min-h-[50vh]">
+            <!-- Canvas Container -->
+            <div class="flex-1 bg-black rounded-xl border border-gray-800 relative overflow-hidden shadow-inner" id="canvasContainer">
+                <canvas id="simCanvas" class="absolute inset-0 w-full h-full"></canvas>
+                
+                <!-- Legend -->
+                <div class="absolute top-4 left-4 bg-gray-900/80 backdrop-blur border border-gray-700 p-2 rounded text-xs flex flex-col gap-1 pointer-events-none">
+                    <div class="flex items-center gap-2"><div class="w-4 border-b-2 border-dashed border-cyan-400"></div> Wave 1</div>
+                    <div class="flex items-center gap-2"><div class="w-4 border-b-2 border-dashed border-fuchsia-400"></div> Wave 2</div>
+                    <div class="flex items-center gap-2"><div class="w-4 border-b-2 border-solid border-yellow-400"></div> Superposition</div>
+                </div>
+            </div>
+
+            <!-- Time Controls -->
+            <div class="mt-3 bg-gray-900 border border-gray-800 rounded-xl p-3 flex flex-wrap items-center gap-4 shadow-lg">
+                <button id="playBtn" class="bg-blue-600 hover:bg-blue-500 text-white w-12 h-10 rounded-lg flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <svg id="playIcon" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                    <svg id="pauseIcon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                </button>
+                <button id="resetBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-3 h-10 rounded-lg text-sm transition-colors">Reset</button>
+                
+                <div class="flex-1 flex items-center gap-3 min-w-[200px]">
+                    <span class="text-xs text-gray-400 font-mono">0s</span>
+                    <input type="range" id="timeSlider" min="0" max="20" step="0.01" value="0" class="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                    <span class="text-xs text-gray-400 font-mono">20s</span>
+                </div>
+                
+                <div class="w-16 text-right font-mono text-blue-400 font-bold" id="timeDisplay">0.00s</div>
+            </div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div class="w-full md:w-80 bg-gray-900 border-l border-gray-800 overflow-y-auto flex flex-col">
+            <div class="p-4 border-b border-gray-800 sticky top-0 bg-gray-900 z-10">
+                <h2 class="text-lg font-bold text-gray-200">Parameters</h2>
+            </div>
+            
+            <div class="p-4 space-y-6">
+                <!-- Axis Settings -->
+                <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                        Axis Configuration
+                    </h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">X Min</label>
+                            <input type="number" id="ax-xmin" value="-50" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">X Max</label>
+                            <input type="number" id="ax-xmax" value="50" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Tick Step</label>
+                            <input type="number" id="ax-tick" value="10" min="1" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Y Max (Amp)</label>
+                            <input type="number" id="ax-ymax" value="20" min="1" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-blue-500 outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wave 1 Settings -->
+                <div class="bg-cyan-900/20 rounded-lg p-3 border border-cyan-900/50 relative">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold text-cyan-400 flex items-center gap-2">Wave Source 1</h3>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="w1-enable" class="sr-only peer" checked>
+                            <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3" id="w1-controls">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Position (x₀)</label>
+                            <input type="number" id="w1-x" value="-20" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-cyan-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Amplitude (A)</label>
+                            <input type="number" id="w1-a" value="5" min="0" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-cyan-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Ang. Vel. (ω) [×π]</label>
+                            <input type="number" id="w1-w" value="1" step="0.1" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-cyan-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Init Phase (φ₀) [×π]</label>
+                            <input type="number" id="w1-p" value="0" step="0.1" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-cyan-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Start Direction</label>
+                            <select id="w1-dir" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-cyan-500 outline-none">
+                                <option value="up">Up (+)</option>
+                                <option value="down">Down (-)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Wave Speed (v)</label>
+                            <input type="number" id="w1-v" value="10" min="0.1" step="1" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-cyan-500 outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wave 2 Settings -->
+                <div class="bg-fuchsia-900/20 rounded-lg p-3 border border-fuchsia-900/50 relative">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold text-fuchsia-400 flex items-center gap-2">Wave Source 2</h3>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="w2-enable" class="sr-only peer" checked>
+                            <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-fuchsia-500"></div>
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3" id="w2-controls">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Position (x₀)</label>
+                            <input type="number" id="w2-x" value="20" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-fuchsia-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Amplitude (A)</label>
+                            <input type="number" id="w2-a" value="5" min="0" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-fuchsia-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Ang. Vel. (ω) [×π]</label>
+                            <input type="number" id="w2-w" value="1" step="0.1" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-fuchsia-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Init Phase (φ₀) [×π]</label>
+                            <input type="number" id="w2-p" value="0" step="0.1" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-fuchsia-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Start Direction</label>
+                            <select id="w2-dir" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-fuchsia-500 outline-none">
+                                <option value="up">Up (+)</option>
+                                <option value="down">Down (-)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Wave Speed (v)</label>
+                            <input type="number" id="w2-v" value="10" min="0.1" step="1" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:border-fuchsia-500 outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Information Panel -->
+                <div class="bg-indigo-900/20 border border-indigo-800/50 rounded-lg p-3 relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+                    <h3 class="text-xs font-semibold text-indigo-300 mb-1.5 flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Information
+                    </h3>
+                    <p class="text-[11px] text-indigo-200/70 leading-relaxed">
+                        The superposition principle states that the net displacement caused by two or more waves is the algebraic sum of the displacements of the individual waves at any given point and time.
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- State Management ---
+    const state = {
+        time: 0,
+        isPlaying: false,
+        lastTimestamp: 0,
+        axis: {
+            xMin: -50,
+            xMax: 50,
+            tick: 10,
+            yMax: 20
+        },
+        wave1: {
+            enabled: true,
+            x0: -20,
+            A: 5,
+            omega: 1,
+            phase: 0,
+            startDir: 'up',
+            v: 10
+        },
+        wave2: {
+            enabled: true,
+            x0: 20,
+            A: 5,
+            omega: 1,
+            phase: 0,
+            startDir: 'up',
+            v: 10
+        }
+    };
+
+    // --- DOM Elements ---
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('canvasContainer');
+    const timeSlider = document.getElementById('timeSlider');
+    const timeDisplay = document.getElementById('timeDisplay');
+    const playBtn = document.getElementById('playBtn');
+    const playIcon = document.getElementById('playIcon');
+    const pauseIcon = document.getElementById('pauseIcon');
+    const resetBtn = document.getElementById('resetBtn');
+    
+    const eq1Display = document.getElementById('eq1');
+    const eq2Display = document.getElementById('eq2');
+
+    // --- Resize Handling ---
+    let width, height;
+    function resizeCanvas() {
+        // Handle High DPI displays
+        const dpr = window.devicePixelRatio || 1;
+        const rect = container.getBoundingClientRect();
+        
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        width = canvas.width;
+        height = canvas.height;
+        
+        ctx.scale(dpr, dpr);
+        width = rect.width;
+        height = rect.height;
+        
+        draw();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // --- Coordinate Mapping ---
+    function mapX(x) {
+        return ((x - state.axis.xMin) / (state.axis.xMax - state.axis.xMin)) * width;
+    }
+    function unmapX(px) {
+        return state.axis.xMin + (px / width) * (state.axis.xMax - state.axis.xMin);
+    }
+    function mapY(y) {
+        // Invert Y so positive is up
+        return height / 2 - (y / state.axis.yMax) * (height / 2);
+    }
+
+    // --- Physics Math ---
+    function getWaveY(x, t, w) {
+        if (!w.enabled) return 0;
+        
+        const dist = Math.abs(x - w.x0);
+        const timeDelay = dist / w.v;
+        const activeTime = t - timeDelay;
+
+        // Wave hasn't reached this point yet
+        if (activeTime < 0) return 0;
+
+        const omegaRad = w.omega * Math.PI;
+        const phaseRad = w.phase * Math.PI;
+        const sign = w.startDir === 'up' ? 1 : -1;
+
+        return sign * w.A * Math.sin(omegaRad * activeTime + phaseRad);
+    }
+
+    // --- Drawing ---
+    function drawPath(points, color, dashArray = []) {
+        if (points.length === 0) return;
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.setLineDash(dashArray);
+        ctx.moveTo(points[0].px, points[0].py);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].px, points[i].py);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]); // Reset
+    }
+
+    function drawSource(x, y, color) {
+        const px = mapX(x);
+        const py = mapY(y);
+        
+        // Draw vertical line from axis to source
+        ctx.beginPath();
+        ctx.strokeStyle = color + '40'; // transparent
+        ctx.lineWidth = 1;
+        ctx.moveTo(px, mapY(0));
+        ctx.lineTo(px, py);
+        ctx.stroke();
+
+        // Draw dot
+        ctx.beginPath();
+        ctx.fillStyle = color;
+        ctx.arc(px, py, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+
+        // 1. Draw Grid
+        ctx.strokeStyle = '#374151'; // gray-700
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        
+        // X grid lines
+        const startX = Math.ceil(state.axis.xMin / state.axis.tick) * state.axis.tick;
+        for (let x = startX; x <= state.axis.xMax; x += state.axis.tick) {
+            const px = mapX(x);
+            ctx.moveTo(px, 0);
+            ctx.lineTo(px, height);
+        }
+        
+        // Y grid lines (auto divided into 4 sections each half)
+        const yTick = state.axis.yMax / 4;
+        for (let y = -state.axis.yMax; y <= state.axis.yMax; y += yTick) {
+            if (y === 0) continue; // Skip main axis
+            const py = mapY(y);
+            ctx.moveTo(0, py);
+            ctx.lineTo(width, py);
+        }
+        ctx.stroke();
+
+        // 2. Draw Main Axes
+        ctx.strokeStyle = '#9CA3AF'; // gray-400
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const originY = mapY(0);
+        ctx.moveTo(0, originY);
+        ctx.lineTo(width, originY); // X axis
+        
+        const originX = mapX(0);
+        if (originX >= 0 && originX <= width) {
+            ctx.moveTo(originX, 0);
+            ctx.lineTo(originX, height); // Y axis
+        }
+        ctx.stroke();
+
+        // 3. Draw Axis Labels
+        ctx.fillStyle = '#9CA3AF';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        for (let x = startX; x <= state.axis.xMax; x += state.axis.tick) {
+            if (x === 0) {
+                ctx.fillText('0', originX - 10, originY + 5);
+                continue;
+            }
+            ctx.fillText(x, mapX(x), originY + 5);
+        }
+
+        // 4. Calculate Wave Points
+        const points1 = [];
+        const points2 = [];
+        const pointsSum = [];
+        
+        // Optimization: step by 2 pixels for performance if needed, but 1 is smoother
+        const step = 1; 
+        for (let px = 0; px <= width; px += step) {
+            const x = unmapX(px);
+            const y1 = getWaveY(x, state.time, state.wave1);
+            const y2 = getWaveY(x, state.time, state.wave2);
+            const ySum = y1 + y2;
+
+            points1.push({ px, py: mapY(y1) });
+            points2.push({ px, py: mapY(y2) });
+            pointsSum.push({ px, py: mapY(ySum) });
+        }
+
+        // 5. Draw Waves
+        ctx.lineWidth = 2;
+        if (state.wave1.enabled) drawPath(points1, '#22d3ee', [5, 5]); // cyan-400 dashed
+        if (state.wave2.enabled) drawPath(points2, '#e879f9', [5, 5]); // fuchsia-400 dashed
+        
+        ctx.lineWidth = 3;
+        if (state.wave1.enabled || state.wave2.enabled) {
+            drawPath(pointsSum, '#facc15', []); // yellow-400 solid
+        }
+
+        // 6. Draw Wave Sources (Dots)
+        if (state.wave1.enabled) drawSource(state.wave1.x0, getWaveY(state.wave1.x0, state.time, state.wave1), '#22d3ee');
+        if (state.wave2.enabled) drawSource(state.wave2.x0, getWaveY(state.wave2.x0, state.time, state.wave2), '#e879f9');
+    }
+
+    // --- Equations Update ---
+    function formatEquation(w, index) {
+        if (!w.enabled) return `y${index} = 0`;
+        
+        const sign = w.startDir === 'up' ? '' : '-';
+        const phaseStr = w.phase === 0 ? '' : (w.phase > 0 ? ` + ${w.phase}π` : ` - ${Math.abs(w.phase)}π`);
+        const x0Str = w.x0 === 0 ? '|x|' : `|x ${w.x0 > 0 ? '- '+w.x0 : '+ '+Math.abs(w.x0)}|`;
+        
+        // y = ±A sin(ωπ(t - |x - x0|/v) + φπ)
+        return `y${index} = ${sign}${w.A} sin(${w.omega}π(t - ${x0Str}/${w.v})${phaseStr})`;
+    }
+
+    function updateEquations() {
+        eq1Display.textContent = formatEquation(state.wave1, '₁');
+        eq2Display.textContent = formatEquation(state.wave2, '₂');
+    }
+
+    // --- Animation Loop ---
+    let animationId;
+    function loop(timestamp) {
+        if (!state.lastTimestamp) state.lastTimestamp = timestamp;
+        const dt = (timestamp - state.lastTimestamp) / 1000; // in seconds
+        state.lastTimestamp = timestamp;
+
+        if (state.isPlaying) {
+            state.time += dt;
+            if (state.time > parseFloat(timeSlider.max)) {
+                state.time = parseFloat(timeSlider.max);
+                togglePlay(false);
+            }
+            timeSlider.value = state.time;
+            timeDisplay.textContent = state.time.toFixed(2) + 's';
+            draw();
+        }
+
+        animationId = requestAnimationFrame(loop);
+    }
+
+    function togglePlay(forceState) {
+        state.isPlaying = forceState !== undefined ? forceState : !state.isPlaying;
+        if (state.isPlaying) {
+            playIcon.classList.add('hidden');
+            pauseIcon.classList.remove('hidden');
+            state.lastTimestamp = performance.now(); // Reset timestamp to avoid jumping
+        } else {
+            playIcon.classList.remove('hidden');
+            pauseIcon.classList.add('hidden');
+        }
+    }
+
+    // --- Event Listeners ---
+    
+    // Time Controls
+    playBtn.addEventListener('click', () => togglePlay());
+    resetBtn.addEventListener('click', () => {
+        state.time = 0;
+        timeSlider.value = 0;
+        timeDisplay.textContent = '0.00s';
+        draw();
+    });
+    timeSlider.addEventListener('input', (e) => {
+        state.time = parseFloat(e.target.value);
+        timeDisplay.textContent = state.time.toFixed(2) + 's';
+        draw();
+    });
+    timeSlider.addEventListener('mousedown', () => togglePlay(false));
+    timeSlider.addEventListener('touchstart', () => togglePlay(false), {passive: true});
+
+    // Data Binding Helper
+    function bindInput(id, obj, key, isFloat = true, callback = null) {
+        const el = document.getElementById(id);
+        if(!el) return;
+        el.addEventListener('input', (e) => {
+            if (el.type === 'checkbox') {
+                obj[key] = el.checked;
+            } else if (el.tagName === 'SELECT') {
+                obj[key] = el.value;
+            } else {
+                const val = isFloat ? parseFloat(el.value) : parseInt(el.value);
+                if (!isNaN(val)) obj[key] = val;
+            }
+            if (callback) callback();
+            updateEquations();
+            draw();
+        });
+    }
+
+    // Bind Axis
+    bindInput('ax-xmin', state.axis, 'xMin', false);
+    bindInput('ax-xmax', state.axis, 'xMax', false);
+    bindInput('ax-tick', state.axis, 'tick', false);
+    bindInput('ax-ymax', state.axis, 'yMax', false);
+
+    // Bind Wave 1
+    const toggleW1Controls = () => { document.getElementById('w1-controls').style.opacity = state.wave1.enabled ? '1' : '0.4'; };
+    bindInput('w1-enable', state.wave1, 'enabled', false, toggleW1Controls);
+    bindInput('w1-x', state.wave1, 'x0', false);
+    bindInput('w1-a', state.wave1, 'A', false);
+    bindInput('w1-w', state.wave1, 'omega', true);
+    bindInput('w1-p', state.wave1, 'phase', true);
+    bindInput('w1-dir', state.wave1, 'startDir', false);
+    bindInput('w1-v', state.wave1, 'v', true);
+
+    // Bind Wave 2
+    const toggleW2Controls = () => { document.getElementById('w2-controls').style.opacity = state.wave2.enabled ? '1' : '0.4'; };
+    bindInput('w2-enable', state.wave2, 'enabled', false, toggleW2Controls);
+    bindInput('w2-x', state.wave2, 'x0', false);
+    bindInput('w2-a', state.wave2, 'A', false);
+    bindInput('w2-w', state.wave2, 'omega', true);
+    bindInput('w2-p', state.wave2, 'phase', true);
+    bindInput('w2-dir', state.wave2, 'startDir', false);
+    bindInput('w2-v', state.wave2, 'v', true);
+
+    // --- Initialization ---
+    setTimeout(() => {
+        resizeCanvas();
+        updateEquations();
+        animationId = requestAnimationFrame(loop);
+    }, 100); // Slight delay to ensure flex layout is computed
+
+</script>
+</body>
+</html>

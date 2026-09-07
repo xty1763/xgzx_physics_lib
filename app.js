@@ -21,9 +21,10 @@
   let resources = [];                // 资源清单（来自 data/resources.json，前端与后端共用）
   let uploadedList = [];             // 本地上传（历史遗留，仅本地可见）
   const objUrlCache = {};            // id -> objectURL（只在上传资源用）
+  const previewUrls = {};            // id -> objectURL（本会话刚保存的资源，可立刻打开，无需等 GitHub Pages）
   let pendingFile = null;            // 当前选中的待上传文件
   let editingId = null;              // 正在编辑的资源 id（null = 新增）
-  const ASSET_V = 14;                // 资源版本号（缓存破）
+  const ASSET_V = 15;                // 资源版本号（缓存破）
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"; // 方案A 后端（Cloudflare Worker）
   const WORKER_TOKEN_KEY = "worker_token";
   const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
@@ -153,8 +154,9 @@
     return Object.prototype.hasOwnProperty.call(r, "content");
   }
 
-  // 为上传资源生成可点击的 object URL（复用缓存）
+  // 为上传资源生成可点击的 object URL（复用缓存）；本会话刚保存的资源优先用本地预览（无需等部署）
   function openable(r) {
+    if (previewUrls[r.id]) return Object.assign({}, r, { url: previewUrls[r.id] });
     if (r.url) return r;
     if (isUploaded(r) && r.content) {
       if (!objUrlCache[r.id]) {
@@ -165,6 +167,13 @@
       return Object.assign({}, r, { url: objUrlCache[r.id] });
     }
     return r;
+  }
+
+  // 记录本会话刚保存的文件预览（管理员立刻可打开）
+  function setPreview(id, blob) {
+    if (!id || !blob) return;
+    if (previewUrls[id]) { try { URL.revokeObjectURL(previewUrls[id]); } catch (e) {} }
+    previewUrls[id] = URL.createObjectURL(blob);
   }
 
   function visible() {
@@ -483,21 +492,25 @@
     };
   }
 
+  // 带超时的 fetch：避免网络卡住导致“保存/删除一直转圈/无反应”
+  async function ghFetch(url, opts, timeout) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeout || 30000);
+    try {
+      return await fetch(url, Object.assign({}, opts, { signal: ctrl.signal }));
+    } catch (e) {
+      if (e && e.name === "AbortError") throw new Error("连接 GitHub 超时，请检查网络后重试");
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   function b64(text) {
     return btoa(unescape(encodeURIComponent(text)));
   }
   function fromB64(b) {
     return decodeURIComponent(escape(atob(b.replace(/\n/g, ""))));
-  }
-  // 把文件 byte 数组转成 base64（供 GitHub Contents API 上传二进制文件）
-  function bufToBase64(buf) {
-    const bytes = new Uint8Array(buf);
-    let bin = "";
-    const chunk = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-    }
-    return btoa(bin);
   }
 
   function esc(s) {
@@ -526,7 +539,7 @@
     const url =
       "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO +
       "/contents/" + path + "?ref=" + PUBLISH_BRANCH;
-    const res = await fetch(url, { headers: ghHeaders(token) });
+    const res = await ghFetch(url, { headers: ghHeaders(token) });
     if (!res.ok) throw new Error("读取仓库文件失败（" + res.status + "）");
     const data = await res.json();
     return { sha: data.sha, text: fromB64(data.content) };
@@ -536,7 +549,7 @@
   async function ghPutFile(token, path, contentB64, message, sha) {
     const body = { message: message, branch: PUBLISH_BRANCH, content: contentB64 };
     if (sha) body.sha = sha;
-    const res = await fetch(
+    const res = await ghFetch(
       "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO +
         "/contents/" + path,
       {
@@ -611,6 +624,8 @@
       tags: rec.tags || [], type: rec.type || "练习",
     });
     await saveResources(token, "登记资源：" + rec.title);
+    // 本会话里立刻可打开（无需等 GitHub Pages 部署）
+    if (rec._blob) setPreview(rec.id, rec._blob);
     return path;
   }
 
@@ -653,7 +668,7 @@
     const url =
       "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO +
       "/contents/" + path + "?ref=" + PUBLISH_BRANCH;
-    const res = await fetch(url, { headers: ghHeaders(token) });
+    const res = await ghFetch(url, { headers: ghHeaders(token) });
     if (!res.ok) throw new Error("读取文件失败（" + res.status + "）");
     const data = await res.json();
     return data.sha;
@@ -661,7 +676,7 @@
 
   async function ghDeleteFile(token, path, message) {
     const sha = await ghGetSha(token, path);
-    const res = await fetch(
+    const res = await ghFetch(
       "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO + "/contents/" + path,
       {
         method: "DELETE",
@@ -681,6 +696,7 @@
       try { await ghDeleteFile(token, res.url, "删除资源：" + res.title); }
       catch (e) { if (!/404|422|失败/.test(e.message)) throw e; }
     }
+    if (previewUrls[res.id]) { try { URL.revokeObjectURL(previewUrls[res.id]); } catch (e) {} delete previewUrls[res.id]; }
     resources = resources.filter((e) => e.id !== res.id);
     await saveResources(token, "删除资源：" + res.title);
     baseList = [...resources, ...uploadedList];
@@ -697,9 +713,24 @@
 
     let url = old.url || "";
     if (rec.contentB64) {
-      const path = "pages/" + slugPath(rec.title, rec.fileExt);
-      await ghPutFile(token, path, rec.contentB64, "更新资源文件：" + rec.title);
+      // 目标文件：优先沿用/覆盖，避免与其它资源重名冲突
+      let path = "pages/" + slugPath(rec.title, rec.fileExt);
+      const takenByOther = (p) => resources.some((x) => x.id !== rec.id && x.url === p);
+      if (takenByOther(path)) {
+        for (let i = 2; i < 30; i++) {
+          const dot = path.lastIndexOf(".");
+          const stem = dot > -1 ? path.slice(0, dot) : path;
+          const dotExt = dot > -1 ? path.slice(dot) : "";
+          const cand = stem + "-" + i + dotExt;
+          if (!takenByOther(cand)) { path = cand; break; }
+        }
+      }
+      // 取目标的 sha（存在则覆盖；不存在(404)则新建）
+      let sha = null;
+      try { sha = await ghGetSha(token, path); } catch (e) { sha = null; }
+      await ghPutFile(token, path, rec.contentB64, "更新资源文件：" + rec.title, sha || undefined);
       url = path;
+      if (rec._blob) setPreview(rec.id, rec._blob);   // 本会话立刻可打开
       if (old.url && old.url !== path && old.url.indexOf("pages/") === 0) {
         try { await ghDeleteFile(token, old.url, "移除旧文件：" + rec.title); } catch (e) {}
       }
@@ -1031,9 +1062,14 @@
   function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
       const fr = new FileReader();
-      fr.onload = () => resolve(bufToBase64(fr.result));
+      // 用 readAsDataURL：浏览器原生 base64，比手动分块拼接快且省内存
+      fr.onload = () => {
+        const dataUrl = String(fr.result || "");
+        const comma = dataUrl.indexOf(",");
+        resolve(comma > -1 ? dataUrl.slice(comma + 1) : dataUrl);
+      };
       fr.onerror = () => reject(fr.error);
-      fr.readAsArrayBuffer(file);
+      fr.readAsDataURL(file);
     });
   }
 
@@ -1046,6 +1082,7 @@
       toast("请填写资源名称", true);
       return;
     }
+    const editing = !!editingId;
     const isPaper = isPaperType();
     const extMatch = pendingFile && /\.[^.]*$/.exec(pendingFile.name);
     const fileExt = pendingFile ? (extMatch ? extMatch[0].toLowerCase() : ".html") : undefined;
@@ -1066,17 +1103,8 @@
       fileExt,
       contentB64: null,
       createdAt: Date.now(),
+      _blob: pendingFile,             // 记录原文件，用于本会话立即预览
     };
-
-    // 若选择了新文件，读取其字节
-    if (pendingFile) {
-      const contentB64 = await readFileAsBase64(pendingFile).catch((e) => {
-        toast("读取文件失败：" + (e && e.message), true);
-        return null;
-      });
-      if (!contentB64) return;
-      rec.contentB64 = contentB64;
-    }
 
     // 站长有 GitHub 令牌则直连（可靠）；仅授权老师(只有 Worker 令牌)才走 Worker
     const isWorker = !!getWorkerToken() && !getPublishToken();
@@ -1088,8 +1116,21 @@
 
     saving = true;
     saveBtn.disabled = true;
+    const origLabel = editing ? "保存修改" : "保存资源";
+    saveBtn.textContent = "上传中…";
+    toast("正在保存，请稍候…");
+
     try {
-      if (editingId) {
+      // 读取并转 base64（用 readAsDataURL，快；较大文件给出提示）
+      if (pendingFile) {
+        if (pendingFile.size > 50 * 1024 * 1024) throw new Error("文件过大（超过50MB），请压缩后再上传");
+        if (pendingFile.size > 20 * 1024 * 1024) toast("文件较大，上传会稍慢…");
+        const contentB64 = await readFileAsBase64(pendingFile).catch(() => null);
+        if (!contentB64) { toast("读取文件失败，请重试", true); return; }
+        rec.contentB64 = contentB64;
+      }
+
+      if (editing) {
         if (isWorker) {
           await workerUpdate(rec);
           await loadAll();
@@ -1117,13 +1158,14 @@
         baseList = [...resources, ...uploadedList];
         render();
         closeModal();
-        toast("已发布到线上（约1分钟后其他访客也能看到）");
+        toast("已发布：卡片已出现，约1分钟后其它访客也能看到");
       }
     } catch (e) {
-      toast("发布失败：" + e.message, true);
+      toast((editing ? "保存失败：" : "发布失败：") + (e && e.message), true);
     } finally {
       saving = false;
       saveBtn.disabled = false;
+      saveBtn.textContent = origLabel;
     }
   }
 

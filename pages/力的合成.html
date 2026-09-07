@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>合力与分力关系</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    .container { max-width: 800px; margin: 0 auto; }
+    canvas { border: 1px solid #000; }
+    .controls { margin-top: 20px; }
+    .control-group { margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>合力与分力关系</h2>
+    <canvas id="vectorCanvas" width="600" height="400"></canvas>
+    <div class="controls">
+      <div class="control-group">
+        <label>分力 F₁ 大小： <input type="range" id="f1Slider" min="10" max="100" value="50"></label>
+        <span id="f1Value">50</span>
+      </div>
+      <div class="control-group">
+        <label>分力 F₂ 大小： <input type="range" id="f2Slider" min="10" max="100" value="50"></label>
+        <span id="f2Value">50</span>
+      </div>
+      <div class="control-group">
+        <label>夹角 θ (度)： <input type="range" id="angleSlider" min="0" max="180" value="90"></label>
+        <span id="angleValue">90</span>
+      </div>
+      <div class="control-group">
+        <strong>合力 R 大小：</strong> <span id="resultantMagnitude">70.71</span><br>
+        <strong>合力方向 (与 F₁ 夹角)：</strong> <span id="resultantAngle">45</span>°
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('vectorCanvas');
+    const ctx = canvas.getContext('2d');
+    const scaleFactor = 3; // 用于将力的大小转换为像素长度
+
+    function drawVectors() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // 获取输入值
+      const f1 = parseFloat(document.getElementById('f1Slider').value);
+      const f2 = parseFloat(document.getElementById('f2Slider').value);
+      const theta = parseFloat(document.getElementById('angleSlider').value);
+      
+      // 计算合力
+      const thetaRad = theta * Math.PI / 180;
+      const resultant = Math.sqrt(f1*f1 + f2*f2 + 2*f1*f2*Math.cos(thetaRad));
+      const resultantAngle = Math.atan2(f2*Math.sin(thetaRad), f1 + f2*Math.cos(thetaRad)) * 180 / Math.PI;
+      
+      // 显示计算结果
+      document.getElementById('f1Value').textContent = f1;
+      document.getElementById('f2Value').textContent = f2;
+      document.getElementById('angleValue').textContent = theta;
+      document.getElementById('resultantMagnitude').textContent = resultant.toFixed(2);
+      document.getElementById('resultantAngle').textContent = resultantAngle.toFixed(2);
+      
+      // 绘制坐标系
+      drawAxes();
+      
+      // 绘制分力 F1
+      const f1End = drawVector(100, 200, f1 * scaleFactor, 0, 'blue', 'F₁');
+      
+      // 绘制分力 F2
+      const f2End = drawVector(100, 200, f2 * scaleFactor, theta, 'red', 'F₂');
+      
+      // 绘制合力 R
+      const rEnd = drawVector(100, 200, resultant * scaleFactor, resultantAngle, 'green', 'R');
+      
+      // 连接F1末端到R末端的虚线
+      connectWithDashedLine(f1End, rEnd);
+      
+      // 连接F2末端到R末端的虚线
+      connectWithDashedLine(f2End, rEnd);
+    }
+
+    function drawAxes() {
+      ctx.beginPath();
+      ctx.moveTo(0, 200);
+      ctx.lineTo(600, 200);
+      ctx.moveTo(100, 0);
+      ctx.lineTo(100, 400);
+      ctx.strokeStyle = '#888';
+      ctx.stroke();
+    }
+
+    function drawVector(x, y, length, angle, color, label) {
+      const angleRad = angle * Math.PI / 180;
+      const endX = x + length * Math.cos(angleRad);
+      const endY = y - length * Math.sin(angleRad);
+      
+      // 绘制箭头
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(endX, endY);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // 绘制箭头尖
+      const arrowSize = 10;
+      const angle1 = angleRad + Math.PI/6;
+      const angle2 = angleRad - Math.PI/6;
+      ctx.beginPath();
+      ctx.moveTo(endX, endY);
+      ctx.lineTo(endX - arrowSize*Math.cos(angle1), endY + arrowSize*Math.sin(angle1));
+      ctx.lineTo(endX - arrowSize*Math.cos(angle2), endY + arrowSize*Math.sin(angle2));
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      
+      // 添加标签
+      ctx.fillStyle = color;
+      ctx.font = '14px Arial';
+      ctx.fillText(label, endX + 5, endY - 5);
+      
+      return {x: endX, y: endY}; // 返回末端坐标
+    }
+
+    function connectWithDashedLine(start, end) {
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.setLineDash([5, 5]); // 设置虚线样式
+      ctx.strokeStyle = '#000'; // 黑色虚线
+      ctx.stroke();
+      ctx.setLineDash([]); // 恢复实线样式
+    }
+
+    // 添加事件监听器
+    document.getElementById('f1Slider').addEventListener('input', drawVectors);
+    document.getElementById('f2Slider').addEventListener('input', drawVectors);
+    document.getElementById('angleSlider').addEventListener('input', drawVectors);
+    
+    // 初始绘制
+    drawVectors();
+  </script>
+</body>
+</html>

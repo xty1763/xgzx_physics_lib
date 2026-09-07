@@ -1,7 +1,7 @@
 /*
  * 高中物理教学资源库 —— 前端逻辑
  * 依赖：data/course-data.js 提供 window.COURSE
- *       data/resources.js  提供 window.MANIFEST
+ *       data/resources.json 提供资源清单（前端 fetch，前后端共用）
  */
 (function () {
   "use strict";
@@ -17,14 +17,27 @@
 
   const openBooks = new Set();       // 默认收起教材，点开后才展开，便于选择
   const openChapters = new Set();    // 展开的章节
-  let baseList = [];                 // 预置清单 + 本地上传
+  let baseList = [];                 // 当前展示的资源（清单 + 本地上传）
+  let resources = [];                // 资源清单（来自 data/resources.json，前端与后端共用）
   let uploadedList = [];             // 本地上传（历史遗留，仅本地可见）
   const objUrlCache = {};            // id -> objectURL（只在上传资源用）
   let pendingFile = null;            // 当前选中的待上传文件
   let editingId = null;              // 正在编辑的资源 id（null = 新增）
+  const ASSET_V = 8;                 // 资源版本号（缓存破）
+  const WORKER_URL = "https://physics-lib.free.workers.dev"; // 方案A 后端地址（部署 Worker 后改为你的地址）
+  const WORKER_TOKEN_KEY = "worker_token";
+  const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
 
   const $ = (sel) => document.querySelector(sel);
   const NAV_KEY = "nav_collapsed";
+
+  // 当前有效身份：优先“授权用户”(Worker 会话)，否则“站长”(GitHub 令牌)
+  function getWorkerToken() {
+    try { return localStorage.getItem(WORKER_TOKEN_KEY) || ""; } catch (e) { return ""; }
+  }
+  function setWorkerToken(t) { try { localStorage.setItem(WORKER_TOKEN_KEY, t); } catch (e) {} }
+  function clearWorkerToken() { try { localStorage.removeItem(WORKER_TOKEN_KEY); } catch (e) {} }
+  const canUpload = () => !!(getWorkerToken() || getPublishToken());
 
   // 收起/展开左侧导航栏（记住偏好）
   function applyNavState() {
@@ -118,9 +131,17 @@
     } catch (e) {
       uploaded = [];
     }
-    // 合并预置与上传，上传的放在后面
+    // 拉取资源清单（JSON）
+    try {
+      const res = await fetch("data/resources.json?v=" + ASSET_V);
+      if (!res.ok) throw new Error("加载清单失败");
+      resources = await res.json();
+      if (!Array.isArray(resources)) resources = [];
+    } catch (e) {
+      resources = [];
+    }
     uploadedList = uploaded;
-    baseList = [...(window.MANIFEST || []), ...uploaded];
+    baseList = [...resources, ...uploaded];
     render();
   }
 
@@ -374,7 +395,8 @@
   async function handleDelete(r) {
     if (!window.confirm("确定要删除资源「" + r.title + "」吗？这会从线上仓库移除。")) return;
     try {
-      await deleteResource(r);
+      if (getWorkerToken()) await workerDelete(r);
+      else await deleteResource(r);
       toast("已删除");
     } catch (e) {
       toast("删除失败：" + e.message, true);
@@ -561,7 +583,6 @@
     const token = getPublishToken();
     if (!token) throw new Error("请先填写 GitHub 访问令牌");
     const message = "新增资源：" + rec.title;
-    // 1) 上传文件（HTML / PDF / DOCX 等二进制均可）；同名标题撞名时加序号
     let path = "pages/" + slugPath(rec.title, rec.fileExt);
     for (let dup = 0; dup < 30; dup++) {
       try {
@@ -578,19 +599,13 @@
         }
       }
     }
-    // 2) 更新 data/resources.js 登记（并发冲突时自动重读取并重试）
-    for (let attempt = 0; attempt < 4; attempt++) {
-      try {
-        const mf = await ghGetContents(token, "data/resources.js");
-        const newSource = manifestInsert(mf.text, buildEntryText(rec, path));
-        await ghPutFile(token, "data/resources.js", b64(newSource), "登记资源：" + rec.title, mf.sha);
-        return path;
-      } catch (e) {
-        if (e.message && /409|does not match/i.test(e.message)) continue;
-        throw e;
-      }
-    }
-    throw new Error("多人同时修改冲突，请稍后重试");
+    resources.push({
+      id: rec.id, title: rec.title, desc: rec.desc || "", book: rec.book || "",
+      chapter: rec.chapter || "", section: rec.section || "", url: path,
+      tags: rec.tags || [], type: rec.type || "练习",
+    });
+    await saveResources(token, "登记资源：" + rec.title);
+    return path;
   }
 
   // ---------- 清单序列化 / 编辑 / 删除 ----------
@@ -611,26 +626,13 @@
     );
   }
 
-  // 用当前 window.MANIFEST 重新生成完整的 data/resources.js
-  function serializeManifest() {
-    const list = window.MANIFEST || [];
-    return (
-      "/*\n" +
-      " * 高中物理教学资源库 —— 预置资源清单（manifest）\n" +
-      " * 由“资源发布/编辑/删除”自动维护，请勿手工改这份再被覆盖。\n" +
-      " */\n" +
-      "window.MANIFEST = [\n" +
-      list.map((e) => "  " + entryToJs(e)).join(",\n") +
-      "\n];\n"
-    );
-  }
-
-  async function saveManifest(token, message) {
-    const newSource = serializeManifest();
+  // 把当前 resources 数组保存到 data/resources.json（供站长的 GitHub 令牌直接写入）
+  async function saveResources(token, message) {
+    const newJson = JSON.stringify(resources, null, 2);
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
-        const mf = await ghGetContents(token, "data/resources.js");
-        await ghPutFile(token, "data/resources.js", b64(newSource), message, mf.sha);
+        const cur = await ghGetContents(token, "data/resources.json");
+        await ghPutFile(token, "data/resources.json", b64(newJson), message, cur.sha);
         return;
       } catch (e) {
         if (e.message && /409|does not match/i.test(e.message)) continue;
@@ -669,54 +671,64 @@
   async function deleteResource(res) {
     const token = getPublishToken();
     if (!token) throw new Error("请先登录管理员");
-    // 尝试删除文件（若文件不存在则跳过）
     if (res.url && res.url.indexOf("pages/") === 0) {
-      try {
-        await ghDeleteFile(token, res.url, "删除资源：" + res.title);
-      } catch (e) {
-        if (!/404|422|失败/.test(e.message)) throw e;
-      }
+      try { await ghDeleteFile(token, res.url, "删除资源：" + res.title); }
+      catch (e) { if (!/404|422|失败/.test(e.message)) throw e; }
     }
-    window.MANIFEST = window.MANIFEST.filter((e) => e.id !== res.id);
-    await saveManifest(token, "删除资源：" + res.title);
-    baseList = [...(window.MANIFEST || []), ...uploadedList];
+    resources = resources.filter((e) => e.id !== res.id);
+    await saveResources(token, "删除资源：" + res.title);
+    baseList = [...resources, ...uploadedList];
     render();
   }
 
-  // 编辑资源：更新清单里的字段，并可选换新文件
+  // 编辑资源：更新清单字段，并可选换新文件
   async function updateResource(rec) {
     const token = getPublishToken();
     if (!token) throw new Error("请先登录管理员");
-    const idx = window.MANIFEST.findIndex((e) => e.id === rec.id);
-    const old = window.MANIFEST[idx];
+    const idx = resources.findIndex((e) => e.id === rec.id);
+    const old = resources[idx];
     if (!old) throw new Error("找不到要编辑的资源");
 
-    // 若上传了新文件，则写入并更新 url
     let url = old.url || "";
     if (rec.contentB64) {
       const path = "pages/" + slugPath(rec.title, rec.fileExt);
       await ghPutFile(token, path, rec.contentB64, "更新资源文件：" + rec.title);
       url = path;
-      // 文件路径变了则删旧文件
       if (old.url && old.url !== path && old.url.indexOf("pages/") === 0) {
         try { await ghDeleteFile(token, old.url, "移除旧文件：" + rec.title); } catch (e) {}
       }
     }
 
-    window.MANIFEST[idx] = {
-      id: old.id,
-      title: rec.title,
-      desc: rec.desc || "",
-      book: rec.book || "",
-      chapter: rec.chapter || "",
-      section: rec.section || "",
-      url: url,
-      tags: rec.tags || [],
-      type: rec.type || "练习",
+    resources[idx] = {
+      id: old.id, title: rec.title, desc: rec.desc || "", book: rec.book || "",
+      chapter: rec.chapter || "", section: rec.section || "", url: url,
+      tags: rec.tags || [], type: rec.type || "练习",
     };
-    await saveManifest(token, "编辑资源：" + rec.title);
-    baseList = [...(window.MANIFEST || []), ...uploadedList];
+    await saveResources(token, "编辑资源：" + rec.title);
+    baseList = [...resources, ...uploadedList];
     render();
+  }
+
+  // ---- 授权用户走 Cloudflare Worker（后端持有 GitHub 令牌） ----
+  async function workerPost(action, payload) {
+    const token = getWorkerToken();
+    if (!token) throw new Error("请先通过“授权登录”");
+    const res = await fetch(WORKER_URL + "/" + action, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({ token: token }, payload)),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || ("请求失败（" + res.status + "）"));
+    return data;
+  }
+  async function workerDelete(res) {
+    await workerPost("delete", { id: res.id, url: res.url, title: res.title });
+    await loadAll();
+  }
+  async function workerUpdate(rec) {
+    await workerPost("update", rec);
+    await loadAll();
   }
 
   // ---------- 上传弹窗 ----------
@@ -785,10 +797,13 @@
 
   // 根据是否有本地令牌，显示/隐藏上传按钮
   function refreshAdminUI() {
-    const has = !!getPublishToken();
+    const owner = !!getPublishToken();
+    const worker = !!getWorkerToken();
+    const has = owner || worker;
     $("#uploadBtn").style.display = has ? "" : "none";
-    $("#adminBtn").textContent = has ? "⚙ 管理员设置" : "🔑 管理员登录";
-    $("#adminLoggedInRow").style.display = has ? "block" : "none";
+    $("#adminBtn").textContent = owner ? "⚙ 管理员设置" : "🔑 管理员登录";
+    $("#adminLoggedInRow").style.display = owner ? "block" : "none";
+    if ($("#workeredInRow")) $("#workeredInRow").style.display = worker ? "block" : "none";
   }
 
   function openModal(res) {
@@ -869,6 +884,47 @@
     toast("已退出，上传入口已隐藏");
   }
 
+  // ---------- 授权登录（其他老师，走 Cloudflare Worker） ----------
+  const workerMask = $("#workerMask");
+  function openWorkerModal() {
+    workerMask.classList.add("show");
+    setTimeout(() => $("#workerUser").focus(), 50);
+  }
+  function closeWorkerModal() {
+    workerMask.classList.remove("show");
+  }
+  async function saveWorkerLogin() {
+    const u = $("#workerUser").value.trim();
+    const p = $("#workerPass").value;
+    if (!u || !p) {
+      toast("请输入授权账号和密码", true);
+      return;
+    }
+    try {
+      const res = await fetch(WORKER_URL + "/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ u: u, p: p }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ("登录失败（" + res.status + "）"));
+      setWorkerToken(data.token);
+      closeWorkerModal();
+      refreshAdminUI();
+      render();
+      toast("已登录（授权用户）");
+    } catch (e) {
+      toast("登录失败：" + e.message, true);
+    }
+  }
+  function workerLogout() {
+    if (!window.confirm("确定要退出授权登录吗？")) return;
+    clearWorkerToken();
+    refreshAdminUI();
+    render();
+    toast("已退出授权登录");
+  }
+
   const FILE_RE = /\.(html?|htm|pdf|docx?|pptx?|xlsx?|txt|md|png|jpe?g|webp|gif|mp4|zip)$/i;
 
   function setPendingFile(file) {
@@ -939,16 +995,17 @@
       rec.contentB64 = contentB64;
     }
 
-    if (!getPublishToken()) {
-      toast("请先点击“🔑 管理员登录”输入令牌", true);
+    const isWorker = !!getWorkerToken();
+    if (!isWorker && !getPublishToken()) {
+      toast("请先登录（管理员或授权登录）", true);
       openAdminModal();
       return;
     }
 
     if (editingId) {
-      // 编辑：更新线上清单（可选替换文件）
       try {
-        await updateResource(rec);
+        if (isWorker) await workerUpdate(rec);
+        else await updateResource(rec);
         await loadAll();
         closeModal();
         toast("已保存修改");
@@ -958,28 +1015,23 @@
       return;
     }
 
-    // 新增：发布到线上
+    // 新增
     if (!pendingFile) {
       toast("请先选择一个文件", true);
       return;
     }
     try {
-      const path = await publishResource(rec);
-      const published = {
-        id: rec.id,
-        title: rec.title,
-        desc: rec.desc,
-        book: rec.book,
-        chapter: rec.chapter,
-        section: rec.section,
-        url: path,
-        tags: rec.tags,
-        type: rec.type,
-      };
-      window.MANIFEST.push(published);
-      await loadAll();
-      closeModal();
-      toast("已发布到线上，其他访客也能看到");
+      if (isWorker) {
+        await workerPost("upload", rec);
+        await loadAll();
+        closeModal();
+        toast("已发布到线上（授权用户）");
+      } else {
+        await publishResource(rec);
+        await loadAll();
+        closeModal();
+        toast("已发布到线上，其他访客也能看到");
+      }
     } catch (e) {
       toast("发布失败：" + e.message, true);
     }
@@ -1242,6 +1294,17 @@
     $("#clearTokenBtn").onclick = clearToken;
     $("#adminToken").addEventListener("keydown", (e) => {
       if (e.key === "Enter") saveAdmin();
+    });
+    $("#workerBtn").onclick = openWorkerModal;
+    $("#closeWorkerModal").onclick = closeWorkerModal;
+    $("#cancelWorkerModal").onclick = closeWorkerModal;
+    workerMask.addEventListener("click", (e) => {
+      if (e.target === workerMask) closeWorkerModal();
+    });
+    $("#workerSave").onclick = saveWorkerLogin;
+    $("#workerLogoutBtn").onclick = workerLogout;
+    $("#workerPass").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") saveWorkerLogin();
     });
 
     const dz = $("#dropzone");

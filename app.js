@@ -23,7 +23,7 @@
   const objUrlCache = {};            // id -> objectURL（只在上传资源用）
   let pendingFile = null;            // 当前选中的待上传文件
   let editingId = null;              // 正在编辑的资源 id（null = 新增）
-  const ASSET_V = 12;                // 资源版本号（缓存破）
+  const ASSET_V = 13;                // 资源版本号（缓存破）
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"; // 方案A 后端（Cloudflare Worker）
   const WORKER_TOKEN_KEY = "worker_token";
   const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
@@ -862,13 +862,41 @@
     mask.classList.remove("show");
   }
 
-  // 依据 标题/文件名 自动识别 章节/类型/标签 并预填（free，无外部模型）
-  function smartFill(force) {
+  // 依据 标题/文件名 + 文件内容 自动识别 章节/类型/标签 并预填（free，无外部模型）
+  const TEXT_EXT_RE = /^(html?|htm|md|txt)$/;
+  function extOf(name) {
+    const m = /\.([a-z0-9]+)$/i.exec(name || "");
+    return m ? m[1].toLowerCase() : "";
+  }
+  // 只读文件头部约100KB作为文本样本（快，用于内容识别；二进制文件跳过）
+  function readTextSample(file) {
+    return new Promise((resolve) => {
+      if (!file) return resolve("");
+      try {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result || ""));
+        fr.onerror = () => resolve("");
+        fr.readAsText(file.slice(0, 102400));
+      } catch (e) {
+        resolve("");
+      }
+    });
+  }
+
+  async function smartFill(force) {
     const title = $("#fTitle").value.trim() || (pendingFile ? pendingFile.name : "");
     if (!title) return;
-    const type = detectType(title);
-    let bookId = detectBook(title);
-    const loc = detectLoc(title, bookId);
+    const ext = pendingFile ? extOf(pendingFile.name) : "";
+    // 文本类文件读取头部一小段内容作辅助（HTML/文本）；毫秒级，不阻塞界面
+    let content = "";
+    if (pendingFile && TEXT_EXT_RE.test(ext)) {
+      content = await readTextSample(pendingFile);
+    }
+    const searchStr = (title + " " + content).trim();
+
+    const type = detectType(title, ext, content);
+    let bookId = detectBook(searchStr);
+    const loc = detectLoc(title, content, bookId);
 
     if (force || !$("#fType").value) {
       if (type) { $("#fType").value = type; refreshTypeUI(); }
@@ -1114,16 +1142,34 @@
     { id: "b6", names: ["选择性必修第三册", "选择性必修三", "选必三", "选必3", "选修三"] },
   ];
   function detectBook(s) {
-    for (const b of BOOK_ALIASES) for (const n of b.names) if (s.indexOf(n) > -1) return b.id;
-    return null;
+    // 选“最长匹配”的别名，避免“必修一”命中“选择性必修一”这类子串误判
+    let best = null, bestLen = 0;
+    for (const b of BOOK_ALIASES)
+      for (const n of b.names)
+        if (s.indexOf(n) > -1 && n.length > bestLen) { best = b.id; bestLen = n.length; }
+    return best;
   }
 
-  function detectType(s) {
-    if (/仿真|模拟|动画|交互|演示/.test(s)) return "仿真资源";
-    if (/教案|教学设计|导学案/.test(s)) return "教案";
-    if (/课件|幻灯片|演示文稿|\bppt\b/i.test(s)) return "课件";
-    if (/试卷|试题|卷子|考试|测验/.test(s)) return "试卷";
-    if (/练习|习题|作业|题目/.test(s)) return "练习";
+  function detectType(s, ext, content) {
+    const t = String(s || "").trim();
+    const c = String(content || "").slice(0, 3000);
+    const hasT = (re) => re.test(t);
+    const hasC = (re) => re.test(c);
+    // 1) 标题/文件名里的明确类型词（最可靠）
+    if (hasT(/教案|教学设计|导学案/)) return "教案";
+    if (hasT(/试卷|试题|卷子|考试|月考|期中|期末|测验/)) return "试卷";
+    if (hasT(/练习|习题|作业|题目|同步|巩固/)) return "练习";
+    if (hasT(/课件|幻灯片|演示文稿|\bppt\b/i)) return "课件";
+    if (hasT(/仿真|模拟|动画|交互|演示/)) return "仿真资源";
+    // 2) 文件类型兜底（标题没提示时）：HTML 通常是可交互仿真；PPT 通常是课件
+    if (/^(html?|htm)$/.test(ext)) return "仿真资源";
+    if (/^(pptx?|ppt)$/.test(ext)) return "课件";
+    // 3) 读文件内容兜底（仅文本类文件）
+    if (hasC(/教案|教学设计|导学案/)) return "教案";
+    if (hasC(/试卷|试题|考试|测验/)) return "试卷";
+    if (hasC(/练习|习题|作业|题目/)) return "练习";
+    if (hasC(/课件|幻灯片|演示文稿/)) return "课件";
+    if (hasC(/仿真|模拟|动画|交互|演示|canvas/i)) return "仿真资源";
     return null;
   }
 
@@ -1143,24 +1189,53 @@
     return s.replace(/^\s*\d+(\.\d+)*\s*/, "");
   }
 
-  function detectLoc(s, bookId) {
+  function detectLoc(s, content, bookId) {
     const books = COURSE.books.filter((b) => !bookId || b.id === bookId);
-    const wantNum = parseChapterNum(s);
-    const topic = removeNoise(s);
+    const hay = (s || "") + " " + (content || "");
+    const wantNum = parseChapterNum(hay);
+    const topic = removeNoise(s || "");
     let chapter = null, section = null;
-    // 1) 数字章节“第X章”
+    // 1) 数字章节“第X章”（标题在前，优先命中标题；按教材顺序首个）
     if (wantNum) {
-      for (const b of books)
-        for (const c of b.chapters)
-          if (parseChapterNum(c.title) === wantNum) { chapter = c.id; break; }
+      outer: for (const b of books) for (const c of b.chapters)
+        if (parseChapterNum(c.title) === wantNum) { chapter = c.id; break outer; }
     }
-    // 2) 主题词命中某章（章标题 + 各小节标题都算）
+    // 2) 标题里的主题词命中某章（章标题 + 各小节标题都算）
     if (!chapter && topic.length >= 2) {
-      for (const b of books)
-        for (const c of b.chapters) {
-          const sig = cleanChapter(c.title) + " " + c.sections.map((sec) => cleanSection(sec.title)).join(" ");
-          if (sig.indexOf(topic) > -1) { chapter = c.id; break; }
+      outer: for (const b of books) for (const c of b.chapters) {
+        const sig = cleanChapter(c.title) + " " + c.sections.map((sec) => cleanSection(sec.title)).join(" ");
+        if (sig.indexOf(topic) > -1) { chapter = c.id; break outer; }
+      }
+    }
+    // 3) 在“标题+内容”里找章节标题（取“最具体/最长”匹配，避免短名误中）
+    if (!chapter) {
+      let best = null, bestLen = 0;
+      for (const b of books) for (const c of b.chapters) {
+        const ct = cleanChapter(c.title);
+        if (ct && ct.length > bestLen && hay.indexOf(ct) > -1) { best = c.id; bestLen = ct.length; }
+      }
+      chapter = best;
+    }
+    // 5) 内容含小节标题但没给章节标题：反查该小节所属章节（取最长匹配）
+    if (!chapter) {
+      let bestC = null, bestS = null, bestLen = 0;
+      for (const b of books) for (const c of b.chapters) for (const sec of c.sections) {
+        const st = cleanSection(sec.title);
+        if (st && st.length > bestLen && hay.indexOf(st) > -1) { bestC = c.id; bestS = sec.id; bestLen = st.length; }
+      }
+      chapter = bestC; section = bestS;
+    }
+    // 4) 已知章节时，再定位小节（取最长匹配，避免“动量”误中“动量守恒”）
+    if (chapter && !section) {
+      const ch = allChapters.find((x) => x.id === chapter);
+      if (ch) {
+        let best = null, bestLen = 0;
+        for (const sec of ch.sections) {
+          const st = cleanSection(sec.title);
+          if (st && st.length > bestLen && hay.indexOf(st) > -1) { best = sec.id; bestLen = st.length; }
         }
+        section = best;
+      }
     }
     return { chapter: chapter, section: section };
   }
@@ -1168,7 +1243,7 @@
   function searchAssistant(s) {
     const bookId = detectBook(s);
     const type = detectType(s);
-    const loc = detectLoc(s, bookId);
+    const loc = detectLoc(s, "", bookId);
     const topic = removeNoise(s);
 
     let pool = baseList.slice();

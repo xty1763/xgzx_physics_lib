@@ -20,5 +20,18 @@
     "url": "pages/波的干涉.html",
     "tags": [],
     "type": "仿真资源"
+  },
+  {
+    "id": "r17887806012249ugbz",
+    "title": "电磁合场",
+    "desc": "",
+    "book": "b5",
+    "chapter": "b5c1",
+    "section": "b5c1s3",
+    "url": "pages/电磁合场.html",
+    "tags": [
+      "电磁合场"
+    ],
+    "type": "仿真资源"
   }
 ]

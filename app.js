@@ -1024,28 +1024,39 @@
     return null;
   }
 
+  // 去掉“第X章”、教材名、类型词、标点，得到主题词（用于识别章节/关键词）
+  const NOISE = /练习|习题|作业|题目|试卷|试题|考试|测验|课件|幻灯片|演示文稿|教案|教学设计|导学案|仿真|模拟|动画|交互|演示|\bppt\b/gi;
+  function removeNoise(s) {
+    let t = String(s).replace(/第[一二三四五六七八九十]+\d*章/g, " ");
+    for (const b of BOOK_ALIASES) for (const n of b.names) t = t.replace(new RegExp(n, "g"), " ");
+    t = t.replace(NOISE, " ");
+    t = t.replace(/[，。、,.\s]+/g, " ").trim();
+    return t;
+  }
+  function cleanChapter(c) {
+    return c.replace(/^第[一二三四五六七八九十]+章\s*/, "");
+  }
+  function cleanSection(s) {
+    return s.replace(/^\s*\d+(\.\d+)*\s*/, "");
+  }
+
   function detectLoc(s, bookId) {
-    const wantNum = parseChapterNum(s);
     const books = COURSE.books.filter((b) => !bookId || b.id === bookId);
+    const wantNum = parseChapterNum(s);
+    const topic = removeNoise(s);
     let chapter = null, section = null;
+    // 1) 数字章节“第X章”
     if (wantNum) {
       for (const b of books)
         for (const c of b.chapters)
           if (parseChapterNum(c.title) === wantNum) { chapter = c.id; break; }
     }
-    if (!chapter) {
-      for (const b of books)
-        for (const c of b.chapters)
-          for (const sec of c.sections) {
-            const phrase = sec.title.replace(/^\s*\d+(\.\d+)*\s*/, "");
-            if (phrase.length >= 3 && s.indexOf(phrase) > -1) { chapter = c.id; section = sec.id; break; }
-          }
-    }
-    if (!chapter) {
+    // 2) 主题词命中某章（章标题 + 各小节标题都算）
+    if (!chapter && topic.length >= 2) {
       for (const b of books)
         for (const c of b.chapters) {
-          const phrase = c.title.replace(/第[一二三四五六七八九十]+章\s*/, "");
-          if (phrase.length >= 3 && s.indexOf(phrase) > -1) { chapter = c.id; break; }
+          const sig = cleanChapter(c.title) + " " + c.sections.map((sec) => cleanSection(sec.title)).join(" ");
+          if (sig.indexOf(topic) > -1) { chapter = c.id; break; }
         }
     }
     return { chapter: chapter, section: section };
@@ -1055,25 +1066,24 @@
     const bookId = detectBook(s);
     const type = detectType(s);
     const loc = detectLoc(s, bookId);
+    const topic = removeNoise(s);
 
     let pool = baseList.slice();
     if (bookId) pool = pool.filter((r) => r.book === bookId);
     if (type) pool = pool.filter((r) => r.type === type);
-    if (loc && loc.section) pool = pool.filter((r) => r.section === loc.section);
-    else if (loc && loc.chapter) pool = pool.filter((r) => r.chapter === loc.chapter);
+    if (loc && loc.chapter) pool = pool.filter((r) => r.chapter === loc.chapter);
 
-    const drop = /必修第?[一二三0-9]|选择性必修|选必|选修|高一上|高一下|高二上|练习|习题|作业|试卷|试题|课件|教案|教学设计|导学案|仿真|模拟|动画|演示|交互/;
-    const words = s.split(/[,\s，。、]+/).filter((w) => w.length >= 2 && !drop.test(w));
-    if (words.length) {
+    if (topic.length >= 2) {
+      const lt = topic.toLowerCase();
       pool = pool.filter((r) => {
         const hay = [
           r.title, r.desc, (r.tags || []).join(" "),
           bookTitle(r.book), chapterTitle(r.chapter), sectionTitle(r.section),
         ].join(" ").toLowerCase();
-        return words.every((w) => hay.indexOf(w) > -1);
+        return hay.indexOf(lt) > -1;
       });
     }
-    return { pool: pool, book: bookId, type: type, loc: loc, keywords: words };
+    return { pool: pool, book: bookId, type: type, loc: loc, keywords: topic };
   }
 
   function htmlEscape(s) {

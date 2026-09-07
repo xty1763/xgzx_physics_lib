@@ -35,5 +35,16 @@ window.MANIFEST = [
     url: "pages/res-resource-wjr3u.html",
     tags: [],
     type: "仿真资源"
+  },
+  {
+    id: "r178876252931582voe",
+    title: "波的叠加",
+    desc: "",
+    book: "b4",
+    chapter: "b4c3",
+    section: "b4c3s1",
+    url: "pages/波的叠加.html",
+    tags: [],
+    type: "仿真资源"
   }
 ];

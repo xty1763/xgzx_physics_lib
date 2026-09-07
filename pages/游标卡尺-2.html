@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vernier Caliper Demonstration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        body {
+            background-color: #f0fdf4; /* Light green tint for less eye strain */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden; /* Prevent scrolling */
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .canvas-container {
+            position: relative;
+            background-color: #ffffff;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e5e7eb;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #2563eb;
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .btn {
+            transition: all 0.1s;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col p-4 gap-4 text-slate-800">
+
+    <!-- Header -->
+    <header class="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-slate-200 shrink-0">
+        <div>
+            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Vernier Caliper Simulator</h1>
+            <p class="text-sm text-slate-500 font-medium">Precision: 0.05 mm (20 divisions)</p>
+        </div>
+        <button id="toggleReadingBtn" class="btn bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-bold shadow-md flex items-center gap-2 text-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            Hide Reading
+        </button>
+    </header>
+
+    <!-- Main View (Full Caliper) -->
+    <div class="canvas-container h-2/5 w-full shrink-0 relative" id="mainCanvasContainer">
+        <div class="absolute top-2 left-4 text-sm font-bold text-slate-400 uppercase tracking-wider z-10 pointer-events-none">Full View (Drag to move)</div>
+        <canvas id="mainCanvas"></canvas>
+    </div>
+
+    <!-- Bottom Section: Magnifier & Controls -->
+    <div class="flex flex-col md:flex-row gap-4 flex-1 min-h-0">
+        
+        <!-- Magnified View -->
+        <div class="canvas-container flex-1 relative" id="magCanvasContainer">
+            <div class="absolute top-2 left-4 text-sm font-bold text-blue-500 uppercase tracking-wider z-10 pointer-events-none">Magnified View</div>
+            <canvas id="magCanvas"></canvas>
+        </div>
+
+        <!-- Controls & Reading Panel -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 flex flex-col gap-6 w-full md:w-96 shrink-0 overflow-y-auto">
+            
+            <!-- Reading Display -->
+            <div class="bg-slate-50 p-4 rounded border border-slate-200">
+                <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">Measurement</h2>
+                
+                <div id="readingDisplay" class="space-y-2">
+                    <div class="flex justify-between text-lg">
+                        <span class="text-slate-600">Main Scale:</span>
+                        <span id="valMain" class="font-mono font-bold">0.00 mm</span>
+                    </div>
+                    <div class="flex justify-between text-lg border-b border-slate-200 pb-2">
+                        <span class="text-slate-600">Vernier Scale:</span>
+                        <span id="valVernier" class="font-mono font-bold">0.00 mm</span>
+                    </div>
+                    <div class="flex justify-between text-2xl pt-1 text-blue-700">
+                        <span class="font-bold">Total:</span>
+                        <span id="valTotal" class="font-mono font-black">0.00 mm</span>
+                    </div>
+                </div>
+
+                <div id="hiddenDisplay" class="hidden h-24 flex items-center justify-center">
+                    <span class="text-slate-400 italic text-lg">Reading is hidden for practice.</span>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex flex-col gap-4">
+                <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider">Fine Adjustment</h2>
+                
+                <div class="flex justify-between gap-2">
+                    <button class="btn flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded font-bold text-lg border border-slate-300" onclick="adjustValue(-20)">- 1.00</button>
+                    <button class="btn flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded font-bold text-lg border border-slate-300" onclick="adjustValue(-1)">- 0.05</button>
+                    <button class="btn flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded font-bold text-lg border border-slate-300" onclick="adjustValue(1)">+ 0.05</button>
+                    <button class="btn flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded font-bold text-lg border border-slate-300" onclick="adjustValue(20)">+ 1.00</button>
+                </div>
+
+                <div class="mt-2">
+                    <input type="range" id="slider" min="0" max="3000" value="0" class="w-full">
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- State ---
+    const MAX_MM = 150;
+    const PRECISION = 0.05;
+    const MAX_STEPS = Math.round(MAX_MM / PRECISION);
+    
+    let currentSteps = 0; // 0 to 3000 (150mm / 0.05)
+    let showReading = true;
+
+    // --- DOM Elements ---
+    const mainCanvas = document.getElementById('mainCanvas');
+    const magCanvas = document.getElementById('magCanvas');
+    const ctxMain = mainCanvas.getContext('2d');
+    const ctxMag = magCanvas.getContext('2d');
+    
+    const slider = document.getElementById('slider');
+    const valMainEl = document.getElementById('valMain');
+    const valVernierEl = document.getElementById('valVernier');
+    const valTotalEl = document.getElementById('valTotal');
+    const readingDisplay = document.getElementById('readingDisplay');
+    const hiddenDisplay = document.getElementById('hiddenDisplay');
+    const toggleReadingBtn = document.getElementById('toggleReadingBtn');
+
+    // --- Interaction State ---
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartSteps = 0;
+    let mainPxPerMm = 10;
+    let caliperOffsetX = 50; // Padding on left
+
+    // --- Initialization ---
+    function init() {
+        slider.max = MAX_STEPS;
+        
+        window.addEventListener('resize', resizeCanvases);
+        resizeCanvases();
+
+        // Drag events for main canvas
+        mainCanvas.addEventListener('mousedown', handleDragStart);
+        mainCanvas.addEventListener('touchstart', handleDragStart, {passive: false});
+        
+        window.addEventListener('mousemove', handleDragMove);
+        window.addEventListener('touchmove', handleDragMove, {passive: false});
+        
+        window.addEventListener('mouseup', handleDragEnd);
+        window.addEventListener('touchend', handleDragEnd);
+
+        // Slider event
+        slider.addEventListener('input', (e) => {
+            currentSteps = parseInt(e.target.value);
+            updateUI();
+        });
+
+        // Toggle reading button
+        toggleReadingBtn.addEventListener('click', () => {
+            showReading = !showReading;
+            if (showReading) {
+                readingDisplay.classList.remove('hidden');
+                hiddenDisplay.classList.add('hidden');
+                toggleReadingBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> Hide Reading`;
+                toggleReadingBtn.classList.replace('bg-slate-500', 'bg-blue-600');
+                toggleReadingBtn.classList.replace('hover:bg-slate-600', 'hover:bg-blue-700');
+            } else {
+                readingDisplay.classList.add('hidden');
+                hiddenDisplay.classList.remove('hidden');
+                toggleReadingBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg> Show Reading`;
+                toggleReadingBtn.classList.replace('bg-blue-600', 'bg-slate-500');
+                toggleReadingBtn.classList.replace('hover:bg-blue-700', 'hover:bg-slate-600');
+            }
+            draw();
+        });
+
+        // Set initial random value for demo
+        currentSteps = Math.floor(Math.random() * 1000) + 200; // Random between 10mm and 60mm
+        slider.value = currentSteps;
+        updateUI();
+    }
+
+    function resizeCanvases() {
+        setupCanvas(mainCanvas, document.getElementById('mainCanvasContainer'));
+        setupCanvas(magCanvas, document.getElementById('magCanvasContainer'));
+        
+        // Calculate scale for main canvas to fit 150mm nicely
+        // Leave some padding
+        const availableWidth = mainCanvas.clientWidth - 100;
+        mainPxPerMm = availableWidth / MAX_MM;
+        if (mainPxPerMm < 5) mainPxPerMm = 5; // Minimum scale
+        
+        draw();
+    }
+
+    function setupCanvas(canvas, container) {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = container.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+    }
+
+    // --- Logic ---
+    function adjustValue(deltaSteps) {
+        currentSteps += deltaSteps;
+        if (currentSteps < 0) currentSteps = 0;
+        if (currentSteps > MAX_STEPS) currentSteps = MAX_STEPS;
+        slider.value = currentSteps;
+        updateUI();
+    }
+
+    function updateUI() {
+        const totalMm = currentSteps * PRECISION;
+        const mainScaleReading = Math.floor(totalMm);
+        const vernierReading = totalMm - mainScaleReading;
+
+        valMainEl.innerText = `${mainScaleReading}.00 mm`;
+        valVernierEl.innerText = `${vernierReading.toFixed(2)} mm`;
+        valTotalEl.innerText = `${totalMm.toFixed(2)} mm`;
+        
+        draw();
+    }
+
+    // --- Drag Handling ---
+    function getClientX(e) {
+        return e.touches ? e.touches[0].clientX : e.clientX;
+    }
+
+    function handleDragStart(e) {
+        // Only start drag if clicking roughly on the moving part (simplification: anywhere on main canvas)
+        isDragging = true;
+        dragStartX = getClientX(e);
+        dragStartSteps = currentSteps;
+        document.body.style.cursor = 'grabbing';
+    }
+
+    function handleDragMove(e) {
+        if (!isDragging) return;
+        e.preventDefault(); // Prevent scrolling on touch
+        
+        const currentX = getClientX(e);
+        const dx = currentX - dragStartX;
+        
+        // Convert pixel delta to mm delta
+        const dMm = dx / mainPxPerMm;
+        const dSteps = Math.round(dMm / PRECISION);
+        
+        currentSteps = dragStartSteps + dSteps;
+        if (currentSteps < 0) currentSteps = 0;
+        if (currentSteps > MAX_STEPS) currentSteps = MAX_STEPS;
+        
+        slider.value = currentSteps;
+        updateUI();
+    }
+
+    function handleDragEnd() {
+        isDragging = false;
+        document.body.style.cursor = 'default';
+    }
+
+    // --- Drawing ---
+    function draw() {
+        drawMainCanvas();
+        drawMagCanvas();
+    }
+
+    function drawMainCanvas() {
+        const w = mainCanvas.clientWidth;
+        const h = mainCanvas.clientHeight;
+        ctxMain.clearRect(0, 0, w, h);
+        
+        const totalMm = currentSteps * PRECISION;
+        const vernierPxOffset = totalMm * mainPxPerMm;
+        
+        const scaleY = h / 2; // Where main and vernier meet
+        
+        ctxMain.save();
+        ctxMain.translate(caliperOffsetX, 0);
+
+        // 1. Draw Main Scale Body
+        ctxMain.fillStyle = '#f1f5f9';
+        ctxMain.fillRect(-40, scaleY - 60, (MAX_MM * mainPxPerMm) + 80, 60);
+        ctxMain.strokeStyle = '#94a3b8';
+        ctxMain.lineWidth = 2;
+        ctxMain.strokeRect(-40, scaleY - 60, (MAX_MM * mainPxPerMm) + 80, 60);
+        
+        // Draw fixed jaw (top)
+        ctxMain.beginPath();
+        ctxMain.moveTo(0, scaleY - 60);
+        ctxMain.lineTo(0, scaleY - 100);
+        ctxMain.lineTo(-20, scaleY - 100);
+        ctxMain.lineTo(-40, scaleY - 60);
+        ctxMain.fill();
+        ctxMain.stroke();
+
+        // Main Scale Ticks
+        ctxMain.fillStyle = '#0f172a';
+        ctxMain.strokeStyle = '#0f172a';
+        ctxMain.textAlign = 'center';
+        ctxMain.textBaseline = 'bottom';
+        ctxMain.font = 'bold 12px sans-serif';
+
+        for (let i = 0; i <= MAX_MM; i++) {
+            const x = i * mainPxPerMm;
+            let tickLen = 8;
+            if (i % 10 === 0) {
+                tickLen = 20;
+                ctxMain.fillText(i.toString(), x, scaleY - 25);
+            } else if (i % 5 === 0) {
+                tickLen = 14;
+            }
+            
+            ctxMain.beginPath();
+            ctxMain.moveTo(x, scaleY);
+            ctxMain.lineTo(x, scaleY - tickLen);
+            ctxMain.lineWidth = (i % 10 === 0) ? 2 : 1;
+            ctxMain.stroke();
+        }
+
+        // 2. Draw Vernier Scale Body (Moving part)
+        ctxMain.translate(vernierPxOffset, 0);
+        
+        ctxMain.fillStyle = '#e2e8f0';
+        // Vernier width is 19mm + padding
+        const vernierWidth = 19 * mainPxPerMm + 40;
+        ctxMain.fillRect(-20, scaleY, vernierWidth, 50);
+        ctxMain.strokeStyle = '#64748b';
+        ctxMain.lineWidth = 2;
+        ctxMain.strokeRect(-20, scaleY, vernierWidth, 50);
+        
+        // Draw moving jaw (bottom)
+        ctxMain.beginPath();
+        ctxMain.moveTo(0, scaleY + 50);
+        ctxMain.lineTo(0, scaleY + 120);
+        ctxMain.lineTo(-20, scaleY + 120);
+        ctxMain.lineTo(-20, scaleY + 50);
+        ctxMain.fill();
+        ctxMain.stroke();
+
+        // Vernier Scale Ticks (20 divisions for 19mm)
+        // Spacing is 19/20 mm = 0.95 mm
+        const vernierTickSpacing = 0.95 * mainPxPerMm;
+        
+        ctxMain.fillStyle = '#0f172a';
+        ctxMain.strokeStyle = '#0f172a';
+        ctxMain.textBaseline = 'top';
+        ctxMain.font = 'bold 12px sans-serif';
+
+        for (let i = 0; i <= 20; i++) {
+            const x = i * vernierTickSpacing;
+            let tickLen = 8;
+            if (i % 10 === 0) {
+                tickLen = 18;
+                ctxMain.fillText((i / 2).toString(), x, scaleY + 22);
+            } else if (i % 2 === 0) {
+                tickLen = 14;
+                ctxMain.fillText((i / 2).toString(), x, scaleY + 18);
+            } else if (i % 5 === 0) {
+                tickLen = 12;
+            }
+            
+            ctxMain.beginPath();
+            ctxMain.moveTo(x, scaleY);
+            ctxMain.lineTo(x, scaleY + tickLen);
+            ctxMain.lineWidth = (i % 2 === 0) ? 2 : 1;
+            ctxMain.stroke();
+        }
+
+        // Draw Magnifier Highlight Box on Main View
+        const magBoxWidth = vernierWidth;
+        ctxMain.fillStyle = 'rgba(59, 130, 246, 0.15)'; // Blue tint
+        ctxMain.fillRect(-10, scaleY - 30, magBoxWidth - 20, 60);
+        ctxMain.strokeStyle = 'rgba(59, 130, 246, 0.5)';
+        ctxMain.lineWidth = 2;
+        ctxMain.setLineDash([4, 4]);
+        ctxMain.strokeRect(-10, scaleY - 30, magBoxWidth - 20, 60);
+        ctxMain.setLineDash([]);
+
+        ctxMain.restore();
+    }
+
+    function drawMagCanvas() {
+        const w = magCanvas.clientWidth;
+        const h = magCanvas.clientHeight;
+        ctxMag.clearRect(0, 0, w, h);
+        
+        const totalMm = currentSteps * PRECISION;
+        
+        // Calculate magnification scale to fit the 19mm vernier scale nicely
+        // We want to show roughly from -2mm to +21mm relative to vernier 0
+        const viewWidthMm = 25;
+        const magPxPerMm = w / viewWidthMm;
+        
+        const scaleY = h / 2;
+        
+        // Center the view on the middle of the Vernier scale (9.5mm from Vernier 0)
+        // Vernier 0 is at totalMm on the main scale.
+        const centerMainMm = totalMm + 9.5;
+        
+        ctxMag.save();
+        // Translate to center of canvas
+        ctxMag.translate(w / 2, 0);
+        // Translate back by the center point in pixels
+        ctxMag.translate(-centerMainMm * magPxPerMm, 0);
+
+        // --- Draw Main Scale (Magnified) ---
+        ctxMag.fillStyle = '#f8fafc';
+        ctxMag.fillRect(centerMainMm * magPxPerMm - w, 0, w*2, scaleY);
+        ctxMag.beginPath();
+        ctxMag.moveTo(centerMainMm * magPxPerMm - w, scaleY);
+        ctxMag.lineTo(centerMainMm * magPxPerMm + w, scaleY);
+        ctxMag.strokeStyle = '#475569';
+        ctxMag.lineWidth = 3;
+        ctxMag.stroke();
+
+        ctxMag.fillStyle = '#0f172a';
+        ctxMag.strokeStyle = '#0f172a';
+        ctxMag.textAlign = 'center';
+        ctxMag.textBaseline = 'bottom';
+        ctxMag.font = 'bold 24px sans-serif';
+
+        // Determine visible range for main scale
+        const startMm = Math.floor(centerMainMm - viewWidthMm/2) - 1;
+        const endMm = Math.ceil(centerMainMm + viewWidthMm/2) + 1;
+
+        for (let i = startMm; i <= endMm; i++) {
+            if (i < 0 || i > MAX_MM) continue;
+            const x = i * magPxPerMm;
+            let tickLen = 15;
+            let lw = 2;
+            if (i % 10 === 0) {
+                tickLen = 40;
+                lw = 4;
+                ctxMag.fillText(i.toString(), x, scaleY - 45);
+            } else if (i % 5 === 0) {
+                tickLen = 25;
+                lw = 3;
+            }
+            
+            ctxMag.beginPath();
+            ctxMag.moveTo(x, scaleY);
+            ctxMag.lineTo(x, scaleY - tickLen);
+            ctxMag.lineWidth = lw;
+            ctxMag.stroke();
+        }
+
+        // --- Draw Vernier Scale (Magnified) ---
+        const vernierPxOffset = totalMm * magPxPerMm;
+        ctxMag.translate(vernierPxOffset, 0);
+        
+        ctxMag.fillStyle = '#e2e8f0';
+        ctxMag.fillRect(-50, scaleY, 19 * magPxPerMm + 100, h - scaleY);
+
+        const vernierTickSpacing = 0.95 * magPxPerMm;
+        ctxMag.textBaseline = 'top';
+        
+        const alignedIndex = currentSteps % 20;
+
+        for (let i = 0; i <= 20; i++) {
+            const x = i * vernierTickSpacing;
+            let tickLen = 15;
+            let lw = 2;
+            
+            if (i % 10 === 0) {
+                tickLen = 35;
+                lw = 4;
+                ctxMag.fillText((i / 2).toString(), x, scaleY + 40);
+            } else if (i % 2 === 0) {
+                tickLen = 25;
+                lw = 3;
+                ctxMag.fillText((i / 2).toString(), x, scaleY + 30);
+            } else if (i % 5 === 0) {
+                tickLen = 20;
+            }
+            
+            // Highlight aligned line if reading is shown
+            if (showReading && i === alignedIndex) {
+                ctxMag.strokeStyle = '#ef4444'; // Red
+                ctxMag.fillStyle = '#ef4444';
+                // Draw a small arrow indicator
+                ctxMag.beginPath();
+                ctxMag.moveTo(x, scaleY + tickLen + 5);
+                ctxMag.lineTo(x - 6, scaleY + tickLen + 15);
+                ctxMag.lineTo(x + 6, scaleY + tickLen + 15);
+                ctxMag.fill();
+            } else {
+                ctxMag.strokeStyle = '#0f172a';
+            }
+
+            ctxMag.beginPath();
+            ctxMag.moveTo(x, scaleY);
+            ctxMag.lineTo(x, scaleY + tickLen);
+            ctxMag.lineWidth = lw;
+            ctxMag.stroke();
+        }
+
+        ctxMag.restore();
+        
+        // Draw crosshair/center line overlay for aesthetic
+        ctxMag.strokeStyle = 'rgba(0,0,0,0.1)';
+        ctxMag.lineWidth = 1;
+        ctxMag.beginPath();
+        ctxMag.moveTo(w/2, 0);
+        ctxMag.lineTo(w/2, h);
+        ctxMag.stroke();
+    }
+
+    // Start
+    window.onload = init;
+
+</script>
+</body>
+</html>

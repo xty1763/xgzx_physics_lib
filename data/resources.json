@@ -35,17 +35,33 @@
     "type": "仿真资源"
   },
   {
-    "id": "r1788784453896a0l1o",
-    "title": "电磁合场",
+    "id": "r1788784482171jyir6",
+    "title": "一维碰撞",
     "desc": "",
-    "book": "b5",
-    "chapter": "b5c1",
-    "section": "b5c1s3",
-    "url": "pages/电磁合场-2.html",
+    "book": "b4",
+    "chapter": "b4c1",
+    "section": "",
+    "url": "pages/一维碰撞.html",
     "tags": [
-      "电磁合场",
+      "一维碰撞",
+      "动量",
       "仿真资源"
     ],
-    "type": "仿真资源"
+    "type": "练习"
+  },
+  {
+    "id": "r1788784531551lx368",
+    "title": "一维碰撞",
+    "desc": "",
+    "book": "b4",
+    "chapter": "b4c1",
+    "section": "",
+    "url": "pages/一维碰撞-2.html",
+    "tags": [
+      "一维碰撞",
+      "动量",
+      "仿真资源"
+    ],
+    "type": "练习"
   }
 ]

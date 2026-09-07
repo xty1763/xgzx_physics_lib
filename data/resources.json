@@ -20,5 +20,61 @@
     "url": "pages/波的干涉.html",
     "tags": [],
     "type": "仿真资源"
+  },
+  {
+    "id": "r1788776988701gm5z8",
+    "title": "力的合成",
+    "desc": "",
+    "book": "b1",
+    "chapter": "b1c3",
+    "section": "b1c3s4",
+    "url": "pages/力的合成.html",
+    "tags": [
+      "力的合成",
+      "相互作用——力"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788776997674lg2ka",
+    "title": "力的合成",
+    "desc": "",
+    "book": "b1",
+    "chapter": "b1c3",
+    "section": "b1c3s4",
+    "url": "pages/力的合成-2.html",
+    "tags": [
+      "力的合成",
+      "相互作用——力"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788777003752gkju3",
+    "title": "力的合成",
+    "desc": "",
+    "book": "b1",
+    "chapter": "b1c3",
+    "section": "b1c3s4",
+    "url": "pages/力的合成-2-3.html",
+    "tags": [
+      "力的合成",
+      "相互作用——力"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r178877701677677jef",
+    "title": "力的合成",
+    "desc": "",
+    "book": "b1",
+    "chapter": "b1c3",
+    "section": "b1c3s4",
+    "url": "pages/力的合成-2-3-4.html",
+    "tags": [
+      "力的合成",
+      "相互作用——力"
+    ],
+    "type": "仿真资源"
   }
 ]

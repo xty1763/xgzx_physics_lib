@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Electromagnetic Particle Simulator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+        input[type="number"], input[type="range"] { -webkit-user-select: auto; user-select: auto; }
+        body, html { margin: 0; padding: 0; height: 100dvh; background-color: #0f172a; color: #e2e8f0; overflow: hidden; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; flex-direction: row; }
+        #canvas-container { position: relative; flex-grow: 1; height: 100%; overflow: hidden; cursor: crosshair; background: radial-gradient(circle at 50% 50%, #f8fafc 0%, #e0f2fe 50%, #ccfbf1 100%); box-shadow: inset 0 0 30px rgba(0,0,0,0.05); }
+        canvas { display: block; width: 100%; height: 100%; background: transparent; }
+        .sidebar { width: 340px; height: 100dvh; max-height: 100dvh; overflow-y: auto; background-color: #0f172a; border-right: 1px solid #1e293b; box-shadow: 4px 0 15px rgba(0,0,0,0.3); z-index: 10; overscroll-behavior: contain; touch-action: pan-y; }
+        @media (max-width: 768px) {
+            body { flex-direction: column !important; }
+            .sidebar { width: 100%; flex: 1; height: 50dvh; max-height: 50dvh; border-right: none; border-top: 2px solid #334155; order: 2; }
+            #canvas-container { height: 50dvh; flex: none; order: 1; }
+        }
+        .glass-panel { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        .control-group { background: rgba(30, 41, 59, 0.4); border-radius: 0.75rem; padding: 1rem; margin-bottom: 1rem; border: 1px solid rgba(255,255,255,0.05); transition: border-color 0.3s ease; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
+        .control-group:hover { border-color: rgba(255,255,255,0.1); }
+        .slider-container { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem; }
+        .slider-container label { width: 90px; font-size: 0.8rem; color: #cbd5e1; font-weight: 500; }
+        .slider-container input[type="range"] { flex-grow: 1; -webkit-appearance: none; background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; outline: none; }
+        .slider-container input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #60a5fa; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; box-shadow: 0 0 10px rgba(96,165,250,0.4); }
+        .slider-container input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); box-shadow: 0 0 14px rgba(96,165,250,0.6); }
+        .slider-container span { width: 45px; font-size: 0.85rem; text-align: right; font-family: monospace; color: #93c5fd; font-weight: 600; }
+        input[type="number"], select { background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(255,255,255,0.1) !important; color: #fff; padding: 0.35rem; border-radius: 0.375rem !important; width: 65px; font-size: 0.875rem; transition: all 0.2s; }
+        input[type="number"]:focus, select:focus { outline: none; border-color: #3b82f6 !important; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
+        
+        .btn { padding: 0.6rem 1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-align: center; display: flex; align-items: center; justify-content: center; gap: 0.5rem; letter-spacing: 0.025em; text-transform: uppercase; font-size: 0.85rem; }
+        .btn-primary { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; box-shadow: 0 4px 12px rgba(37,99,235,0.3); border: 1px solid rgba(255,255,255,0.1); }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(37,99,235,0.4); filter: brightness(1.1); }
+        .btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; box-shadow: 0 4px 12px rgba(220,38,38,0.3); border: 1px solid rgba(255,255,255,0.1); }
+        .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(220,38,38,0.4); filter: brightness(1.1); }
+        .btn-secondary { background: linear-gradient(135deg, #64748b, #475569); color: white; box-shadow: 0 4px 12px rgba(71,85,105,0.3); border: 1px solid rgba(255,255,255,0.1); }
+        .btn-secondary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(71,85,105,0.4); filter: brightness(1.1); }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar glass-panel p-5 flex flex-col gap-3">
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <i class="fas fa-wave-square text-white text-sm"></i>
+            </div>
+            <h1 class="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 tracking-wide">EM Simulator</h1>
+        </div>
+        
+        <div class="flex gap-2 mb-2">
+            <button id="btn-toggle" class="btn btn-primary flex-1"><i class="fas fa-play"></i> Start</button>
+            <button id="btn-reset" class="btn btn-secondary flex-1"><i class="fas fa-undo"></i> Reset</button>
+            <button id="btn-clear" class="btn btn-danger flex-1"><i class="fas fa-trash-alt"></i> Clear</button>
+        </div>
+        <div class="mb-4 bg-slate-800/40 p-4 rounded-xl border border-slate-700/50 shadow-inner">
+            <label class="text-xs text-slate-400 uppercase tracking-widest mb-3 block font-bold"><i class="fas fa-tools mr-1"></i> Tools</label>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+                <label class="flex items-center justify-center gap-2 cursor-pointer bg-slate-800/80 p-2.5 rounded-lg hover:bg-slate-700 transition-all border border-slate-600/50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-900/30 has-[:checked]:shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+                    <input type="radio" name="toolMode" value="particle" checked class="hidden"> 
+                    <i class="fas fa-atom text-blue-400"></i>
+                    <span class="font-semibold text-slate-200">Particle</span>
+                </label>
+                <label class="flex items-center justify-center gap-2 cursor-pointer bg-slate-800/80 p-2.5 rounded-lg hover:bg-slate-700 transition-all border border-slate-600/50 has-[:checked]:border-red-500 has-[:checked]:bg-red-900/30 has-[:checked]:shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+                    <input type="radio" name="toolMode" value="efield" class="hidden"> 
+                    <i class="fas fa-bolt text-red-400"></i>
+                    <span class="font-semibold text-red-300">E-Field</span>
+                </label>
+                <label class="flex items-center justify-center gap-2 cursor-pointer bg-slate-800/80 p-2.5 rounded-lg hover:bg-slate-700 transition-all border border-slate-600/50 has-[:checked]:border-blue-400 has-[:checked]:bg-blue-900/30 has-[:checked]:shadow-[0_0_10px_rgba(96,165,250,0.2)]">
+                    <input type="radio" name="toolMode" value="bfield" class="hidden"> 
+                    <i class="fas fa-magnet text-blue-400"></i>
+                    <span class="font-semibold text-blue-300">B-Field</span>
+                </label>
+                <label class="flex items-center justify-center gap-2 cursor-pointer bg-slate-800/80 p-2.5 rounded-lg hover:bg-slate-700 transition-all border border-slate-600/50 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-900/30 has-[:checked]:shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                    <input type="radio" name="toolMode" value="delete" class="hidden"> 
+                    <i class="fas fa-eraser text-emerald-400"></i>
+                    <span class="font-semibold text-emerald-300">Delete</span>
+                </label>
+                <label class="flex items-center justify-center gap-2 cursor-pointer bg-slate-800/80 p-2.5 rounded-lg hover:bg-slate-700 transition-all border border-slate-600/50 has-[:checked]:border-purple-500 has-[:checked]:bg-purple-900/30 has-[:checked]:shadow-[0_0_10px_rgba(168,85,247,0.2)] col-span-2">
+                    <input type="radio" name="toolMode" value="merge" class="hidden"> 
+                    <i class="fas fa-object-group text-purple-400"></i>
+                    <span class="font-semibold text-purple-300">Merge Fields</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h2 class="text-sm font-semibold text-blue-400 uppercase tracking-wider mb-3 flex items-center gap-2"><i class="fas fa-atom"></i> Particle & Env</h2>
+            <div class="flex items-center justify-between mb-2">
+                <label class="text-sm">Gravity (m/s²)</label>
+                <input type="checkbox" id="toggle-gravity" class="w-4 h-4">
+            </div>
+            <div class="slider-container">
+                <label>Charge (C)</label>
+                <input type="range" id="p-charge" min="-5" max="5" step="1" value="1">
+                <span id="val-p-charge">1</span>
+            </div>
+            <div class="slider-container">
+                <label>Mass (kg)</label>
+                <input type="range" id="p-mass" min="0.1" max="5" step="0.1" value="1">
+                <span id="val-p-mass">1</span>
+            </div>
+            <div class="flex items-center gap-2 mt-2 mb-2">
+                <label class="text-xs text-slate-400">Polarity:</label>
+                <select id="p-polarity" class="bg-slate-800 text-white text-xs p-1 rounded border border-slate-600">
+                    <option value="1">Positive (+)</option>
+                    <option value="-1">Negative (-)</option>
+                    <option value="0">Neutral (0)</option>
+                </select>
+            </div>
+            <div class="slider-container">
+                <label>Speed (m/s)</label>
+                <input type="range" id="p-speed" min="0" max="2000" step="10" value="400">
+                <span id="val-p-speed">400</span>
+            </div>
+            <div class="slider-container">
+                <label>Angle (°)</label>
+                <input type="range" id="p-v-angle" min="0" max="360" step="1" value="0">
+                <span id="val-p-v-angle">0</span>
+            </div>
+            </div>
+
+        <div class="control-group">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-sm font-semibold text-red-400 uppercase tracking-wider flex items-center gap-2"><i class="fas fa-bolt"></i> Electric Field (E)</h2>
+            </div>
+            <div class="slider-container">
+                <label>Mag (V/m)</label>
+                <input type="range" id="e-mag" min="0" max="1000" step="10" value="100">
+                <span id="val-e-mag">100</span>
+            </div>
+            <div class="slider-container">
+                <label>Angle (°)</label>
+                <input type="range" id="e-angle" min="0" max="360" step="1" value="90">
+                <span id="val-e-angle">90</span>
+            </div>
+            <div class="flex items-center gap-2 mt-2 mb-2">
+                <label class="text-xs text-slate-400">Shape:</label>
+                <select id="e-shape" class="bg-slate-800 text-white text-xs p-1 rounded border border-slate-600">
+                    <option value="rect">Rectangle</option>
+                    <option value="circle">Circle</option>
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+                <div class="flex flex-col hidden"><label class="text-xs text-slate-400">X (m)</label><input type="number" id="e-x" value="100"></div>
+                <div class="flex flex-col hidden"><label class="text-xs text-slate-400">Y (m)</label><input type="number" id="e-y" value="100"></div>
+                <div class="flex flex-col e-rect-ctrl"><label class="text-xs text-slate-400">Width (m)</label><input type="number" id="e-w" value="300"></div>
+                <div class="flex flex-col e-rect-ctrl"><label class="text-xs text-slate-400">Height (m)</label><input type="number" id="e-h" value="300"></div>
+                <div class="flex flex-col e-circle-ctrl hidden"><label class="text-xs text-slate-400">Radius (m)</label><input type="number" id="e-r" value="150"></div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-sm font-semibold text-blue-400 uppercase tracking-wider flex items-center gap-2"><i class="fas fa-magnet"></i> Magnetic Field (B)</h2>
+            </div>
+            <div class="slider-container">
+                <label>B_z (T)</label>
+                <input type="range" id="b-z-mag" min="-10" max="10" step="0.5" value="5">
+                <span id="val-b-z-mag">5</span>
+            </div>
+            <div class="flex items-center gap-2 mt-2 mb-2">
+                <label class="text-xs text-slate-400">Shape:</label>
+                <select id="b-shape" class="bg-slate-800 text-white text-xs p-1 rounded border border-slate-600">
+                    <option value="rect">Rectangle</option>
+                    <option value="circle">Circle</option>
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+                <div class="flex flex-col hidden"><label class="text-xs text-slate-400">X (m)</label><input type="number" id="b-x" value="450"></div>
+                <div class="flex flex-col hidden"><label class="text-xs text-slate-400">Y (m)</label><input type="number" id="b-y" value="100"></div>
+                <div class="flex flex-col b-rect-ctrl"><label class="text-xs text-slate-400">Width (m)</label><input type="number" id="b-w" value="300"></div>
+                <div class="flex flex-col b-rect-ctrl"><label class="text-xs text-slate-400">Height (m)</label><input type="number" id="b-h" value="300"></div>
+                <div class="flex flex-col b-circle-ctrl hidden"><label class="text-xs text-slate-400">Radius (m)</label><input type="number" id="b-r" value="150"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="simCanvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        // Simulation State
+        const state = {
+            running: false,
+            gravityEnabled: false,
+            g: 980, // pixels/s^2
+            dt: 0.016, // Fixed time step (~60fps)
+            
+            particle: {
+                x: 50, y: 250,
+                speed: 400, angle: 0,
+                vx: 400, vy: 0,
+                q: 1, m: 1,
+                radius: 6,
+            path: [],
+            maxPath: 20000
+            },
+            
+            toolMode: 'particle',
+            dragging: null,
+            dragOffsetX: 0,
+            dragOffsetY: 0,
+            eFields: [],
+            bFields: [],
+            eFieldSettings: {
+                shape: 'rect',
+                w: 300, h: 300, r: 150,
+                mag: 100, angle: 90,
+                Ex: 0, Ey: 100
+            },
+            
+            bFieldSettings: {
+                shape: 'rect',
+                w: 300, h: 300, r: 150,
+                Bz: 5
+            },
+            selectedField: null,
+            mergeSelection: []
+        };
+
+        // Initial setup
+        function initInitialState() {
+            state.particle.x = 50;
+            state.particle.y = canvas.height / 2;
+            state.particle.path = [];
+            updateParticleFromUI();
+        }
+
+        function resize() {
+            width = canvas.parentElement.clientWidth;
+            height = canvas.parentElement.clientHeight;
+            canvas.width = width;
+            canvas.height = height;
+            if(!state.running) draw();
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // UI Binding
+        function bindSlider(id, stateObj, key, valId, isFloat = false) {
+            const el = document.getElementById(id);
+            const valEl = document.getElementById(valId);
+            el.addEventListener('input', (e) => {
+                const val = isFloat ? parseFloat(e.target.value) : parseInt(e.target.value);
+                stateObj[key] = val;
+                valEl.innerText = val;
+                if(key === 'q' || key === 'm' || key === 'speed' || key === 'angle') {
+                    if(!state.running && state.particle.path.length === 0) {
+                        // Update initial display if not running
+                    }
+                }
+            });
+        }
+
+        function bindNumber(id, stateObj, key, fieldType) {
+            const el = document.getElementById(id);
+            el.addEventListener('input', (e) => {
+                stateObj[key] = parseInt(e.target.value) || 0;
+                if (state.selectedField && state.selectedField.type === fieldType) {
+                    state.selectedField.subShapes.forEach(s => s[key] = stateObj[key]);
+                }
+                if(!state.running) draw();
+            });
+        }
+
+        function bindCheckbox(id, stateObj, key) {
+            const el = document.getElementById(id);
+            el.addEventListener('change', (e) => {
+                stateObj[key] = e.target.checked;
+            });
+        }
+
+        // Bindings
+        bindCheckbox('toggle-gravity', state, 'gravityEnabled');
+        
+        bindSlider('p-charge', state.particle, 'q', 'val-p-charge');
+        bindSlider('p-mass', state.particle, 'm', 'val-p-mass', true);
+        
+        document.getElementById('p-polarity').addEventListener('change', (e) => {
+            const val = parseInt(e.target.value);
+            state.particle.q = val;
+            document.getElementById('p-charge').value = val;
+            document.getElementById('val-p-charge').innerText = val;
+            if(!state.running) draw();
+        });
+        
+        // Initial velocity sliders
+        const speedSlider = document.getElementById('p-speed');
+        const vAngleSlider = document.getElementById('p-v-angle');
+        const speedVal = document.getElementById('val-p-speed');
+        const vAngleVal = document.getElementById('val-p-v-angle');
+        
+        function updateParticleVelocity() {
+            const rad = state.particle.angle * Math.PI / 180;
+            state.particle.vx = state.particle.speed * Math.cos(rad);
+            state.particle.vy = state.particle.speed * Math.sin(rad);
+        }
+
+        speedSlider.addEventListener('input', (e) => { 
+            speedVal.innerText = e.target.value; 
+            state.particle.speed = parseFloat(e.target.value); 
+            updateParticleVelocity();
+            if(!state.running) draw();
+        });
+        
+        vAngleSlider.addEventListener('input', (e) => { 
+            vAngleVal.innerText = e.target.value; 
+            state.particle.angle = parseFloat(e.target.value); 
+            updateParticleVelocity();
+            if(!state.running) draw();
+        });
+        
+        const eMagSlider = document.getElementById('e-mag');
+        const eAngleSlider = document.getElementById('e-angle');
+        const valEMag = document.getElementById('val-e-mag');
+        const valEAngle = document.getElementById('val-e-angle');
+        
+        function updateEFieldVectors() {
+            const rad = state.eFieldSettings.angle * Math.PI / 180;
+            state.eFieldSettings.Ex = state.eFieldSettings.mag * Math.cos(rad);
+            state.eFieldSettings.Ey = state.eFieldSettings.mag * Math.sin(rad);
+        }
+        
+        eMagSlider.addEventListener('input', (e) => {
+            state.eFieldSettings.mag = parseFloat(e.target.value);
+            valEMag.innerText = state.eFieldSettings.mag;
+            updateEFieldVectors();
+            if (state.selectedField && state.selectedField.type === 'E') {
+                state.selectedField.mag = state.eFieldSettings.mag;
+                state.selectedField.angle = state.eFieldSettings.angle;
+                state.selectedField.Ex = state.eFieldSettings.Ex;
+                state.selectedField.Ey = state.eFieldSettings.Ey;
+            }
+            if(!state.running) draw();
+        });
+        
+        eAngleSlider.addEventListener('input', (e) => {
+            state.eFieldSettings.angle = parseFloat(e.target.value);
+            valEAngle.innerText = state.eFieldSettings.angle;
+            updateEFieldVectors();
+            if (state.selectedField && state.selectedField.type === 'E') {
+                state.selectedField.mag = state.eFieldSettings.mag;
+                state.selectedField.angle = state.eFieldSettings.angle;
+                state.selectedField.Ex = state.eFieldSettings.Ex;
+                state.selectedField.Ey = state.eFieldSettings.Ey;
+            }
+            if(!state.running) draw();
+        });
+        
+        bindNumber('e-w', state.eFieldSettings, 'w', 'E'); bindNumber('e-h', state.eFieldSettings, 'h', 'E');
+
+        const bMagSlider = document.getElementById('b-z-mag');
+        bMagSlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            state.bFieldSettings.Bz = val;
+            document.getElementById('val-b-z-mag').innerText = val;
+            if (state.selectedField && state.selectedField.type === 'B') {
+                state.selectedField.Bz = val;
+            }
+            if(!state.running) draw();
+        });
+        bindNumber('b-w', state.bFieldSettings, 'w', 'B'); bindNumber('b-h', state.bFieldSettings, 'h', 'B');
+        
+        bindNumber('e-r', state.eFieldSettings, 'r', 'E');
+        bindNumber('b-r', state.bFieldSettings, 'r', 'B');
+
+        document.getElementById('e-shape').addEventListener('change', (e) => {
+            state.eFieldSettings.shape = e.target.value;
+            document.querySelectorAll('.e-rect-ctrl').forEach(el => el.classList.toggle('hidden', state.eFieldSettings.shape !== 'rect'));
+            document.querySelectorAll('.e-circle-ctrl').forEach(el => el.classList.toggle('hidden', state.eFieldSettings.shape !== 'circle'));
+            if (state.selectedField && state.selectedField.type === 'E') {
+                state.selectedField.subShapes.forEach(s => s.shape = state.eFieldSettings.shape);
+                if(!state.running) draw();
+            }
+        });
+
+        document.getElementById('b-shape').addEventListener('change', (e) => {
+            state.bFieldSettings.shape = e.target.value;
+            document.querySelectorAll('.b-rect-ctrl').forEach(el => el.classList.toggle('hidden', state.bFieldSettings.shape !== 'rect'));
+            document.querySelectorAll('.b-circle-ctrl').forEach(el => el.classList.toggle('hidden', state.bFieldSettings.shape !== 'circle'));
+            if (state.selectedField && state.selectedField.type === 'B') {
+                state.selectedField.subShapes.forEach(s => s.shape = state.bFieldSettings.shape);
+                if(!state.running) draw();
+            }
+        });
+
+        document.querySelectorAll('input[name="toolMode"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                state.toolMode = e.target.value;
+                state.mergeSelection = []; // Clear merge selection when changing tools
+                if(!state.running) draw();
+            });
+        });
+
+        function updateParticleFromUI() {
+            state.particle.speed = parseFloat(speedSlider.value);
+            state.particle.angle = parseFloat(vAngleSlider.value);
+            updateParticleVelocity();
+            state.particle.q = parseFloat(document.getElementById('p-charge').value);
+            state.particle.m = parseFloat(document.getElementById('p-mass').value);
+        }
+
+        // Buttons
+        const btnToggle = document.getElementById('btn-toggle');
+        btnToggle.addEventListener('click', () => {
+            state.running = !state.running;
+            btnToggle.innerHTML = state.running ? '<i class="fas fa-pause"></i> Pause' : '<i class="fas fa-play"></i> Start';
+            btnToggle.className = state.running ? 'btn btn-secondary flex-1' : 'btn btn-primary flex-1';
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            state.running = false;
+            btnToggle.innerHTML = '<i class="fas fa-play"></i> Start';
+            btnToggle.className = 'btn btn-primary flex-1';
+            initInitialState();
+        });
+
+        document.getElementById('btn-clear').addEventListener('click', () => {
+            state.particle.path = [];
+            state.eFields = [];
+            state.bFields = [];
+            state.selectedField = null;
+            state.mergeSelection = [];
+        });
+
+        // Canvas Interaction (Place particle or fields)
+        function getPointerPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+
+        function getBoundingRect(s) {
+            if (s.shape === 'circle') return { x: s.x - s.r, y: s.y - s.r, w: s.r * 2, h: s.r * 2 };
+            return { x: s.x, y: s.y, w: s.w, h: s.h };
+        }
+
+        function checkSubShapeOverlap(s1, s2) {
+            const r1 = getBoundingRect(s1);
+            const r2 = getBoundingRect(s2);
+            return !(r1.x + r1.w < r2.x || r2.x + r2.w < r1.x || r1.y + r1.h < r2.y || r2.y + r2.h < r1.y);
+        }
+
+        function checkOverlap(f1, f2) {
+            for(let s1 of f1.subShapes) {
+                for(let s2 of f2.subShapes) {
+                    if(checkSubShapeOverlap(s1, s2)) return true;
+                }
+            }
+            return false;
+        }
+
+        function mergeFields(fTop, fBottom) {
+            fTop.subShapes.push(...fBottom.subShapes);
+        }
+
+        function handlePointerDown(e) {
+            if (e.target !== canvas) return;
+            e.preventDefault();
+            const pos = getPointerPos(e);
+            
+            if (state.toolMode === 'merge') {
+                let clickedField = null;
+                let clickedArr = null;
+                
+                // Find clicked field
+                for (let i = state.eFields.length - 1; i >= 0; i--) {
+                    if (checkInside(pos, state.eFields[i])) {
+                        clickedField = state.eFields[i];
+                        clickedArr = state.eFields;
+                        break;
+                    }
+                }
+                if (!clickedField) {
+                    for (let i = state.bFields.length - 1; i >= 0; i--) {
+                        if (checkInside(pos, state.bFields[i])) {
+                            clickedField = state.bFields[i];
+                            clickedArr = state.bFields;
+                            break;
+                        }
+                    }
+                }
+                
+                if (clickedField) {
+                    if (state.mergeSelection.length === 0) {
+                        // Select first field
+                        state.mergeSelection.push({ field: clickedField, arr: clickedArr });
+                    } else if (state.mergeSelection.length === 1) {
+                        const first = state.mergeSelection[0];
+                        // If they are the same type of field but not the exact same object
+                        if (first.field !== clickedField && first.arr === clickedArr) {
+                            // Merge first into clickedField (clickedField dictates properties as it was clicked second)
+                            mergeFields(clickedField, first.field);
+                            // Remove first field from array
+                            const idxToRemove = first.arr.indexOf(first.field);
+                            if(idxToRemove > -1) first.arr.splice(idxToRemove, 1);
+                            state.selectedField = clickedField;
+                        }
+                        state.mergeSelection = []; // Clear selection after attempting merge
+                    }
+                } else {
+                    state.mergeSelection = []; // Clicked empty space
+                }
+                if(!state.running) draw();
+                return;
+            }
+
+            if (state.toolMode !== 'merge') {
+                state.mergeSelection = [];
+            }
+
+            // Check if clicking on the particle to drag it
+            const dx = pos.x - state.particle.x;
+            const dy = pos.y - state.particle.y;
+            if (Math.sqrt(dx*dx + dy*dy) <= Math.max(25, state.particle.radius + state.particle.m)) {
+                state.dragging = { type: 'particle', offsetX: dx, offsetY: dy };
+                state.particle.path.push(null); // Break path instead of clearing
+                if(!state.running) draw();
+                return;
+            }
+
+            if (state.toolMode === 'delete') {
+                for (let i = state.eFields.length - 1; i >= 0; i--) {
+                    if (checkInside(pos, state.eFields[i])) {
+                        if (state.selectedField === state.eFields[i]) state.selectedField = null;
+                        state.eFields.splice(i, 1);
+                        if(!state.running) draw();
+                        return;
+                    }
+                }
+                for (let i = state.bFields.length - 1; i >= 0; i--) {
+                    if (checkInside(pos, state.bFields[i])) {
+                        if (state.selectedField === state.bFields[i]) state.selectedField = null;
+                        state.bFields.splice(i, 1);
+                        if(!state.running) draw();
+                        return;
+                    }
+                }
+                state.selectedField = null;
+                if(!state.running) draw();
+                return;
+            }
+
+            // Check if clicking on existing fields to drag them (top layer first)
+            for (let i = state.eFields.length - 1; i >= 0; i--) {
+                if (checkInside(pos, state.eFields[i])) {
+                    const f = state.eFields.splice(i, 1)[0]; // move to top
+                    state.eFields.push(f);
+                    state.selectedField = f;
+                    state.dragging = {
+                        type: 'efield', target: f,
+                        startX: pos.x, startY: pos.y,
+                        originalShapes: JSON.parse(JSON.stringify(f.subShapes))
+                    };
+                    // Sync UI sliders
+                    state.eFieldSettings.mag = f.mag;
+                    state.eFieldSettings.angle = f.angle;
+                    state.eFieldSettings.Ex = f.Ex;
+                    state.eFieldSettings.Ey = f.Ey;
+                    document.getElementById('e-mag').value = f.mag;
+                    document.getElementById('val-e-mag').innerText = f.mag;
+                    document.getElementById('e-angle').value = f.angle;
+                    document.getElementById('val-e-angle').innerText = f.angle;
+                    if (f.subShapes.length > 0) {
+                        const s = f.subShapes[0];
+                        state.eFieldSettings.shape = s.shape;
+                        state.eFieldSettings.w = s.w || 300;
+                        state.eFieldSettings.h = s.h || 300;
+                        state.eFieldSettings.r = s.r || 150;
+                        document.getElementById('e-shape').value = s.shape;
+                        document.getElementById('e-w').value = state.eFieldSettings.w;
+                        document.getElementById('e-h').value = state.eFieldSettings.h;
+                        document.getElementById('e-r').value = state.eFieldSettings.r;
+                        document.querySelectorAll('.e-rect-ctrl').forEach(el => el.classList.toggle('hidden', s.shape !== 'rect'));
+                        document.querySelectorAll('.e-circle-ctrl').forEach(el => el.classList.toggle('hidden', s.shape !== 'circle'));
+                    }
+                    if(!state.running) draw();
+                    return;
+                }
+            }
+            for (let i = state.bFields.length - 1; i >= 0; i--) {
+                if (checkInside(pos, state.bFields[i])) {
+                    const f = state.bFields.splice(i, 1)[0]; // move to top
+                    state.bFields.push(f);
+                    state.selectedField = f;
+                    state.dragging = {
+                        type: 'bfield', target: f,
+                        startX: pos.x, startY: pos.y,
+                        originalShapes: JSON.parse(JSON.stringify(f.subShapes))
+                    };
+                    // Sync UI sliders
+                    state.bFieldSettings.Bz = f.Bz;
+                    document.getElementById('b-z-mag').value = f.Bz;
+                    document.getElementById('val-b-z-mag').innerText = f.Bz;
+                    if (f.subShapes.length > 0) {
+                        const s = f.subShapes[0];
+                        state.bFieldSettings.shape = s.shape;
+                        state.bFieldSettings.w = s.w || 300;
+                        state.bFieldSettings.h = s.h || 300;
+                        state.bFieldSettings.r = s.r || 150;
+                        document.getElementById('b-shape').value = s.shape;
+                        document.getElementById('b-w').value = state.bFieldSettings.w;
+                        document.getElementById('b-h').value = state.bFieldSettings.h;
+                        document.getElementById('b-r').value = state.bFieldSettings.r;
+                        document.querySelectorAll('.b-rect-ctrl').forEach(el => el.classList.toggle('hidden', s.shape !== 'rect'));
+                        document.querySelectorAll('.b-circle-ctrl').forEach(el => el.classList.toggle('hidden', s.shape !== 'circle'));
+                    }
+                    if(!state.running) draw();
+                    return;
+                }
+            }
+            
+            // Otherwise, place new item based on toolMode
+            if (state.toolMode === 'particle') {
+                state.particle.x = pos.x;
+                state.particle.y = pos.y;
+                state.particle.path.push(null); // Break path instead of clearing
+                state.selectedField = null;
+                updateParticleFromUI();
+            } else if (state.toolMode === 'efield') {
+                const subShape = { shape: state.eFieldSettings.shape, w: state.eFieldSettings.w, h: state.eFieldSettings.h, r: state.eFieldSettings.r };
+                if (subShape.shape === 'rect') { subShape.x = pos.x - subShape.w / 2; subShape.y = pos.y - subShape.h / 2; } 
+                else { subShape.x = pos.x; subShape.y = pos.y; }
+                const newF = { type: 'E', Ex: state.eFieldSettings.Ex, Ey: state.eFieldSettings.Ey, mag: state.eFieldSettings.mag, angle: state.eFieldSettings.angle, subShapes: [subShape] };
+                state.eFields.push(newF);
+                state.selectedField = newF;
+                state.dragging = { type: 'efield', target: newF, startX: pos.x, startY: pos.y, originalShapes: JSON.parse(JSON.stringify(newF.subShapes)) };
+            } else if (state.toolMode === 'bfield') {
+                const subShape = { shape: state.bFieldSettings.shape, w: state.bFieldSettings.w, h: state.bFieldSettings.h, r: state.bFieldSettings.r };
+                if (subShape.shape === 'rect') { subShape.x = pos.x - subShape.w / 2; subShape.y = pos.y - subShape.h / 2; } 
+                else { subShape.x = pos.x; subShape.y = pos.y; }
+                const newF = { type: 'B', Bz: state.bFieldSettings.Bz, subShapes: [subShape] };
+                state.bFields.push(newF);
+                state.selectedField = newF;
+                state.dragging = { type: 'bfield', target: newF, startX: pos.x, startY: pos.y, originalShapes: JSON.parse(JSON.stringify(newF.subShapes)) };
+            } else {
+                state.selectedField = null;
+            }
+            
+            if(!state.running) draw();
+        }
+
+        function handlePointerMove(e) {
+            if (!state.dragging) return;
+            e.preventDefault();
+            const pos = getPointerPos(e);
+            
+            if (state.dragging.type === 'particle') {
+                state.particle.x = pos.x - state.dragging.offsetX;
+                state.particle.y = pos.y - state.dragging.offsetY;
+                // Do not clear path, keep trajectory
+            } else {
+                const f = state.dragging.target;
+                const dx = pos.x - state.dragging.startX;
+                const dy = pos.y - state.dragging.startY;
+                f.subShapes.forEach((s, i) => {
+                    s.x = state.dragging.originalShapes[i].x + dx;
+                    s.y = state.dragging.originalShapes[i].y + dy;
+                });
+            }
+            
+            if(!state.running) draw();
+        }
+
+        function handlePointerUp(e) {
+            if (state.dragging) {
+                state.dragging = null;
+                if(!state.running) draw();
+            }
+        }
+
+        canvas.addEventListener('mousedown', handlePointerDown);
+        canvas.addEventListener('touchstart', handlePointerDown, {passive: false});
+        window.addEventListener('mousemove', handlePointerMove);
+        window.addEventListener('touchmove', handlePointerMove, {passive: false});
+        window.addEventListener('mouseup', handlePointerUp);
+        window.addEventListener('touchend', handlePointerUp, {passive: false});
+
+        // Physics Engine
+        function checkInside(p, field) {
+            for(let s of field.subShapes) {
+                if (s.shape === 'circle') {
+                    const dx = p.x - s.x;
+                    const dy = p.y - s.y;
+                    if ((dx * dx + dy * dy) <= (s.r * s.r)) return true;
+                } else {
+                    if (p.x >= s.x && p.x <= s.x + s.w && p.y >= s.y && p.y <= s.y + s.h) return true;
+                }
+            }
+            return false;
+        }
+
+        function updatePhysics() {
+            if (!state.running) return;
+
+            const p = state.particle;
+            const dt = state.dt;
+            
+            // Sub-stepping for better accuracy in magnetic fields
+            const steps = 4;
+            const subDt = dt / steps;
+
+            for(let i=0; i<steps; i++) {
+                let Fx = 0;
+                let Fy = 0;
+
+                // Gravity
+                if (state.gravityEnabled) {
+                    Fy += p.m * state.g;
+                }
+
+                // Electric Field
+                for (let i = state.eFields.length - 1; i >= 0; i--) {
+                    if (checkInside(p, state.eFields[i])) {
+                        Fx += p.q * state.eFields[i].Ex * 10; // Scaling factor
+                        Fy += p.q * state.eFields[i].Ey * 10;
+                        break; // Top layer dictates field
+                    }
+                }
+
+                // 1. Apply linear forces (Gravity + Electric) that do work
+                p.vx += (Fx / p.m) * subDt;
+                p.vy += (Fy / p.m) * subDt;
+
+                // 2. Apply Magnetic Field (Lorentz Force) via exact vector rotation
+                // This prevents numerical energy gain and ensures PERFECT uniform circular motion!
+                let Bz = 0;
+                for (let i = state.bFields.length - 1; i >= 0; i--) {
+                    if (checkInside(p, state.bFields[i])) {
+                        Bz = state.bFields[i].Bz;
+                        break; // Top layer dictates field
+                    }
+                }
+                
+                if (Bz !== 0 && p.q !== 0) {
+                    const omega = -(p.q * Bz) / p.m;
+                    const theta = omega * subDt;
+                    const cosT = Math.cos(theta);
+                    const sinT = Math.sin(theta);
+                    const vx_new = p.vx * cosT - p.vy * sinT;
+                    const vy_new = p.vx * sinT + p.vy * cosT;
+                    p.vx = vx_new;
+                    p.vy = vy_new;
+                }
+                
+                // 3. Update position
+                p.x += p.vx * subDt;
+                p.y += p.vy * subDt;
+            }
+
+            // Boundary check - pause if way off screen, but DO NOT reset trajectory
+            const padding = 2000;
+            if (p.x < -padding || p.x > width + padding || p.y < -padding || p.y > height + padding) {
+                state.running = false;
+                btnToggle.innerHTML = '<i class="fas fa-play"></i> Start';
+                btnToggle.className = 'btn btn-primary flex-1';
+                // Removed initInitialState() so the path and particle position are preserved
+            }
+
+            // Save path
+            if (state.running) {
+                p.path.push({x: p.x, y: p.y});
+                if (p.path.length > p.maxPath) {
+                    p.path.shift();
+                }
+            }
+        }
+
+        // Rendering
+        function drawGridPattern(ctx, field, type) {
+            ctx.save();
+            ctx.beginPath();
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            // Ensure we only draw inside the shape
+            for(let s of field.subShapes) {
+                if (s.shape === 'circle') {
+                    ctx.moveTo(s.x + s.r, s.y);
+                    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                    minX = Math.min(minX, s.x - s.r); minY = Math.min(minY, s.y - s.r);
+                    maxX = Math.max(maxX, s.x + s.r); maxY = Math.max(maxY, s.y + s.r);
+                } else {
+                    ctx.rect(s.x, s.y, s.w, s.h);
+                    minX = Math.min(minX, s.x); minY = Math.min(minY, s.y);
+                    maxX = Math.max(maxX, s.x + s.w); maxY = Math.max(maxY, s.y + s.h);
+                }
+            }
+            ctx.clip();
+
+            const step = 35;
+            ctx.fillStyle = type === 'B' ? 'rgba(30, 64, 175, 0.8)' : 'rgba(153, 27, 27, 0.8)';
+            ctx.font = 'bold 22px system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            for (let x = minX + step/2; x < maxX; x += step) {
+                for (let y = minY + step/2; y < maxY; y += step) {
+                    if (type === 'B') {
+                        if (field.Bz > 0) {
+                            ctx.fillText('⊙', x, y); // Out of page
+                        } else if (field.Bz < 0) {
+                            ctx.fillText('⊗', x, y); // Into page
+                        }
+                    } else if (type === 'E') {
+                        // Draw arrows for E field
+                        const mag = Math.sqrt(field.Ex*field.Ex + field.Ey*field.Ey);
+                        if(mag > 0) {
+                            const nx = field.Ex / mag;
+                            const ny = field.Ey / mag;
+                            const len = 10;
+                            ctx.strokeStyle = 'rgba(185, 28, 28, 0.5)';
+                            ctx.lineWidth = 2;
+                            ctx.beginPath();
+                            ctx.moveTo(x - nx*len/2, y - ny*len/2);
+                            ctx.lineTo(x + nx*len/2, y + ny*len/2);
+                            // Arrow head
+                            const angle = Math.atan2(ny, nx);
+                            ctx.lineTo(x + nx*len/2 - 4*Math.cos(angle-Math.PI/6), y + ny*len/2 - 4*Math.sin(angle-Math.PI/6));
+                            ctx.moveTo(x + nx*len/2, y + ny*len/2);
+                            ctx.lineTo(x + nx*len/2 - 4*Math.cos(angle+Math.PI/6), y + ny*len/2 - 4*Math.sin(angle+Math.PI/6));
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+            ctx.restore();
+        }
+
+        function draw() {
+            // Background
+            ctx.clearRect(0, 0, width, height);
+
+            // Draw E-Fields
+            for (const f of state.eFields) {
+                const isMergeSelected = state.mergeSelection.some(m => m.field === f);
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+                ctx.strokeStyle = isMergeSelected ? '#9333ea' : ((f === state.selectedField) ? '#eab308' : 'rgba(220, 38, 38, 0.8)');
+                ctx.lineWidth = (f === state.selectedField || isMergeSelected) ? 4 : 2;
+                if (isMergeSelected) ctx.setLineDash([6, 6]); else ctx.setLineDash([]);
+                ctx.beginPath();
+                let labelX = 0, labelY = 0;
+                // Add a slight glow to selected field via canvas shadow (only for selected)
+                if (f === state.selectedField) {
+                     ctx.shadowBlur = 10;
+                     ctx.shadowColor = '#eab308';
+                }
+                for(let s of f.subShapes) {
+                    if (s.shape === 'circle') {
+                        ctx.moveTo(s.x + s.r, s.y);
+                        ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+                        labelX = s.x; labelY = s.y;
+                    } else {
+                        ctx.rect(s.x, s.y, s.w, s.h);
+                        labelX = s.x + 5; labelY = s.y + 15;
+                    }
+                }
+                ctx.fill(); ctx.stroke();
+                ctx.shadowBlur = 0; // Reset shadow immediately after field stroke
+                ctx.setLineDash([]);
+                drawGridPattern(ctx, f, 'E');
+                ctx.fillStyle = 'rgba(153, 27, 27, 0.9)';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.fillText('E-Field', labelX, labelY);
+            }
+
+            // Draw B-Fields
+            for (const f of state.bFields) {
+                const isMergeSelected = state.mergeSelection.some(m => m.field === f);
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.15)';
+                ctx.strokeStyle = isMergeSelected ? '#9333ea' : ((f === state.selectedField) ? '#eab308' : 'rgba(37, 99, 235, 0.8)');
+                ctx.lineWidth = (f === state.selectedField || isMergeSelected) ? 4 : 2;
+                if (isMergeSelected) ctx.setLineDash([6, 6]); else ctx.setLineDash([]);
+                ctx.beginPath();
+                let labelX = 0, labelY = 0;
+                for(let s of f.subShapes) {
+                    if (s.shape === 'circle') {
+                        ctx.moveTo(s.x + s.r, s.y);
+                        ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+                        labelX = s.x; labelY = s.y;
+                    } else {
+                        ctx.rect(s.x, s.y, s.w, s.h);
+                        labelX = s.x + 5; labelY = s.y + 15;
+                    }
+                }
+                ctx.fill(); ctx.stroke();
+                ctx.setLineDash([]); // Reset dash
+                drawGridPattern(ctx, f, 'B');
+                ctx.fillStyle = 'rgba(30, 58, 138, 0.9)';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.fillText('B-Field', labelX, labelY);
+            }
+
+            // Draw Path
+            const p = state.particle;
+            if (p.path.length > 1) {
+                ctx.beginPath();
+                ctx.strokeStyle = p.q > 0 ? 'rgba(185, 28, 28, 0.8)' : (p.q < 0 ? 'rgba(29, 78, 216, 0.8)' : 'rgba(71, 85, 105, 0.8)');
+                ctx.lineWidth = 3;
+                ctx.lineJoin = 'round';
+                let isNewSegment = true;
+                for (let i = 0; i < p.path.length; i++) {
+                    if (p.path[i] === null) {
+                        isNewSegment = true;
+                    } else {
+                        if (isNewSegment) {
+                            ctx.moveTo(p.path[i].x, p.path[i].y);
+                            isNewSegment = false;
+                        } else {
+                            ctx.lineTo(p.path[i].x, p.path[i].y);
+                        }
+                    }
+                }
+                ctx.stroke();
+            }
+
+            // Draw Particle
+            ctx.beginPath();
+            const pRadius = p.radius + p.m;
+            ctx.arc(p.x, p.y, pRadius, 0, Math.PI * 2); 
+            
+            // Add a subtle radial gradient for a 3D sphere look
+            const grad = ctx.createRadialGradient(p.x - pRadius*0.3, p.y - pRadius*0.3, pRadius*0.1, p.x, p.y, pRadius);
+            if (p.q > 0) { grad.addColorStop(0, '#ef4444'); grad.addColorStop(1, '#991b1b'); }
+            else if (p.q < 0) { grad.addColorStop(0, '#3b82f6'); grad.addColorStop(1, '#1e3a8a'); }
+            else { grad.addColorStop(0, '#94a3b8'); grad.addColorStop(1, '#334155'); }
+            
+            ctx.fillStyle = grad;
+            ctx.shadowBlur = 0; // Explicitly ensure no shadow for performance
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            
+            // Glow removed for performance
+
+            // Draw Velocity Vector if paused
+            if (!state.running && (p.vx !== 0 || p.vy !== 0)) {
+                ctx.beginPath();
+                ctx.strokeStyle = '#065f46';
+                ctx.lineWidth = 3;
+                ctx.moveTo(p.x, p.y);
+                const scale = 0.5;
+                const ex = p.x + p.vx * scale;
+                const ey = p.y + p.vy * scale;
+                ctx.lineTo(ex, ey);
+                
+                // Arrowhead
+                const angle = Math.atan2(p.vy, p.vx);
+                ctx.lineTo(ex - 6*Math.cos(angle-Math.PI/6), ey - 6*Math.sin(angle-Math.PI/6));
+                ctx.moveTo(ex, ey);
+                ctx.lineTo(ex - 6*Math.cos(angle+Math.PI/6), ey - 6*Math.sin(angle+Math.PI/6));
+                ctx.stroke();
+            }
+        }
+
+        // Main Loop
+        function loop() {
+            updatePhysics();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // Start
+        setTimeout(() => {
+            initInitialState();
+            loop();
+        }, 100);
+
+    </script>
+</body>
+</html>

@@ -37,10 +37,24 @@
 - 身份：`gh_publish_token`（站长 GitHub 令牌，走直连 GitHub，国内可用）；`worker_token`（授权老师走 Worker/云函数，暂不可用）
 
 ## 当前进度 / 待办
-1. **上传/编辑/删除当前可用方式是「🔑 管理员登录」**：站长用 GitHub 令牌直连 GitHub 操作（这个能正常用）。`data/resources.json` 是清单，写入走 GitHub Contents API。
-2. **方案A（多用户授权上传）未完成**：Cloudflare Worker 已部署但 `.workers.dev` 国内连不通；已改写成腾讯云开发云函数（`cloudbase/index.js`），**尚未部署到腾讯云**。
-3. **部署腾讯云被“实名认证/账号身份”卡住**（需用户本人完成，见 cloudbase/README.md）。云函数建好后：配环境变量（GITHUB_TOKEN、AUTH_SECRET、GITHUB_OWNER、GITHUB_REPO、GITHUB_BRANCH、USERS_JSON）→ 开启 HTTP 触发 → 把得到的地址回填到 `app.js` 的 `WORKER_URL` → 推送发布，授权老师（👥 授权登录）即可用。
-4. 已知问题/要点：Git 直连 `push` 在此环境可能 `Connection was reset`——用 GitHub Contents API 推文件（用 PAT 的 `PUT /repos/{owner}/{repo}/contents/{path}`，需先 GET 取 sha）；`data/resources.json` 用 `JSON.stringify(resources,null,2)` 保存；版本号 `?v=` 用于破缓存。
+
+### ✅ 已可用（现阶段重点：把“腾讯云之外”的工作做好）
+- 教材→章→节导航、搜索、类型筛选：**可用**。
+- 上传 / 编辑 / 删除：用「🔑 管理员登录」（站长 GitHub 令牌直连 GitHub），**国内可用**。清单 `data/resources.json`，写入走 GitHub Contents API。
+- 自动识别填表（✨自动识别填表）、文件按标题命名、右下角 🤖 资源助手：**可用**。
+- 以上都属于“静态站 + GitHub 直连”范畴，**是本轮可以继续做好、收尾的范围**。
+
+### ⏸️ 已暂停 / 另行规划（暂不要推进）
+- 方案A“多用户授权上传（Cloudflare Worker / 腾讯云开发云函数）”**暂缓**，用户将另行布置。
+- `worker/`、`cloudbase/` 目录仅供参考，**先不要**做腾讯云部署，也暂时不要把 `WORKER_URL` 指向它。
+- 当前 `WORKER_URL` 仍指向 Cloudflare（连不通）；因方案A暂停，保持现状即可，无需改。
+
+### 其它可做的（非腾讯云，按需）
+- 打磨资源助手（更准、更多示例问法）、补充更多章节/示例资源、优化界面/页脚、清理废弃文件（如 `data/resources.js`）等。
+
+## 已知要点
+- Git 直连 `push` 在此环境可能 `Connection was reset`——改用 GitHub Contents API 推文件（用 PAT 的 `PUT /repos/{owner}/{repo}/contents/{path}`，需先 GET 取 sha）。
+- `data/resources.json` 用 `JSON.stringify(resources,null,2)` 保存；静态资源版本号 `?v=`（app.js 里 `ASSET_V`）用于破缓存，改动后 +1。
 
 ## 推送方式备注
 - 分支：`main`；仓库 `xty1763/xgzx_physics_lib`。

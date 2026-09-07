@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>一维小球碰撞模拟</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #89c2ff 0%, #4d7cff 60%, #1b3b8f 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 980px;
+            margin: 0 auto;
+        }
+        h1 {
+            margin-bottom: 20px;
+            text-align: center;
+            color: #e3f2ff;
+            text-shadow: 0 0 12px rgba(255,255,255,0.4);
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            min-width: 160px;
+        }
+        label {
+            font-size: 13px;
+            color: #dbe9ff;
+            margin-bottom: 6px;
+        }
+        input, button {
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.25);
+            background: rgba(255,255,255,0.12);
+            color: #ffffff;
+            font-size: 14px;
+        }
+        input:focus {
+            outline: none;
+            box-shadow: 0 0 12px rgba(255,255,255,0.25);
+            background: rgba(255,255,255,0.18);
+        }
+        button {
+            cursor: pointer;
+            background: linear-gradient(135deg, #4a7fff, #2c5dd7);
+            border: 1px solid rgba(255,255,255,0.35);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
+        }
+        canvas {
+            width: 100%;
+            max-width: 980px;
+            height: 260px;
+            border-radius: 16px;
+            box-shadow: 0 14px 30px rgba(0,0,0,0.25);
+            background: radial-gradient(circle at 20% 10%, rgba(255,255,255,0.25), transparent 20%),
+                        radial-gradient(circle at 80% 15%, rgba(255,255,255,0.15), transparent 18%),
+                        linear-gradient(180deg, rgba(255,255,255,0.12), rgba(20,40,100,0.7));
+            display: block;
+            margin: 0 auto;
+        }
+        #info {
+            margin-top: 14px;
+            font-size: 16px;
+            text-align: center;
+            color: #eff7ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>一维小球碰撞模拟</h1>
+        <div class="controls">
+            <div class="control-group">
+                <label for="mass1">小球1质量</label>
+                <input id="mass1" type="number" value="1" min="0.1" step="0.1">
+            </div>
+            <div class="control-group">
+                <label for="mass2">小球2质量</label>
+                <input id="mass2" type="number" value="1" min="0.1" step="0.1">
+            </div>
+            <div class="control-group">
+                <label for="speed1">小球1初速度</label>
+                <input id="speed1" type="number" value="2" step="0.1">
+            </div>
+            <div class="control-group">
+                <label for="speed2">小球2初速度</label>
+                <input id="speed2" type="number" value="-1" step="0.1">
+            </div>
+            <div class="control-group">
+                <label for="friction">地面摩擦系数 (0-1)</label>
+                <input id="friction" type="number" value="0.02" min="0" max="1" step="0.01">
+            </div>
+            <div class="control-group">
+                <label for="sticky">碰后连在一起</label>
+                <input id="sticky" type="checkbox">
+            </div>
+            <div class="control-group">
+                <label>&nbsp;</label>
+                <button id="startBtn">开始</button>
+            </div>
+            <div class="control-group">
+                <label>&nbsp;</label>
+                <button id="resetBtn">重置</button>
+            </div>
+        </div>
+        <canvas id="canvas" width="980" height="260"></canvas>
+        <div id="info">当前速度：小球1 (vx)，小球2 (vx)，动量守恒验证</div>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const mass1Input = document.getElementById('mass1');
+        const mass2Input = document.getElementById('mass2');
+        const speed1Input = document.getElementById('speed1');
+        const speed2Input = document.getElementById('speed2');
+        const frictionInput = document.getElementById('friction');
+        const stickyInput = document.getElementById('sticky');
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const info = document.getElementById('info');
+
+        const groundY = 220;
+        const trackY = 190;
+        const frictionMax = 1;
+        const g = 0.98;
+
+        let ball1 = { x: 180, y: trackY, vx: 2, mass: 1, radius: 20, color: '#4ad9ff' };
+        let ball2 = { x: 780, y: trackY, vx: -1, mass: 1, radius: 20, color: '#ffd15c' };
+        let animationId = null;
+        let running = false;
+        let collided = false;
+        let initialMomentum = 0;
+
+        function drawScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawSky();
+            drawTrack();
+            drawBall(ball1);
+            drawBall(ball2);
+        }
+
+        function drawSky() {
+            const sky = ctx.createLinearGradient(0, 0, 0, groundY);
+            sky.addColorStop(0, '#c3e0ff');
+            sky.addColorStop(1, '#90caff');
+            ctx.fillStyle = sky;
+            ctx.fillRect(0, 0, canvas.width, groundY);
+        }
+
+        function drawTrack() {
+            ctx.fillStyle = '#2a4f7e';
+            ctx.fillRect(0, trackY + 30, canvas.width, 40);
+            ctx.strokeStyle = '#a6c8ff';
+            ctx.lineWidth = 2;
+            for (let x = 20; x < canvas.width; x += 40) {
+                ctx.beginPath();
+                ctx.moveTo(x, trackY + 40);
+                ctx.lineTo(x + 20, trackY + 40);
+                ctx.stroke();
+            }
+        }
+
+        function drawBall(ball) {
+            const gradient = ctx.createRadialGradient(ball.x - ball.radius * 0.3, ball.y - ball.radius * 0.3, 1, ball.x, ball.y, ball.radius);
+            gradient.addColorStop(0, '#ffffff');
+            gradient.addColorStop(0.4, ball.color);
+            gradient.addColorStop(1, '#0a234d');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff88';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function applyFriction(ball, friction) {
+            const sign = ball.vx > 0 ? 1 : ball.vx < 0 ? -1 : 0;
+            if (sign === 0) return;
+            const decel = friction * g;
+            ball.vx = Math.abs(ball.vx) <= decel ? 0 : ball.vx - sign * decel;
+        }
+
+        function step() {
+            if (!running) return;
+            const friction = Math.max(0, Math.min(frictionMax, parseFloat(frictionInput.value) || 0));
+
+            if (!collided && Math.abs(ball1.x - ball2.x) <= ball1.radius + ball2.radius) {
+                collided = true;
+                const m1 = ball1.mass;
+                const m2 = ball2.mass;
+                const u1 = ball1.vx;
+                const u2 = ball2.vx;
+                if (stickyInput.checked) {
+                    const vCombined = (m1 * u1 + m2 * u2) / (m1 + m2);
+                    ball1.vx = vCombined;
+                    ball2.vx = vCombined;
+                    ball1.color = '#ffa56b';
+                    ball2.color = '#ffa56b';
+                    if (ball1.x < ball2.x) {
+                        ball2.x = ball1.x + ball1.radius + ball2.radius;
+                    } else {
+                        ball1.x = ball2.x + ball1.radius + ball2.radius;
+                    }
+                } else {
+                    const v1 = ((m1 - m2) * u1 + 2 * m2 * u2) / (m1 + m2);
+                    const v2 = ((m2 - m1) * u2 + 2 * m1 * u1) / (m1 + m2);
+                    ball1.vx = v1;
+                    ball2.vx = v2;
+                }
+            }
+
+            applyFriction(ball1, friction);
+            applyFriction(ball2, friction);
+            ball1.x += ball1.vx;
+            ball2.x += ball2.vx;
+
+            if (ball1.x - ball1.radius <= 0 || ball2.x + ball2.radius >= canvas.width) {
+                running = false;
+                if (ball1.x - ball1.radius <= 0) ball1.vx = 0;
+                if (ball2.x + ball2.radius >= canvas.width) ball2.vx = 0;
+            }
+
+            drawScene();
+            updateInfo();
+            animationId = requestAnimationFrame(step);
+        }
+
+        function updateInfo() {
+            const momentum = (ball1.mass * ball1.vx + ball2.mass * ball2.vx).toFixed(3);
+            info.textContent = `当前速度：小球1 ${ball1.vx.toFixed(2)}，小球2 ${ball2.vx.toFixed(2)}；动量：${momentum}，初始动量：${initialMomentum.toFixed(3)}`;
+        }
+
+        function reset() {
+            cancelAnimationFrame(animationId);
+            running = false;
+            collided = false;
+            ball1.mass = parseFloat(mass1Input.value) || 1;
+            ball2.mass = parseFloat(mass2Input.value) || 1;
+            ball1.vx = parseFloat(speed1Input.value) || 0;
+            ball2.vx = parseFloat(speed2Input.value) || 0;
+            ball1.x = 180;
+            ball2.x = 780;
+            ball1.color = '#4ad9ff';
+            ball2.color = '#ffd15c';
+            initialMomentum = ball1.mass * ball1.vx + ball2.mass * ball2.vx;
+            drawScene();
+            updateInfo();
+        }
+
+        startBtn.addEventListener('click', () => {
+            if (!running) {
+                reset();
+                running = true;
+                step();
+            }
+        });
+
+        resetBtn.addEventListener('click', reset);
+        reset();
+    </script>
+</body>
+</html>

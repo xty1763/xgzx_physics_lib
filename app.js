@@ -23,8 +23,8 @@
   const objUrlCache = {};            // id -> objectURL（只在上传资源用）
   let pendingFile = null;            // 当前选中的待上传文件
   let editingId = null;              // 正在编辑的资源 id（null = 新增）
-  const ASSET_V = 8;                 // 资源版本号（缓存破）
-  const WORKER_URL = "https://physics-lib.free.workers.dev"; // 方案A 后端地址（部署 Worker 后改为你的地址）
+  const ASSET_V = 9;                 // 资源版本号（缓存破）
+  const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"; // 方案A 后端（Cloudflare Worker）
   const WORKER_TOKEN_KEY = "worker_token";
   const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
 

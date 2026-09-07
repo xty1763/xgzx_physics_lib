@@ -23,7 +23,7 @@
   const objUrlCache = {};            // id -> objectURL（只在上传资源用）
   let pendingFile = null;            // 当前选中的待上传文件
   let editingId = null;              // 正在编辑的资源 id（null = 新增）
-  const ASSET_V = 13;                // 资源版本号（缓存破）
+  const ASSET_V = 14;                // 资源版本号（缓存破）
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"; // 方案A 后端（Cloudflare Worker）
   const WORKER_TOKEN_KEY = "worker_token";
   const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
@@ -135,9 +135,9 @@
     } catch (e) {
       uploaded = [];
     }
-    // 拉取资源清单（JSON）
+    // 拉取资源清单（JSON）；cache:no-store 避免浏览器缓存旧清单，导致保存后“不显示/被覆盖”
     try {
-      const res = await fetch("data/resources.json?v=" + ASSET_V);
+      const res = await fetch("data/resources.json?v=" + ASSET_V, { cache: "no-store" });
       if (!res.ok) throw new Error("加载清单失败");
       resources = await res.json();
       if (!Array.isArray(resources)) resources = [];
@@ -844,12 +844,14 @@
       $("#modalTitle").textContent = "编辑资源";
       $("#saveResource").textContent = "保存修改";
     } else {
-      // 新增
+      // 新增：整体清空表单，避免残留上一个资源的章节/类型等内容
       $("#fTitle").value = "";
       $("#fDesc").value = "";
       $("#fTags").value = "";
       $("#modalTitle").textContent = "上传资源";
       $("#saveResource").textContent = "保存资源";
+      refreshTypeUI();               // 重置“试卷”提示与章节禁用
+      populateChapterSelect();       // 重建章节 & 小节下拉，避免残留上一个资源
       var dzSmall2 = $("#dropzone small");
       if (dzSmall2) dzSmall2.textContent = "支持 HTML / PDF / Word / PPT / Excel / 图片 / 视频 / 压缩包等";
     }
@@ -1035,7 +1037,10 @@
     });
   }
 
+  let saving = false;                 // 防止重复点击“保存”
   async function saveResource() {
+    const saveBtn = $("#saveResource");
+    if (saving) return;               // 防双击重复发布
     const title = $("#fTitle").value.trim();
     if (!title) {
       toast("请填写资源名称", true);
@@ -1081,25 +1086,26 @@
       return;
     }
 
-    if (editingId) {
-      try {
-        if (isWorker) await workerUpdate(rec);
-        else await updateResource(rec);
-        await loadAll();
+    saving = true;
+    saveBtn.disabled = true;
+    try {
+      if (editingId) {
+        if (isWorker) {
+          await workerUpdate(rec);
+          await loadAll();
+        } else {
+          await updateResource(rec);   // 内部已更新 resources 并渲染
+        }
         closeModal();
         toast("已保存修改");
-      } catch (e) {
-        toast("保存失败：" + e.message, true);
+        return;
       }
-      return;
-    }
 
-    // 新增
-    if (!pendingFile) {
-      toast("请先选择一个文件", true);
-      return;
-    }
-    try {
+      // 新增
+      if (!pendingFile) {
+        toast("请先选择一个文件", true);
+        return;
+      }
       if (isWorker) {
         await workerPost("upload", rec);
         await loadAll();
@@ -1107,12 +1113,17 @@
         toast("已发布到线上（授权用户）");
       } else {
         await publishResource(rec);
-        await loadAll();
+        // 直接用内存里的 resources 更新视图：避免再次 fetch 被缓存覆盖而“刚保存就消失”
+        baseList = [...resources, ...uploadedList];
+        render();
         closeModal();
-        toast("已发布到线上，其他访客也能看到");
+        toast("已发布到线上（约1分钟后其他访客也能看到）");
       }
     } catch (e) {
       toast("发布失败：" + e.message, true);
+    } finally {
+      saving = false;
+      saveBtn.disabled = false;
     }
   }
 

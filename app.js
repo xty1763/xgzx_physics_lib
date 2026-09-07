@@ -23,7 +23,7 @@
   const objUrlCache = {};            // id -> objectURL（只在上传资源用）
   let pendingFile = null;            // 当前选中的待上传文件
   let editingId = null;              // 正在编辑的资源 id（null = 新增）
-  const ASSET_V = 9;                 // 资源版本号（缓存破）
+  const ASSET_V = 10;                // 资源版本号（缓存破）
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"; // 方案A 后端（Cloudflare Worker）
   const WORKER_TOKEN_KEY = "worker_token";
   const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
@@ -66,6 +66,10 @@
   const chapterTitle = (id) => (chapterOf(id) || {}).title || "";
   const sectionTitle = (id) => (sectionOf(id) || {}).title || "";
   const chaptersOfBook = (bookId) => (bookOf(bookId) || {}).chapters || [];
+  const bookOfChapter = (chapterId) => {
+    for (const b of COURSE.books) for (const c of b.chapters) if (c.id === chapterId) return b.id;
+    return null;
+  };
 
   function toast(msg, bad) {
     const t = $("#toast");
@@ -846,6 +850,38 @@
     mask.classList.remove("show");
   }
 
+  // 依据 标题/文件名 自动识别 章节/类型/标签 并预填（free，无外部模型）
+  function smartFill(force) {
+    const title = $("#fTitle").value.trim() || (pendingFile ? pendingFile.name : "");
+    if (!title) return;
+    const type = detectType(title);
+    let bookId = detectBook(title);
+    const loc = detectLoc(title, bookId);
+
+    if (force || !$("#fType").value) {
+      if (type) { $("#fType").value = type; refreshTypeUI(); }
+    }
+    // 若识别到章节但没识别到教材，则根据章节反推教材
+    if (loc && loc.chapter && !bookId) bookId = bookOfChapter(loc.chapter);
+    if ((force || !$("#fBook").value) && bookId) $("#fBook").value = bookId;
+    populateChapterSelect();
+    if ((force || !$("#fChapter").value) && loc && loc.chapter) $("#fChapter").value = loc.chapter;
+    populateSectionSelect();
+    if (force && loc && loc.section) $("#fSection").value = loc.section;
+
+    const topic = removeNoise(title);
+    const secName = loc && loc.section
+      ? sectionTitle(loc.section).replace(/^\s*\d+(\.\d+)*\s*/, "")
+      : (loc && loc.chapter ? chapterTitle(loc.chapter).replace(/^第[一二三四五六七八九十]+章\s*/, "") : "");
+    const existing = $("#fTags").value.split(/[,，\s]+/).filter(Boolean);
+    const tags = [];
+    if (topic) tags.push(topic);
+    if (secName) tags.push(secName);
+    if (type) tags.push(type);
+    $("#fTags").value = tags.concat(existing.filter((t) => tags.indexOf(t) < 0)).join(" ");
+    toast("已自动识别并预填（可再修改）");
+  }
+
   // ---------- 管理员登录 ----------
   const adminMask = $("#adminMask");
 
@@ -939,6 +975,8 @@
     if (!$("#fTitle").value) {
       $("#fTitle").value = file.name.replace(/\.[^.]+$/, "");
     }
+    // 选文件后自动温和预填章节/类型/标签（只填空，不覆盖已选）
+    smartFill(false);
   }
 
   function clearPendingFile() {
@@ -1274,6 +1312,7 @@
       populateChapterSelect();
     });
     $("#fChapter").addEventListener("change", populateSectionSelect);
+    $("#autoFillBtn").onclick = () => smartFill(true);
     $("#saveResource").onclick = saveResource;
 
     // 资源助手

@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Physics: Dynamic Equilibrium Methods</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+    <style>
+        * { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+        body { margin: 0; overflow: hidden; background-color: #0f172a; color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #canvas-container { position: absolute; top: 0; left: 320px; right: 0; bottom: 0; }
+        .sidebar { position: absolute; top: 0; left: 0; width: 320px; height: 100vh; background-color: #1e293b; border-right: 1px solid #334155; z-index: 10; display: flex; flex-direction: column; }
+        .method-btn { transition: all 0.2s; text-align: left; }
+        .method-btn.active { background-color: #3b82f6; color: white; border-left: 4px solid #60a5fa; }
+        .method-btn:not(.active):hover { background-color: #334155; }
+        input[type=range] { accent-color: #3b82f6; }
+        
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid #334155; position: relative; }
+            #canvas-container { left: 0; top: auto; position: relative; height: calc(100vh - 300px); }
+            body { overflow-y: auto; overflow-x: hidden; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar shadow-xl">
+        <div class="p-6 border-b border-slate-700">
+            <h1 class="text-2xl font-bold text-white mb-2">Dynamic Equilibrium</h1>
+            <p class="text-sm text-slate-400">Interactive exploration of the 4 classic methods to analyze forces in changing systems.</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 space-y-2" id="method-buttons">
+            <button onclick="setMethod(0)" class="method-btn active w-full p-4 rounded-lg font-semibold text-slate-200">
+                1. Analytical Method
+                <span class="block text-xs font-normal text-slate-400 mt-1">Orthogonal decomposition & math</span>
+            </button>
+            <button onclick="setMethod(1)" class="method-btn w-full p-4 rounded-lg font-semibold text-slate-200">
+                2. Vector Triangle
+                <span class="block text-xs font-normal text-slate-400 mt-1">Vertex locus on a straight line</span>
+            </button>
+            <button onclick="setMethod(2)" class="method-btn w-full p-4 rounded-lg font-semibold text-slate-200">
+                3. Similar Triangles
+                <span class="block text-xs font-normal text-slate-400 mt-1">Force triangle ∝ Geometry</span>
+            </button>
+            <button onclick="setMethod(3)" class="method-btn w-full p-4 rounded-lg font-semibold text-slate-200">
+                4. Auxiliary Circle
+                <span class="block text-xs font-normal text-slate-400 mt-1">Vertex locus on a circle</span>
+            </button>
+        </div>
+
+        <div class="p-6 border-t border-slate-700 bg-slate-800">
+            <label class="block text-sm font-medium text-slate-300 mb-3 flex justify-between">
+                <span>System Variable</span>
+                <span id="slider-val-display" class="text-blue-400 font-mono">0.50</span>
+            </label>
+            <input type="range" id="sys-slider" min="0" max="1" step="0.01" value="0.5" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer">
+            
+            <label class="block text-sm font-medium text-slate-300 mt-4 mb-3 flex justify-between">
+                <span>Rotate Force Diagram</span>
+                <span id="rot-slider-val" class="text-purple-400 font-mono">0°</span>
+            </label>
+            <input type="range" id="rot-slider" min="-180" max="180" step="1" value="0" class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer">
+            
+            <div class="mt-4 flex justify-between items-center border-t border-slate-700 pt-3">
+                <span class="text-sm font-medium text-slate-300">Theory & Analysis</span>
+                <button onclick="toggleDesc()" class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded transition-colors">Toggle Info</button>
+            </div>
+            <div id="desc-container" class="mt-3 text-xs text-slate-400 leading-relaxed transition-all duration-300">
+                <p id="method-desc">Adjust the slider to change the angle of the pulling force. Observe how the tension and pulling force change mathematically.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        // Global State
+        let currentMethod = 0;
+        let pValue = 0.5; // Parameter from slider (0 to 1)
+        let rotValue = 0; // Rotation of force diagram in degrees
+        let showDesc = true;
+
+        function toggleDesc() {
+            showDesc = !showDesc;
+            document.getElementById('desc-container').style.display = showDesc ? 'block' : 'none';
+        }
+        
+        // Colors
+        const C_BG = '#0f172a';
+        const C_PHYSICS = '#cbd5e1';
+        const C_GRAVITY = '#ef4444'; // Red
+        const C_NORMAL = '#10b981'; // Green
+        const C_TENSION = '#3b82f6'; // Blue
+        const C_FORCE = '#f59e0b'; // Amber
+        const C_GUIDE = '#475569';
+        const C_HIGHLIGHT = '#a855f7'; // Purple
+
+        const descriptions = [
+            "Analytical Method: A block is pulled on a horizontal surface. We resolve forces into X and Y axes. Adjust the slider to change the angle θ of force F. The equations show how F changes to maintain equilibrium.",
+            "Vector Triangle: A block on an incline is pulled by force F. Gravity (G) is constant. Normal force (N) direction is fixed. Adjust slider to change direction of F. The tip of vector F moves along a straight line.",
+            "Similar Triangles: A ball rests on a smooth sphere, held by a string. As the ball moves (adjust slider), the physical triangle (Center-Support-Ball) remains similar to the Force Triangle. Notice how Normal force (N) magnitude stays constant!",
+            "Auxiliary Circle: A knot is pulled by 3 forces. G is constant. The angle between T1 and T2 is fixed at 60°. As the system rotates (adjust slider), the vertex of the force triangle traces a circle."
+        ];
+
+        // UI Interaction
+        function setMethod(idx) {
+            currentMethod = idx;
+            document.querySelectorAll('.method-btn').forEach((btn, i) => {
+                if (i === idx) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+            document.getElementById('method-desc').innerText = descriptions[idx];
+            // Reset slider to middle for better initial view
+            document.getElementById('sys-slider').value = 0.5;
+            pValue = 0.5;
+            updateSliderDisplay();
+        }
+
+        document.getElementById('sys-slider').addEventListener('input', function(e) {
+            pValue = parseFloat(e.target.value);
+            updateSliderDisplay();
+        });
+        
+        document.getElementById('rot-slider').addEventListener('input', function(e) {
+            rotValue = parseFloat(e.target.value);
+            updateSliderDisplay();
+        });
+
+        function updateSliderDisplay() {
+            document.getElementById('slider-val-display').innerText = pValue.toFixed(2);
+            document.getElementById('rot-slider-val').innerText = rotValue + '°';
+        }
+
+        // p5.js Sketch
+        function setup() {
+            let container = document.getElementById('canvas-container');
+            let canvas = createCanvas(container.clientWidth, container.clientHeight);
+            canvas.parent('canvas-container');
+            textAlign(CENTER, CENTER);
+            updateSliderDisplay();
+        }
+
+        function windowResized() {
+            let container = document.getElementById('canvas-container');
+            resizeCanvas(container.clientWidth, container.clientHeight);
+        }
+
+        function drawVector(x, y, vx, vy, colorStr, label) {
+            push();
+            stroke(colorStr);
+            strokeWeight(3);
+            fill(colorStr);
+            line(x, y, x + vx, y + vy);
+            
+            // Arrow head
+            let angle = atan2(vy, vx);
+            let arrowSize = 10;
+            translate(x + vx, y + vy);
+            rotate(angle);
+            triangle(0, 0, -arrowSize, arrowSize/2, -arrowSize, -arrowSize/2);
+            
+            // Label
+            rotate(-angle);
+            noStroke();
+            textSize(16);
+            textStyle(BOLD);
+            let offset = 20;
+            text(label, vx > 0 ? offset : -offset, vy > 0 ? offset : -offset);
+            pop();
+        }
+
+        function drawDashedLine(x1, y1, x2, y2) {
+            push();
+            stroke(C_GUIDE);
+            strokeWeight(1);
+            drawingContext.setLineDash([5, 5]);
+            line(x1, y1, x2, y2);
+            pop();
+        }
+
+        function draw() {
+            background(C_BG);
+            
+            let cx = width / 2;
+            let cy = height / 2;
+            
+            // Split screen layout for desktop, stacked for narrow
+            let isWide = width > 600;
+            let leftCx = isWide ? width * 0.25 : width * 0.5;
+            let rightCx = isWide ? width * 0.75 : width * 0.5;
+            let leftCy = isWide ? height * 0.5 : height * 0.3;
+            let rightCy = isWide ? height * 0.5 : height * 0.75;
+
+            // Draw separators and titles
+            push();
+            stroke(C_GUIDE);
+            strokeWeight(1);
+            if (isWide) {
+                line(width/2, 50, width/2, height - 50);
+            } else {
+                line(50, height/2, width - 50, height/2);
+            }
+            
+            fill(C_PHYSICS);
+            noStroke();
+            textSize(20);
+            text("Physical Model", leftCx, isWide ? 40 : 30);
+            text("Force Diagram", rightCx, isWide ? 40 : height/2 + 30);
+            pop();
+
+            switch(currentMethod) {
+                case 0: drawMethod1(leftCx, leftCy, rightCx, rightCy); break;
+                case 1: drawMethod2(leftCx, leftCy, rightCx, rightCy); break;
+                case 2: drawMethod3(leftCx, leftCy, rightCx, rightCy); break;
+                case 3: drawMethod4(leftCx, leftCy, rightCx, rightCy); break;
+            }
+        }
+
+        // 1. Analytical Method (Block pulled at angle)
+        function drawMethod1(lx, ly, rx, ry) {
+            let theta = map(pValue, 0, 1, 0, PI/3); // Angle 0 to 60 deg
+            let mass = 100;
+            let mu = 0.3; // friction coeff
+            
+            // F*cos(theta) = mu * N
+            // N + F*sin(theta) = mg
+            // F*cos(theta) = mu * (mg - F*sin(theta))
+            // F = (mu * mg) / (cos(theta) + mu * sin(theta))
+            let mg = 150; // Visual scale for gravity
+            let F_mag = (mu * mg) / (cos(theta) + mu * sin(theta));
+            let N_mag = mg - F_mag * sin(theta);
+            let f_mag = mu * N_mag;
+
+            // --- Left: Physical ---
+            push();
+            translate(lx, ly + 50);
+            
+            // Ground
+            stroke(C_PHYSICS); strokeWeight(2);
+            line(-100, 0, 100, 0);
+            for(let i=-100; i<100; i+=10) line(i, 0, i-5, 10);
+            
+            // Block
+            fill('#334155'); stroke(C_PHYSICS);
+            rect(-30, -40, 60, 40);
+            
+            // Forces on block
+            drawVector(0, -20, 0, mg, C_GRAVITY, "G");
+            drawVector(0, 0, 0, -N_mag, C_NORMAL, "N");
+            drawVector(0, -20, f_mag, 0, C_FORCE, "f"); // Friction acts backwards, wait, F pulls right, f points left.
+            drawVector(0, -20, -f_mag, 0, C_HIGHLIGHT, "f"); // Corrected friction direction
+            
+            // Pulling force
+            let fx = F_mag * cos(theta);
+            let fy = -F_mag * sin(theta);
+            drawVector(0, -20, fx, fy, C_TENSION, "F");
+            
+            // Concurrent point
+            fill('#ef4444'); noStroke(); circle(0, -20, 6);
+
+            // Angle arc
+            noFill(); stroke(C_GUIDE);
+            arc(0, -20, 40, 40, -theta, 0);
+            fill(C_PHYSICS); noStroke(); textSize(12);
+            text("θ", 30, -30);
+            pop();
+
+            // --- Right: Analytical / Math (Formula Method Only) ---
+            push();
+            translate(rx, ry - 60);
+            
+            textAlign(CENTER, CENTER);
+            
+            // Title
+            textSize(18);
+            fill(C_PHYSICS);
+            textStyle(BOLD);
+            text("Orthogonal Decomposition", 0, -40);
+            textStyle(NORMAL);
+            
+            // X-Axis Equation
+            textSize(16);
+            fill(C_HIGHLIGHT);
+            text(`X-Axis: ΣFx = 0`, 0, 0);
+            text(`F·cos(θ) - f = 0  ⇒  F·cos(θ) = μN`, 0, 25);
+            
+            // Y-Axis Equation
+            fill(C_NORMAL);
+            text(`Y-Axis: ΣFy = 0`, 0, 65);
+            text(`N + F·sin(θ) - G = 0  ⇒  N = G - F·sin(θ)`, 0, 90);
+            
+            // Final Derived Formula
+            fill(C_TENSION);
+            textSize(18);
+            textStyle(BOLD);
+            text(`F = μG / (cosθ + μ·sinθ)`, 0, 140);
+            
+            // Dynamic Values
+            textStyle(NORMAL);
+            textSize(14);
+            fill(C_PHYSICS);
+            text(`θ = ${(theta * 180 / PI).toFixed(1)}°   |   F = ${F_mag.toFixed(1)}`, 0, 180);
+            
+            pop();
+        }
+
+        // 2. Vector Triangle (Vertex on straight line)
+        function drawMethod2(lx, ly, rx, ry) {
+            let inclineAngle = PI/6; // 30 degrees
+            // Force F angle relative to incline. 
+            // Slider 0: parallel to incline (pulling up). 
+            // Slider 1: pulling straight up (vertical).
+            let forceAngleRel = map(pValue, 0, 1, 0, PI/2 + inclineAngle); 
+            
+            let G = 150; // Gravity magnitude
+            
+            // Physical geometry
+            let blockX = 0;
+            let blockY = 0;
+
+            // --- Left: Physical ---
+            push();
+            translate(lx, ly + 50);
+            
+            // Incline
+            stroke(C_PHYSICS); strokeWeight(2);
+            let w = 150;
+            let h = w * tan(inclineAngle);
+            triangle(-w, h, w, -h, -w, -h); // Draw wedge
+            
+            rotate(-inclineAngle); // Rotate to incline frame
+            
+            // Block
+            fill('#334155'); stroke(C_PHYSICS);
+            rect(-25, -40, 50, 40);
+            
+            // G in incline frame
+            let gx = G * sin(inclineAngle);
+            let gy = G * cos(inclineAngle);
+            
+            // Calculate F magnitude to balance Gx
+            // F * cos(forceAngleRel) = Gx
+            let F_mag = gx / cos(forceAngleRel);
+            // Limit F_mag for visual sanity if angle gets too close to 90
+            if (abs(cos(forceAngleRel)) < 0.05) F_mag = G * 2; 
+
+            let N_mag = gy - F_mag * sin(forceAngleRel);
+
+            // Draw forces on physical model (Strictly Concurrent)
+            translate(0, -20); // Move origin to center of mass
+            
+            push();
+            rotate(inclineAngle); // Back to world frame for G
+            drawVector(0, 0, 0, G, C_GRAVITY, "G");
+            pop(); // Back to incline frame
+            
+            drawVector(0, 0, 0, -N_mag, C_NORMAL, "N");
+            
+            let fx = F_mag * cos(forceAngleRel);
+            let fy = -F_mag * sin(forceAngleRel);
+            drawVector(0, 0, fx, fy, C_TENSION, "F");
+            
+            // Concurrent point
+            fill('#ef4444'); noStroke(); circle(0, 0, 6);
+            
+            translate(0, 20); // Restore origin
+            
+            pop();
+
+            // --- Right: Vector Triangle ---
+            push();
+            translate(rx, ry - 60);
+            
+            push(); // Start independent rotation
+            rotate(radians(rotValue));
+            
+            // Draw G (Starts at origin, points down)
+            drawVector(0, 0, 0, G, C_GRAVITY, "G");
+            
+            // N angle in world frame is up-left
+            let nAngle = -PI/2 - inclineAngle; 
+            
+            // Draw N line of action (Locus line) starting from tip of G
+            stroke(C_HIGHLIGHT); strokeWeight(1); drawingContext.setLineDash([5, 5]);
+            let p1x = 0 - 200 * cos(nAngle);
+            let p1y = G - 200 * sin(nAngle);
+            let p2x = 0 + 200 * cos(nAngle);
+            let p2y = G + 200 * sin(nAngle);
+            line(p1x, p1y, p2x, p2y);
+            drawingContext.setLineDash([]);
+            
+            // Draw N vector (Starts from tip of G, goes along locus)
+            let nx = N_mag * cos(nAngle);
+            let ny = N_mag * sin(nAngle);
+            drawVector(0, G, nx, ny, C_NORMAL, "N");
+            
+            // Draw F vector (Closes the triangle back to origin: G + N + F = 0)
+            drawVector(nx, G + ny, -nx, -G - ny, C_TENSION, "F");
+            pop(); // End rotation
+
+            // Text (Unrotated for readability)
+            noStroke(); fill(C_PHYSICS); textSize(14); textAlign(CENTER);
+            text("Locus of F's tip is a straight line", 0, G + 100);
+            if (abs(forceAngleRel) < 0.05) {
+                fill(C_HIGHLIGHT);
+                text("Minimum F (Perpendicular to N)", 0, G + 120);
+            }
+            pop();
+        }
+
+        // 3. Similar Triangles (Ball on sphere)
+        function drawMethod3(lx, ly, rx, ry) {
+            let R = 100; // Radius of sphere
+            let H = 80;  // Height of support above sphere center
+            // Slider controls angle of ball on sphere
+            let angle = map(pValue, 0, 1, PI/12, PI/2.5); 
+            
+            let G = 120; // Gravity visual scale
+            
+            // Physical points
+            let C = {x: 0, y: 0}; // Center of sphere
+            let P = {x: 0, y: -(R + H)}; // Support point
+            let B = {x: R * sin(angle), y: -R * cos(angle)}; // Ball position
+            
+            let L = dist(P.x, P.y, B.x, B.y); // String length
+            
+            // Triangle similarity: Force Triangle ~ Geometry Triangle PCB
+            // G / PC = N / CB = T / PB
+            // G / (R+H) = N / R = T / L
+            let scaleFact = G / (R + H);
+            let N_mag = R * scaleFact; // Constant!
+            let T_mag = L * scaleFact; // Proportional to L
+
+            // --- Left: Physical ---
+            push();
+            translate(lx, ly + 50);
+            
+            // Sphere
+            noFill(); stroke(C_PHYSICS); strokeWeight(2);
+            arc(0, 0, R*2, R*2, PI, 0);
+            
+            // Central Pole
+            stroke(C_GUIDE); strokeWeight(4);
+            line(0, 0, 0, P.y);
+            
+            // String
+            stroke(C_TENSION); strokeWeight(2);
+            line(P.x, P.y, B.x, B.y);
+            
+            // Ball
+            fill('#334155'); stroke(C_PHYSICS); strokeWeight(1);
+            circle(B.x, B.y, 20);
+            
+            // Geometry Triangle Highlight
+            fill(255, 255, 255, 20); noStroke();
+            triangle(C.x, C.y, P.x, P.y, B.x, B.y);
+            
+            // Labels
+            fill(C_PHYSICS); textSize(12);
+            text("C", C.x, C.y + 15);
+            text("P", P.x, P.y - 15);
+            
+            // Draw Forces on Ball
+            translate(B.x, B.y);
+            drawVector(0, 0, 0, G, C_GRAVITY, "G");
+            
+            // N is along CB (outward)
+            let nx = (B.x - C.x) / R * N_mag;
+            let ny = (B.y - C.y) / R * N_mag;
+            drawVector(0, 0, nx, ny, C_NORMAL, "N");
+            
+            // T is along BP
+            let tx = (P.x - B.x) / L * T_mag;
+            let ty = (P.y - B.y) / L * T_mag;
+            drawVector(0, 0, tx, ty, C_TENSION, "T");
+            
+            // Concurrent point
+            fill('#ef4444'); noStroke(); circle(0, 0, 6);
+            
+            pop();
+
+            // --- Right: Similar Triangles ---
+            push();
+            translate(rx, ry + 60); // Moved down to prevent text overlap
+            
+            push(); // Start independent rotation
+            rotate(radians(rotValue));
+            
+            // Draw Geometry Triangle (C, P, B) scaled up for visibility
+            let scaleG = 1.3;
+            let cg = {x: C.x, y: C.y};
+            let pg = {x: P.x * scaleG, y: P.y * scaleG};
+            let bg = {x: B.x * scaleG, y: B.y * scaleG};
+            
+            // Draw Geometry Triangle (Dashed)
+            stroke(C_GUIDE); strokeWeight(2); drawingContext.setLineDash([5, 5]);
+            line(cg.x, cg.y, pg.x, pg.y); // PC
+            line(cg.x, cg.y, bg.x, bg.y); // CB
+            line(pg.x, pg.y, bg.x, bg.y); // BP
+            drawingContext.setLineDash([]);
+            
+            // Draw Translated Force Vectors over the geometry
+            // G is along PC (downwards) - Length perfectly matches Geometry line PC
+            drawVector(pg.x, pg.y, cg.x - pg.x, cg.y - pg.y, C_GRAVITY, "G");
+            
+            // N is along CB (outwards from C to B) - Length perfectly matches Geometry line CB
+            drawVector(cg.x, cg.y, bg.x - cg.x, bg.y - cg.y, C_NORMAL, "N");
+            
+            // T is along BP (from B to P) - Length perfectly matches Geometry line BP
+            drawVector(bg.x, bg.y, pg.x - bg.x, pg.y - bg.y, C_TENSION, "T");
+            pop(); // End rotation
+            
+            // Text explanation (Moved below the diagram to avoid overlapping)
+            noStroke(); fill(C_PHYSICS); textAlign(LEFT); textSize(14);
+            let textY = 80; // Positioned below the triangle
+            text("Force Vectors Translated to Geometry (PCB)", -140, textY);
+            fill(C_GRAVITY); text(`G overlaps PC (Constant height)`, -140, textY + 25);
+            fill(C_NORMAL); text(`N overlaps CB (Constant radius) -> N is CONSTANT`, -140, textY + 50);
+            fill(C_TENSION); text(`T overlaps PB (String length changes)`, -140, textY + 75);
+            
+            // Highlight constant N
+            fill(C_HIGHLIGHT); textSize(13); textStyle(BOLD);
+            text(`N magnitude = ${N_mag.toFixed(0)} (Constant)`, -140, textY + 105);
+            pop();
+        }
+
+        // 4. Auxiliary Circle (Lami's extension)
+        function drawMethod4(lx, ly, rx, ry) {
+            let G = 150;
+            let fixedAngle = PI/3; // 60 degrees between two strings
+            
+            // Limit rotation angle mathematically to prevent strings from detaching/flipping
+            let maxAng = PI / 3.5; 
+            let vertexAngleOnCircle = map(pValue, 0, 1, -maxAng, maxAng);
+            
+            // --- Math for Circle ---
+            // Triangle base is G. Top angle is fixedAngle.
+            // Radius of circumcircle R_circ = G / (2 * sin(fixedAngle))
+            let R_circ = G / (2 * sin(fixedAngle));
+            // Center of circle: x is offset, y is G/2
+            let cx_circ = G / (2 * tan(fixedAngle)); // Distance from chord to center
+            let cy_circ = G / 2;
+
+            // The vertex moves on this circle.
+            // Base of triangle is (0,0) to (0, G).
+            let circleCenterX = cx_circ;
+            let circleCenterY = G/2;
+            
+            // Angle on the circle. 
+            // When symmetrical, vertex is at (circleCenterX + R_circ, G/2) -> angle 0.
+            let vx_triangle = circleCenterX - R_circ * cos(vertexAngleOnCircle);
+            let vy_triangle = circleCenterY + R_circ * sin(vertexAngleOnCircle);
+
+            // --- Left: Physical ---
+            push();
+            translate(lx, ly - 50);
+            
+            let knotX = 0;
+            let knotY = 100;
+            
+            // Calculate Tensions for physical drawing
+            let t1x_mag = -vx_triangle; let t1y_mag = -vy_triangle;
+            let t2x_mag = vx_triangle; let t2y_mag = vy_triangle - G;
+            
+            // Support fixed track (Full circular track to prevent visual detachment)
+            noFill(); stroke(C_PHYSICS); strokeWeight(4);
+            circle(knotX, knotY, 200);
+            
+            // Strings aligned exactly with tensions
+            stroke(C_GUIDE); strokeWeight(2);
+            // Scale vector to reach the track (radius 100)
+            let s1_len = dist(0, 0, t1x_mag, t1y_mag);
+            let s2_len = dist(0, 0, t2x_mag, t2y_mag);
+            let s1x = (t1x_mag / s1_len) * 100; let s1y = (t1y_mag / s1_len) * 100;
+            let s2x = (t2x_mag / s2_len) * 100; let s2y = (t2y_mag / s2_len) * 100;
+            line(knotX, knotY, knotX + s1x, knotY + s1y);
+            line(knotX, knotY, knotX + s2x, knotY + s2y);
+            
+            // Track attachment rings
+            fill('#94a3b8'); noStroke();
+            circle(knotX + s1x, knotY + s1y, 8);
+            circle(knotX + s2x, knotY + s2y, 8);
+
+            // Knot and Weight
+            fill('#334155'); stroke(C_PHYSICS); strokeWeight(1);
+            circle(knotX, knotY, 10);
+            
+            drawVector(knotX, knotY, 0, G*0.6, C_GRAVITY, "G");
+            
+            // Draw tension vectors on knot
+            drawVector(knotX, knotY, t1x_mag*0.6, t1y_mag*0.6, C_TENSION, "T1");
+            drawVector(knotX, knotY, t2x_mag*0.6, t2y_mag*0.6, C_NORMAL, "T2");
+            
+            // Concurrent point
+            fill('#ef4444'); noStroke(); circle(knotX, knotY, 6);
+            pop();
+
+            // --- Right: Auxiliary Circle ---
+            push();
+            translate(rx, ry - G/2);
+            
+            push(); // Start independent rotation
+            // Rotate around the center of the triangle base for better UX
+            translate(0, G/2);
+            rotate(radians(rotValue));
+            translate(0, -G/2);
+            
+            // Draw Circle
+            noFill(); stroke(C_GUIDE); strokeWeight(1); drawingContext.setLineDash([4, 4]);
+            circle(circleCenterX, circleCenterY, R_circ * 2);
+            drawingContext.setLineDash([]);
+            
+            // Draw G (Base)
+            drawVector(0, 0, 0, G, C_GRAVITY, "G");
+            
+            // Draw Triangle
+            // Vector T1 from vertex to origin
+            drawVector(vx_triangle, vy_triangle, -vx_triangle, -vy_triangle, C_TENSION, "T1");
+            // Vector T2 from tail of G to vertex
+            drawVector(0, G, vx_triangle, vy_triangle - G, C_NORMAL, "T2");
+            
+            // Highlight constant angle
+            push();
+            translate(vx_triangle, vy_triangle);
+            noFill(); stroke(C_HIGHLIGHT); strokeWeight(2);
+            pop();
+            pop(); // End rotation
+
+            noStroke(); fill(C_PHYSICS); textAlign(CENTER); textSize(14);
+            text("Angle between T1 & T2 is constant (60°)", 0, G + 60);
+            text("Vertex locus is a circle", 0, G + 80);
+            
+            // Law of Sines Text
+            fill(C_HIGHLIGHT); textSize(16);
+            text("Law of Sines (Lami's Theorem):", 0, G + 110);
+            fill(C_PHYSICS); textSize(14);
+            text(`G / sin(60°) = T1 / sin(θ1) = T2 / sin(θ2) = 2R`, 0, G + 135);
+            
+            // Diameter max tension case
+            if (abs(vertexAngleOnCircle) < 0.1) {
+                fill(C_HIGHLIGHT);
+                text("Tension reaches local extreme", 0, G + 160);
+            }
+            pop();
+        }
+    </script>
+</body>
+</html>

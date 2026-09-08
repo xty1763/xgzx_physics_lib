@@ -24,7 +24,7 @@
   const previewUrls = {};            // id -> objectURL（本会话刚保存的资源，可立刻打开，无需等 GitHub Pages）
   let pendingFile = null;            // 当前选中的待上传文件
   let editingId = null;              // 正在编辑的资源 id（null = 新增）
-  const ASSET_V = 15;                // 资源版本号（缓存破）
+  const ASSET_V = 16;                // 资源版本号（缓存破）
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"; // 方案A 后端（Cloudflare Worker）
   const WORKER_TOKEN_KEY = "worker_token";
   const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
@@ -960,6 +960,10 @@
 
   function openAdminModal() {
     $("#adminToken").value = getPublishToken();
+    const ai = getAiConf();
+    if ($("#aiEndpoint")) $("#aiEndpoint").value = ai.endpoint || "";
+    if ($("#aiModel")) $("#aiModel").value = ai.model || "";
+    if ($("#aiKey")) $("#aiKey").value = ai.key || "";
     refreshAdminUI();
     adminMask.classList.add("show");
     setTimeout(() => $("#adminToken").focus(), 50);
@@ -976,6 +980,12 @@
       return;
     }
     setPublishToken(t);
+    // 一并保存 AI 设置（可选）
+    setAiConf({
+      endpoint: $("#aiEndpoint") ? $("#aiEndpoint").value.trim() : aiConf.endpoint,
+      model: $("#aiModel") ? $("#aiModel").value.trim() : aiConf.model,
+      key: $("#aiKey") ? $("#aiKey").value.trim() : aiConf.key,
+    });
     closeAdminModal();
     refreshAdminUI();
     render(); // 立即让卡片出现“编辑/删除”
@@ -1293,6 +1303,134 @@
     return { chapter: chapter, section: section };
   }
 
+  // ---------- 可选的大模型（AI）配置：免费接口、浏览器直连；失败自动回退规则引擎 ----------
+  // 默认用 Pollinations 免费匿名接口（无需 key、支持 CORS；免费可能较慢/偶发限额，失败即回退，不影响使用）
+  const AI_DEFAULT_ENDPOINT = "https://text.pollinations.ai/openai";
+  const AI_DEFAULT_MODEL = "openai";
+  let aiConf = { endpoint: AI_DEFAULT_ENDPOINT, model: AI_DEFAULT_MODEL, key: "" };
+  function getAiConf() {
+    try {
+      const s = localStorage.getItem("ai_conf");
+      if (s) aiConf = Object.assign({ endpoint: AI_DEFAULT_ENDPOINT, model: AI_DEFAULT_MODEL, key: "" }, JSON.parse(s));
+    } catch (e) {}
+    return aiConf;
+  }
+  function setAiConf(c) {
+    aiConf = Object.assign({}, getAiConf(), c);
+    try { localStorage.setItem("ai_conf", JSON.stringify(aiConf)); } catch (e) {}
+  }
+
+  // 调用 OpenAI 兼容 /chat/completions；失败或超时返回 null（由调用方回退）
+  async function llmChat(system, user, opts) {
+    const conf = getAiConf();
+    if (!conf.endpoint) return null;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), (opts && opts.timeout) || 25000);
+    try {
+      const headers = { "Content-Type": "application/json", Accept: "application/json" };
+      if (conf.key) headers.Authorization = "Bearer " + conf.key;
+      const body = {
+        model: conf.model || AI_DEFAULT_MODEL,
+        messages: [{ role: "system", content: system }, { role: "user", content: user }],
+        temperature: (opts && opts.temperature != null) ? opts.temperature : 0.3,
+        max_tokens: (opts && opts.maxTokens) || 200,
+        stream: false,
+      };
+      const res = await fetch(conf.endpoint, {
+        method: "POST", headers: headers, body: JSON.stringify(body), signal: ctrl.signal,
+      });
+      if (!res.ok) throw new Error("AI " + res.status);
+      const data = await res.json();
+      return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+    } catch (e) {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // 从模型返回里尽量抠出对象（模型可能用 ```json 包裹或夹带其它文字）
+  function parseJsonLoose(text) {
+    if (!text) return null;
+    const m = String(text).match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try { return JSON.parse(m[0]); } catch (e) {
+      try { return JSON.parse(m[0].replace(/'/g, '"').replace(/，/g, ",")); } catch (e2) { return null; }
+    }
+  }
+
+  // 用大模型从资源清单里挑最相关的资源标题
+  async function aiPickTitles(q) {
+    if (!baseList.length) return null;
+    const idx = baseList.map((r) => {
+      const loc = [bookTitle(r.book), chapterTitle(r.chapter), sectionTitle(r.section)].filter(Boolean).join(" · ");
+      return (r.title || "") + "┃" + loc + "┃" + (r.type || "") + "┃" + (r.desc || "");
+    }).join("\n");
+    const system =
+      "你是高中物理教学资源库的检索助手。下面是仓库里的资源清单，每行格式：标题┃所属教材/章节┃类型┃简介。\n" +
+      "请根据用户的查询选出最相关的资源标题。只返回 JSON：{\"titles\":[\"标题1\",\"标题2\"]}，最多 5 个；都不相关则返回 {\"titles\":[]}。只输出 JSON。\n\n资源清单：\n" + idx;
+    const resp = await llmChat(system, "查询：" + q, { maxTokens: 300, temperature: 0.2 });
+    const obj = parseJsonLoose(resp);
+    if (obj && Array.isArray(obj.titles)) return obj.titles.map((t) => String(t).trim()).filter(Boolean);
+    return null;
+  }
+
+  // 大模型助手：优先 AI 挑资源，失败回退规则；仅命中同一章时提供“筛选到右侧”
+  async function aiAssistantReply(q) {
+    const picked = await aiPickTitles(q);
+    let list = [];
+    if (picked && picked.length) {
+      for (const t of picked) {
+        if (!t) continue;
+        const r = baseList.find((x) => x.title === t)
+          || baseList.find((x) => x.title.indexOf(t) > -1 || (t.length > 1 && t.indexOf(x.title) > -1));
+        if (r && !list.some((x) => x.id === r.id)) list.push(r);
+      }
+    }
+    if (!list.length) return assistantReply(q);   // 回退到规则
+    let filter = null;
+    const chs = [...new Set(list.map((r) => r.chapter).filter(Boolean))];
+    if (chs.length === 1) {
+      const first = list.find((r) => r.chapter === chs[0]);
+      filter = { book: (first && first.book) || null, chapter: chs[0], section: null, type: "all" };
+    }
+    return { text: "为你找到 " + list.length + " 个相关资源：", resources: list, filter: filter };
+  }
+
+  // 生成资源简介（用于上传/编辑表单“✨ 智能简介”）
+  async function aiDescribe(title, chapterId, sectionId, type, contentSample) {
+    const sys = "你是高中物理教学资源库的编辑。请为下面的资源写一句简介，35字以内，只输出简介正文，不要引号、不要“简介：”前缀、不要列表或编号。";
+    let info = "资源名称：" + title;
+    if (chapterId) info += "\n所属：" + chapterTitle(chapterId) + (sectionId ? " / " + sectionTitle(sectionId) : "");
+    if (type) info += "\n类型：" + type;
+    if (contentSample) info += "\n文件内容（片段）：" + String(contentSample).slice(0, 300);
+    const resp = await llmChat(sys, info, { maxTokens: 80, temperature: 0.6 });
+    if (!resp) return "";
+    let d = String(resp).trim().replace(/^("*|“|「|『|\s*简介[:：]?\s*)/, "").replace(/("*|”|」|』)$/, "").trim();
+    return d.slice(0, 60);
+  }
+
+  // “✨ 智能简介”按钮：自动生成并填入描述
+  async function aiGenerateDesc() {
+    const title = $("#fTitle").value.trim();
+    if (!title) { toast("请先填写资源名称", true); return; }
+    const btn = $("#aiDescBtn");
+    btn.disabled = true;
+    btn.textContent = "生成中…";
+    try {
+      let sample = "";
+      if (pendingFile && TEXT_EXT_RE.test(extOf(pendingFile.name))) sample = await readTextSample(pendingFile);
+      const d = await aiDescribe(title, $("#fChapter").value, $("#fSection").value, $("#fType").value, sample);
+      if (d) { $("#fDesc").value = d; toast("已生成简介（可再修改）"); }
+      else { toast("简介生成失败（网络或接口不可用），已保留原文", true); }
+    } catch (e) {
+      toast("简介生成失败：" + (e && e.message), true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "✨ 智能简介";
+    }
+  }
+
   function searchAssistant(s) {
     const bookId = detectBook(s);
     const type = detectType(s);
@@ -1368,13 +1506,33 @@
     if (c && typeof c.scrollIntoView === "function") c.scrollIntoView({ behavior: "smooth" });
   }
 
-  function assistantSend() {
+  async function assistantSend() {
     const input = $("#assistInput");
     const q = input.value.trim();
     if (!q) return;
     input.value = "";
     addMsg(htmlEscape(q), "user");
-    const reply = assistantReply(q);
+
+    const sendBtn = $("#assistSend");
+    sendBtn.disabled = true;
+    const origTxt = sendBtn.textContent;
+    sendBtn.textContent = "思考中…";
+    const think = document.createElement("div");
+    think.className = "assist-msg bot";
+    think.textContent = "🤖 正在思考…";
+    $("#assistMessages").appendChild(think);
+    $("#assistMessages").scrollTop = $("#assistMessages").scrollHeight;
+
+    let reply;
+    try {
+      reply = await aiAssistantReply(q);
+    } catch (e) {
+      reply = assistantReply(q);
+    }
+    if (think.parentNode) think.parentNode.removeChild(think);
+    sendBtn.disabled = false;
+    sendBtn.textContent = origTxt;
+
     const hitList = reply.resources.length
       ? "<ul>" +
         reply.resources
@@ -1385,7 +1543,7 @@
           .join("") +
         "</ul>"
       : "";
-    const btn = reply.resources.length
+    const btn = reply.filter && reply.resources.length
       ? "<div class='assist-btnrow'><button class='btn ghost' type='button' data-applyfilter='1'>筛选到右侧</button></div>"
       : "";
     addMsg(reply.text.replace(/\n/g, "<br/>") + hitList + btn, "bot");
@@ -1453,7 +1611,8 @@
       populateChapterSelect();
     });
     $("#fChapter").addEventListener("change", populateSectionSelect);
-    $("#autoFillBtn").onclick = () => smartFill(true);
+    $("#autoFillBtn").onclick = async () => { await smartFill(true); aiGenerateDesc(); };
+    $("#aiDescBtn").onclick = aiGenerateDesc;
     $("#saveResource").onclick = saveResource;
 
     // 资源助手

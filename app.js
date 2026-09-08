@@ -24,7 +24,7 @@
   const previewUrls = {};            // id -> objectURL（本会话刚保存的资源，可立刻打开，无需等 GitHub Pages）
   let pendingFile = null;            // 当前选中的待上传文件
   let editingId = null;              // 正在编辑的资源 id（null = 新增）
-  const ASSET_V = 16;                // 资源版本号（缓存破）
+  const ASSET_V = 17;                // 资源版本号（缓存破）
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"; // 方案A 后端（Cloudflare Worker）
   const WORKER_TOKEN_KEY = "worker_token";
   const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
@@ -1325,7 +1325,7 @@
     const conf = getAiConf();
     if (!conf.endpoint) return null;
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), (opts && opts.timeout) || 25000);
+    const timer = setTimeout(() => ctrl.abort(), (opts && opts.timeout) || 9000);
     try {
       const headers = { "Content-Type": "application/json", Accept: "application/json" };
       if (conf.key) headers.Authorization = "Bearer " + conf.key;
@@ -1369,7 +1369,7 @@
     const system =
       "你是高中物理教学资源库的检索助手。下面是仓库里的资源清单，每行格式：标题┃所属教材/章节┃类型┃简介。\n" +
       "请根据用户的查询选出最相关的资源标题。只返回 JSON：{\"titles\":[\"标题1\",\"标题2\"]}，最多 5 个；都不相关则返回 {\"titles\":[]}。只输出 JSON。\n\n资源清单：\n" + idx;
-    const resp = await llmChat(system, "查询：" + q, { maxTokens: 300, temperature: 0.2 });
+    const resp = await llmChat(system, "查询：" + q, { maxTokens: 300, temperature: 0.2, timeout: 6000 });
     const obj = parseJsonLoose(resp);
     if (obj && Array.isArray(obj.titles)) return obj.titles.map((t) => String(t).trim()).filter(Boolean);
     return null;
@@ -1398,19 +1398,38 @@
   }
 
   // 生成资源简介（用于上传/编辑表单“✨ 智能简介”）
+  // 基于元数据生成一句兜底简介（AI 不可用时也能给出合理描述）
+  function fallbackDesc(title, chapterId, sectionId, type) {
+    const cleanTitle = String(title || "").replace(/\.[a-z0-9]+$/i, "");
+    const seg = [];
+    const bid = bookOfChapter(chapterId);
+    if (bid) seg.push(bookTitle(bid));
+    if (chapterId) seg.push(chapterTitle(chapterId));
+    if (sectionId) seg.push(sectionTitle(sectionId));
+    const loc = seg
+      .filter(Boolean)
+      .map((s) => s.replace(/^第[一二三四五六七八九十]+章\s*/, "").replace(/^\s*\d+(\.\d+)*\s*/, ""))
+      .join(" · ");
+    const t = type || "教学资源";
+    return cleanTitle + (loc ? "（" + loc + "）" : "") + " · " + t;
+  }
+
   async function aiDescribe(title, chapterId, sectionId, type, contentSample) {
     const sys = "你是高中物理教学资源库的编辑。请为下面的资源写一句简介，35字以内，只输出简介正文，不要引号、不要“简介：”前缀、不要列表或编号。";
     let info = "资源名称：" + title;
     if (chapterId) info += "\n所属：" + chapterTitle(chapterId) + (sectionId ? " / " + sectionTitle(sectionId) : "");
     if (type) info += "\n类型：" + type;
     if (contentSample) info += "\n文件内容（片段）：" + String(contentSample).slice(0, 300);
-    const resp = await llmChat(sys, info, { maxTokens: 80, temperature: 0.6 });
-    if (!resp) return "";
-    let d = String(resp).trim().replace(/^("*|“|「|『|\s*简介[:：]?\s*)/, "").replace(/("*|”|」|』)$/, "").trim();
-    return d.slice(0, 60);
+    const resp = await llmChat(sys, info, { maxTokens: 80, temperature: 0.6, timeout: 9000 });
+    if (resp) {
+      let d = String(resp).trim().replace(/^("*|“|「|『|\s*简介[:：]?\s*)/, "").replace(/("*|”|」|』)$/, "").trim();
+      d = d.slice(0, 60);
+      if (d) return { text: d, ai: true };
+    }
+    return { text: fallbackDesc(title, chapterId, sectionId, type), ai: false };
   }
 
-  // “✨ 智能简介”按钮：自动生成并填入描述
+  // “✨ 智能简介”按钮：自动生成并填入描述（AI 优先，失败则用本地规则，绝不空着）
   async function aiGenerateDesc() {
     const title = $("#fTitle").value.trim();
     if (!title) { toast("请先填写资源名称", true); return; }
@@ -1420,11 +1439,12 @@
     try {
       let sample = "";
       if (pendingFile && TEXT_EXT_RE.test(extOf(pendingFile.name))) sample = await readTextSample(pendingFile);
-      const d = await aiDescribe(title, $("#fChapter").value, $("#fSection").value, $("#fType").value, sample);
-      if (d) { $("#fDesc").value = d; toast("已生成简介（可再修改）"); }
-      else { toast("简介生成失败（网络或接口不可用），已保留原文", true); }
+      const res = await aiDescribe(title, $("#fChapter").value, $("#fSection").value, $("#fType").value, sample);
+      $("#fDesc").value = res.text;
+      toast(res.ai ? "已生成智能简介（可再修改）" : "已生成简介（本地规则；AI 接口暂不可用，可在“管理员登录”里配置）");
     } catch (e) {
-      toast("简介生成失败：" + (e && e.message), true);
+      $("#fDesc").value = fallbackDesc(title, $("#fChapter").value, $("#fSection").value, $("#fType").value);
+      toast("已生成简介（AI 异常已用本地规则）");
     } finally {
       btn.disabled = false;
       btn.textContent = "✨ 智能简介";

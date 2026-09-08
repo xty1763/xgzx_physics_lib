@@ -33,7 +33,7 @@
 
 ## 关键常量（app.js 顶部）
 - `WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"` （**目前指向 Cloudflare Worker，国内连不通，最终应改为腾讯云云函数的 HTTP 触发地址**）
-- `ASSET_V = 17`（静态资源版本号，改 app.js/index.html 后需 +1）
+- `ASSET_V = 18`（静态资源版本号，改 app.js/index.html 后需 +1）
 - 身份：`gh_publish_token`（站长 GitHub 令牌，走直连 GitHub，国内可用）；`worker_token`（授权老师走 Worker/云函数，暂不可用）
 
 ## 当前进度 / 待办

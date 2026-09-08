@@ -33,7 +33,7 @@
 
 ## 关键常量（app.js 顶部）
 - `WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"` （**目前指向 Cloudflare Worker，国内连不通，最终应改为腾讯云云函数的 HTTP 触发地址**）
-- `ASSET_V = 15`（静态资源版本号，改 app.js/index.html 后需 +1）
+- `ASSET_V = 16`（静态资源版本号，改 app.js/index.html 后需 +1）
 - 身份：`gh_publish_token`（站长 GitHub 令牌，走直连 GitHub，国内可用）；`worker_token`（授权老师走 Worker/云函数，暂不可用）
 
 ## 当前进度 / 待办
@@ -65,6 +65,10 @@
   且与其它资源重名时自动加序号）；`readFileAsBase64` 改用原生 `readAsDataURL`（更快、省内存），并对超大文件给出提示/拦截；
   所有 GitHub API 调用加 30s 超时，避免网络卡住导致“保存/删除一直无反应”；会话内刚保存/编辑的文件提供“本地预览”，
   管理员**立刻能打开**，无需等 GitHub Pages 部署。
+- **接入可选大模型（AI）**：资源助手（🤖）和「✨ 智能简介」会尽力调用**免费、浏览器可直连、OpenAI 兼容**的接口
+  （默认 `https://text.pollinations.ai/openai`，无需 key，但免费接口可能较慢/偶发限额）。失败/超时**自动回退**到本地规则，
+  不影响使用。接口地址/模型/Key 在「🔑 管理员登录」弹窗中配置并存入 localStorage（`ai_conf`）。注意：这是**无后端**方案，
+  免费匿名接口稳定性有限；若需更可靠，可在设置里填更稳的免费接口或 key（如硅基流动等，浏览器直连需该接口支持 CORS）。
 
 ### 其它可做的（非腾讯云，按需）
 - 打磨资源助手（更准、更多示例问法）、补充更多章节/示例资源、优化界面/页脚等。

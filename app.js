@@ -24,7 +24,7 @@
   const previewUrls = {};            // id -> objectURL（本会话刚保存的资源，可立刻打开，无需等 GitHub Pages）
   let pendingFile = null;            // 当前选中的待上传文件
   let editingId = null;              // 正在编辑的资源 id（null = 新增）
-  const ASSET_V = 18;                // 资源版本号（缓存破）
+  const ASSET_V = 19;                // 资源版本号（缓存破）
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"; // 方案A 后端（Cloudflare Worker）
   const WORKER_TOKEN_KEY = "worker_token";
   const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
@@ -1304,9 +1304,9 @@
   }
 
   // ---------- 可选的大模型（AI）配置：浏览器直连、OpenAI 兼容；失败自动回退规则引擎 ----------
-  // 默认用硅基流动（SiliconFlow）：国内可达、支持浏览器 CORS、注册送免费模型额度/key。站长在“管理员登录”填入自己的 key 即启用 AI。
-  const AI_DEFAULT_ENDPOINT = "https://api.siliconflow.cn/v1/chat/completions";
-  const AI_DEFAULT_MODEL = "Qwen/Qwen2.5-7B-Instruct";
+  // 默认用智谱（BigModel/GLM）：国内可达、支持浏览器 CORS、`glm-4-flash` 免费。站长在“管理员登录”填入自己的 key 即启用 AI。
+  const AI_DEFAULT_ENDPOINT = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
+  const AI_DEFAULT_MODEL = "glm-4-flash";
   let aiConf = { endpoint: AI_DEFAULT_ENDPOINT, model: AI_DEFAULT_MODEL, key: "" };
   function getAiConf() {
     try {

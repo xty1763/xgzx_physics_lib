@@ -33,7 +33,7 @@
 
 ## 关键常量（app.js 顶部）
 - `WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"` （**目前指向 Cloudflare Worker，国内连不通，最终应改为腾讯云云函数的 HTTP 触发地址**）
-- `ASSET_V = 16`（静态资源版本号，改 app.js/index.html 后需 +1）
+- `ASSET_V = 17`（静态资源版本号，改 app.js/index.html 后需 +1）
 - 身份：`gh_publish_token`（站长 GitHub 令牌，走直连 GitHub，国内可用）；`worker_token`（授权老师走 Worker/云函数，暂不可用）
 
 ## 当前进度 / 待办
@@ -69,6 +69,9 @@
   （默认 `https://text.pollinations.ai/openai`，无需 key，但免费接口可能较慢/偶发限额）。失败/超时**自动回退**到本地规则，
   不影响使用。接口地址/模型/Key 在「🔑 管理员登录」弹窗中配置并存入 localStorage（`ai_conf`）。注意：这是**无后端**方案，
   免费匿名接口稳定性有限；若需更可靠，可在设置里填更稳的免费接口或 key（如硅基流动等，浏览器直连需该接口支持 CORS）。
+- **智能简介“永不失败”**：实测免费匿名接口（Pollinations / KeylessAI 等）当前不稳定（偶发 402/404/超时）。已改为「✨ 智能简介」**AI 优先、
+  失败自动用本地规则**生成一句“资源名+章节+类型”的简介，**不会失败、不会留空**；资源助手也在 AI 超时/失败时**快速回退**到规则（短超时 6-9s）。
+  若要真·大模型效果，请在「管理员登录」里填一个有免费额度的 key 接口（例：硅基流动 SiliconFlow）。
 
 ### 其它可做的（非腾讯云，按需）
 - 打磨资源助手（更准、更多示例问法）、补充更多章节/示例资源、优化界面/页脚等。

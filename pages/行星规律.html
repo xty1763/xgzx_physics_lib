@@ -1,0 +1,1727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Orbital Mechanics Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #020617;
+            color: #e2e8f0;
+            font-family: 'Inter', sans-serif;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            touch-action: none;
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom Scrollbar & Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -10px;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+        .btn-preset {
+            transition: all 0.2s;
+            border: 1px solid #334155;
+        }
+        .btn-preset:hover {
+            background: #1e293b;
+            border-color: #475569;
+        }
+        .btn-preset.active {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: #3b82f6;
+            color: #60a5fa;
+            box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.1);
+        }
+        #ui-panel {
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        /* Math Equation Styling */
+        .math-frac {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            vertical-align: middle;
+            margin: 0 4px;
+        }
+        .math-num {
+            border-bottom: 1px solid currentColor;
+            padding: 0 2px;
+            font-size: 0.9em;
+            line-height: 1.2;
+        }
+        .math-den {
+            padding: 0 2px;
+            font-size: 0.9em;
+            line-height: 1.2;
+        }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row h-screen w-screen">
+
+    <!-- UI Panel -->
+    <div id="ui-panel" class="w-full md:w-80 h-[40vh] md:h-full bg-gray-900/80 border-b md:border-b-0 md:border-r border-gray-800 flex flex-col z-10 p-4 md:p-5 shadow-2xl overflow-y-auto shrink-0 transition-all duration-300">
+        <div class="mb-6">
+            <h1 class="text-xl font-bold text-blue-400 tracking-wide">ORBITAL<br>MECHANICS</h1>
+            <p class="text-xs text-gray-500 mt-1 mono uppercase tracking-widest">Physics Demo V1.0</p>
+        </div>
+
+        <div class="flex flex-col gap-3 mb-8">
+            <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-1">Scenarios</h2>
+            <button class="btn-preset active py-3 px-4 rounded-lg text-left flex flex-col gap-1" data-preset="circular">
+                <span class="font-semibold text-sm pointer-events-none">Circular Orbit</span>
+                <span class="text-xs text-gray-500 pointer-events-none">Uniform circular motion</span>
+            </button>
+            <button class="btn-preset py-3 px-4 rounded-lg text-left flex flex-col gap-1" data-preset="binary">
+                <span class="font-semibold text-sm pointer-events-none">Binary System</span>
+                <span class="text-xs text-gray-500 pointer-events-none">Orbiting common barycenter</span>
+            </button>
+            <button class="btn-preset py-3 px-4 rounded-lg text-left flex flex-col gap-1" data-preset="elliptical">
+                <span class="font-semibold text-sm pointer-events-none">Elliptical Orbit</span>
+                <span class="text-xs text-gray-500 pointer-events-none">Kepler's Laws demonstration</span>
+            </button>
+            <button class="btn-preset py-3 px-4 rounded-lg text-left flex flex-col gap-1" data-preset="transfer">
+                <span class="font-semibold text-sm pointer-events-none">Orbital Transfer</span>
+                <span class="text-xs text-gray-500 pointer-events-none">Hohmann transfer ellipse</span>
+            </button>
+            <button class="btn-preset py-3 px-4 rounded-lg text-left flex flex-col gap-1" data-preset="thirdlaw">
+                <span class="font-semibold text-sm pointer-events-none">Kepler's 3rd Law</span>
+                <span class="text-xs text-gray-500 pointer-events-none">Law of Harmonies (T² ∝ a³)</span>
+            </button>
+            <button class="btn-preset py-3 px-4 rounded-lg text-left flex flex-col gap-1" data-preset="threebody">
+                <span class="font-semibold text-sm pointer-events-none">Three-Body System</span>
+                <span class="text-xs text-gray-500 pointer-events-none">Chaotic & stable N-body orbits</span>
+            </button>
+            <button class="btn-preset py-3 px-4 rounded-lg text-left flex flex-col gap-1" data-preset="geo">
+                <span class="font-semibold text-sm pointer-events-none">Geosynchronous Orbit</span>
+                <span class="text-xs text-gray-500 pointer-events-none">Earth rotation & satellite sync</span>
+            </button>
+        </div>
+
+        <div class="flex flex-col gap-4 mb-6">
+            <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Controls</h2>
+            
+            <div>
+                <div class="flex justify-between text-xs text-gray-400 mb-2">
+                    <span>Time Scale</span>
+                    <span id="speed-val" class="mono">1.0x</span>
+                </div>
+                <input type="range" id="speed-slider" min="0" max="3" step="0.1" value="1">
+            </div>
+
+            <div class="flex items-center justify-between mt-2">
+                <span class="text-sm text-gray-300">Show Vectors</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="toggle-vectors" class="sr-only peer" checked>
+                    <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                </label>
+            </div>
+
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-300">Reference Orbits</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="toggle-orbits" class="sr-only peer" checked>
+                    <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                </label>
+            </div>
+
+            <div id="area-toggle-container" class="flex items-center justify-between mt-2 hidden">
+                <span class="text-sm text-gray-300">Show Swept Area</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="toggle-area" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+            </div>
+
+            <div id="area-interval-container" class="mt-3 hidden">
+                <div class="flex justify-between text-xs text-gray-400 mb-2">
+                    <span>Sweep Interval</span>
+                    <span id="area-val" class="mono text-green-400">12.5%</span>
+                </div>
+                <input type="range" id="area-slider" min="0.025" max="0.5" step="0.025" value="0.125">
+            </div>
+
+            <div id="binary-mass-container" class="mt-3 hidden">
+                <div class="flex justify-between text-xs text-gray-400 mb-2">
+                    <span class="text-blue-400">Mass 1 (Blue)</span>
+                    <span id="mass1-val" class="mono">1.0 M☉</span>
+                </div>
+                <input type="range" id="mass1-slider" min="0.1" max="3.0" step="0.1" value="1.0" class="mb-3">
+                
+                <div class="flex justify-between text-xs text-gray-400 mb-2">
+                    <span class="text-red-400">Mass 2 (Red)</span>
+                    <span id="mass2-val" class="mono">1.0 M☉</span>
+                </div>
+                <input type="range" id="mass2-slider" min="0.1" max="3.0" step="0.1" value="1.0">
+            </div>
+
+            <div id="center-mass-container" class="mt-3">
+                <div class="flex justify-between text-xs text-gray-400 mb-2">
+                    <span class="text-yellow-400">Central Mass</span>
+                    <span id="center-mass-val" class="mono">1.0 M☉</span>
+                </div>
+                <input type="range" id="center-mass-slider" min="0.1" max="5.0" step="0.1" value="1.0">
+            </div>
+
+            <div id="circular-controls" class="mt-4">
+                <div class="flex justify-between text-xs text-gray-400 mb-2">
+                    <span class="text-yellow-400">Planet Radius (R)</span>
+                    <span id="planet-r-val" class="mono">20 Mm</span>
+                </div>
+                <input type="range" id="planet-r-slider" min="10" max="80" step="1" value="20" class="mb-3">
+                
+                <div class="flex justify-between text-xs text-gray-400 mb-2">
+                    <span class="text-purple-400">Launch Velocity (v)</span>
+                    <span id="launch-v-val" class="mono">16000 km/s</span>
+                </div>
+                <input type="range" id="launch-v-slider" min="0" max="30000" step="100" value="16000" class="mb-3">
+                
+                <button id="btn-launch" class="w-full py-2 px-3 rounded bg-purple-900/40 hover:bg-purple-800/60 text-sm border border-purple-500 text-purple-300 transition-colors flex items-center justify-center gap-2">
+                    🚀 Launch Satellite
+                </button>
+            </div>
+
+            <div id="threebody-controls" class="mt-4 hidden">
+                <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Stable Configurations</h2>
+                <div class="flex flex-col gap-2">
+                    <button class="btn-tb-preset py-2 px-3 rounded bg-gray-800 text-sm text-left border border-blue-500 text-blue-400 transition-colors" data-tb="figure8">Figure-8 (Lemniscate)</button>
+                    <button class="btn-tb-preset py-2 px-3 rounded bg-gray-800 text-sm text-left border border-gray-700 hover:border-blue-500 transition-colors" data-tb="hierarchical">Sun-Planet-Moon</button>
+                    <button class="btn-tb-preset py-2 px-3 rounded bg-gray-800 text-sm text-left border border-gray-700 hover:border-blue-500 transition-colors" data-tb="triangle">Lagrange Triangle</button>
+                    <button class="btn-tb-preset py-2 px-3 rounded bg-gray-800 text-sm text-left border border-gray-700 hover:border-blue-500 transition-colors" data-tb="collinear">Collinear (Euler)</button>
+                </div>
+            </div>
+
+            <div id="geo-controls" class="mt-4 hidden">
+                <button id="btn-sync-geo" class="w-full py-2 px-3 rounded bg-blue-900/40 hover:bg-blue-800/60 text-sm border border-blue-500 text-blue-300 transition-colors flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    Restore Sync State
+                </button>
+            </div>
+            
+            <div class="mt-4 p-3 bg-blue-900/20 border border-blue-800/50 rounded-lg text-xs text-blue-300 flex gap-2 items-start">
+                <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                <span>Interactive: Drag planets or orbit lines to adjust the radius dynamically.</span>
+            </div>
+        </div>
+
+        <div class="mt-auto pt-4 border-t border-gray-800 flex gap-2">
+            <button id="btn-play" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                Pause
+            </button>
+            <button id="btn-reset" class="px-4 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-lg font-semibold transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Simulation Canvas Container -->
+    <div class="flex-1 relative bg-gradient-to-b from-[#0a1128] via-[#020617] to-[#000000]">
+        <canvas id="sim-canvas" class="absolute inset-0 w-full h-full"></canvas>
+        
+        <!-- On-canvas Information Overlay -->
+        <div id="overlay-left" class="absolute top-4 left-4 md:top-6 md:left-6 pointer-events-none z-20 transition-opacity duration-300">
+            <h2 id="overlay-title" class="text-xl md:text-2xl font-bold text-white mb-1 md:mb-2 drop-shadow-md">Circular Orbit</h2>
+            <div id="overlay-desc" class="text-gray-300 text-sm max-w-md drop-shadow-md border-l-2 border-blue-500 pl-3 py-1 bg-black/20 rounded-r-lg">
+                Planet moves at a constant speed in a circular path around a central mass. Gravity provides the exact centripetal force required.
+            </div>
+            
+            <div id="telemetry" class="mt-4 font-mono text-xs text-blue-300 bg-black/40 p-3 rounded-lg border border-gray-800 inline-block min-w-[280px]">
+                <div>VELOCITY: <span id="tel-v">0.00</span> km/s</div>
+                <div>RADIUS: <span id="tel-r">0.00</span> Mm</div>
+                <div id="tel-area-container" class="hidden text-green-400">SWEPT AREA: <span id="tel-area">0.00</span> Mm²</div>
+                <div id="tel-extra" class="mt-1 pt-1 border-t border-gray-700 text-yellow-400 hidden"></div>
+        </div>
+    </div>
+
+    <!-- Formula Overlay (Right Side) -->
+    <div id="overlay-right" class="absolute top-4 right-4 md:top-6 md:right-6 pointer-events-none max-w-[240px] md:max-w-[320px] hidden md:block z-20 transition-opacity duration-300">
+        <div class="bg-black/50 backdrop-blur-md border border-gray-700/50 p-4 md:p-5 rounded-xl shadow-2xl">
+            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 border-b border-gray-700/80 pb-2 flex items-center gap-2">
+                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                Governing Equations
+            </h3>
+            <div id="formula-container" class="drop-shadow-md">
+                <!-- Formulas injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Zen Mode / Hide UI Button -->
+    <button id="btn-zen" class="fixed bottom-4 right-4 z-50 bg-gray-800/80 hover:bg-gray-700 text-white p-3 rounded-full backdrop-blur shadow-lg border border-gray-600 transition-all focus:outline-none" title="Toggle UI">
+        <svg id="icon-eye-open" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+        <svg id="icon-eye-closed" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"></path></svg>
+    </button>
+</div>
+
+    <script>
+        const canvas = document.getElementById('sim-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // UI Elements
+        const buttons = document.querySelectorAll('.btn-preset');
+        const speedSlider = document.getElementById('speed-slider');
+        const speedVal = document.getElementById('speed-val');
+        const btnPlay = document.getElementById('btn-play');
+        const btnReset = document.getElementById('btn-reset');
+        const toggleVectors = document.getElementById('toggle-vectors');
+        const toggleOrbits = document.getElementById('toggle-orbits');
+        const toggleArea = document.getElementById('toggle-area');
+        const areaToggleContainer = document.getElementById('area-toggle-container');
+        const overlayTitle = document.getElementById('overlay-title');
+        const overlayDesc = document.getElementById('overlay-desc');
+        const telV = document.getElementById('tel-v');
+        const telR = document.getElementById('tel-r');
+        const telAreaContainer = document.getElementById('tel-area-container');
+        const telArea = document.getElementById('tel-area');
+        const telExtra = document.getElementById('tel-extra');
+        const areaIntervalContainer = document.getElementById('area-interval-container');
+        const areaSlider = document.getElementById('area-slider');
+        const areaVal = document.getElementById('area-val');
+        const binaryMassContainer = document.getElementById('binary-mass-container');
+        const mass1Slider = document.getElementById('mass1-slider');
+        const mass2Slider = document.getElementById('mass2-slider');
+        const mass1Val = document.getElementById('mass1-val');
+        const mass2Val = document.getElementById('mass2-val');
+        const centerMassContainer = document.getElementById('center-mass-container');
+        const centerMassSlider = document.getElementById('center-mass-slider');
+        const centerMassVal = document.getElementById('center-mass-val');
+        const circularControls = document.getElementById('circular-controls');
+        const planetRSlider = document.getElementById('planet-r-slider');
+        const planetRVal = document.getElementById('planet-r-val');
+        const launchVSlider = document.getElementById('launch-v-slider');
+        const launchVVal = document.getElementById('launch-v-val');
+        const btnLaunch = document.getElementById('btn-launch');
+        const formulaContainer = document.getElementById('formula-container');
+        const tbControls = document.getElementById('threebody-controls');
+        const tbButtons = document.querySelectorAll('.btn-tb-preset');
+        const geoControls = document.getElementById('geo-controls');
+        const btnSyncGeo = document.getElementById('btn-sync-geo');
+        const btnZen = document.getElementById('btn-zen');
+        const uiPanel = document.getElementById('ui-panel');
+        const overlayLeft = document.getElementById('overlay-left');
+        const overlayRight = document.getElementById('overlay-right');
+        const iconEyeOpen = document.getElementById('icon-eye-open');
+        const iconEyeClosed = document.getElementById('icon-eye-closed');
+
+        // State
+        let width, height;
+        let centerX, centerY;
+        let offsetX = 0;
+        let offsetY = 0;
+        let isPanning = false;
+        let lastPanX = 0;
+        let lastPanY = 0;
+        let scale = 1;
+        let time = 0;
+        let isPaused = false;
+        let currentPreset = 'circular';
+        let timeScale = 1.0;
+        let showVectors = true;
+        let showOrbits = true;
+        let showArea = false;
+        let sweepFraction = 0.125;
+        let trails = [];
+        let particles = []; // For thruster effects
+        let isDragging = false;
+        let dragTarget = null;
+        let hitboxes = [];
+        let currentM = 0;
+        let stars = [];
+        let activeBurn = 0;
+        let burnType = '';
+        let earthAngle = 0;
+        let planetRadius = 20;
+        let launchVelocity = 16000;
+        let launchedSats = [];
+        const GEO_RADIUS = 300;
+        const R_EARTH = 45;
+
+        // Physics Constants & Helpers
+        const G = 1; // Simplified Gravitational Constant for visual scale
+        const BASE_M_CENTER = 500000; 
+        let centerMassMult = 1.0;
+        let M_center = BASE_M_CENTER; 
+
+        // Kepler Solver (Newton-Raphson method)
+        // Solves M = E - e*sin(E) for E
+        function solveKepler(M, e) {
+            let E = M;
+            for (let i = 0; i < 10; i++) {
+                E = E - (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+            }
+            return E;
+        }
+
+        // Get position from orbital elements
+        // a: semi-major axis, e: eccentricity, M: mean anomaly
+        function getOrbitalPosition(a, e, M) {
+            const E = solveKepler(M, e);
+            // Position in orbital plane (focus at origin)
+            const x = a * (Math.cos(E) - e);
+            const y = a * Math.sqrt(1 - e * e) * Math.sin(E);
+            return { x, y, E };
+        }
+
+        // Resize handler
+        function resize() {
+            canvas.width = canvas.clientWidth * window.devicePixelRatio;
+            canvas.height = canvas.clientHeight * window.devicePixelRatio;
+            width = canvas.width;
+            height = canvas.height;
+            centerX = width / 2;
+            centerY = height / 2;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            width /= window.devicePixelRatio;
+            height /= window.devicePixelRatio;
+            centerX /= window.devicePixelRatio;
+            centerY /= window.devicePixelRatio;
+            
+            // Adjust scale based on screen size to fit orbits
+            scale = Math.min(width, height) / 800;
+            
+            // Generate starfield
+            stars = [];
+            for (let i = 0; i < 250; i++) {
+                stars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    r: Math.random() * 1.2 + 0.3,
+                    alpha: Math.random(),
+                    speed: (Math.random() * 0.015) + 0.005,
+                    dir: Math.random() > 0.5 ? 1 : -1
+                });
+            }
+        }
+        window.addEventListener('resize', resize);
+        resize();
+        setTimeout(resize, 100); // Ensure proper sizing on mobile after layout settling
+
+        // Presets Configuration
+        const presetData = {
+            circular: {
+                title: "Circular Orbit & Satellite Launch",
+                desc: "Planet moves in a circular path. Try launching a satellite from the surface! The launch velocity must exceed the First Cosmic Velocity to achieve orbit.",
+                a: 200, e: 0,
+                color: "#3b82f6", size: 8, centerSize: 20, centerColor: "#fbbf24",
+                formula: `<div class="mb-2 text-xs text-gray-400 uppercase tracking-wider">Centripetal Force</div><div class="text-base text-blue-300 font-serif flex items-center mb-4"><span>F<sub>g</sub> = F<sub>c</sub></span></div><div class="mb-2 text-xs text-gray-400 uppercase tracking-wider">Cosmic Velocities</div><div class="text-base text-purple-300 font-serif flex flex-col gap-2 mb-2"><span>v<sub>1</sub> = &radic;<span style="border-top:1px solid currentColor; padding-top:1px; margin-left:2px;">(GM / R)</span></span><span>v<sub>2</sub> = &radic;<span style="border-top:1px solid currentColor; padding-top:1px; margin-left:2px;">(2GM / R)</span></span></div><div id="v1-result" class="text-sm text-purple-400 font-mono bg-purple-900/40 p-3 rounded border border-purple-800/50 flex flex-col gap-1"></div>`
+            },
+            binary: {
+                title: "Binary Star System",
+                desc: "Two bodies orbit their common center of mass (barycenter). The more massive body stays closer to the center.",
+                a: 200, e: 0,
+                m1: 1.0, m2: 1.0,
+                color1: "#60a5fa", color2: "#f87171", size: 12,
+                formula: `<div class="mb-2 text-xs text-gray-400 uppercase tracking-wider">Mutual Gravitation</div><div class="text-base text-blue-300 font-serif flex items-center mb-4"><span>F<sub>g</sub> = G</span><div class="math-frac"><span class="math-num">m<sub>1</sub> m<sub>2</sub></span><span class="math-den">(r<sub>1</sub> + r<sub>2</sub>)<sup>2</sup></span></div></div><div class="mb-2 text-xs text-gray-400 uppercase tracking-wider mt-4">Angular Velocity (&omega;)</div><div class="text-base text-blue-300 font-serif flex items-center"><span>F<sub>g</sub> = m<sub>1</sub>&omega;<sup>2</sup>r<sub>1</sub> = m<sub>2</sub>&omega;<sup>2</sup>r<sub>2</sub></span></div>`
+            },
+            elliptical: {
+                title: "Elliptical Orbit (Kepler's Laws)",
+                desc: "Planet travels in an ellipse with the star at one focus. Notice it moves faster at periapsis (closest) and slower at apoapsis (farthest).",
+                a: 250, e: 0.65,
+                color: "#10b981", size: 8, centerSize: 20, centerColor: "#fbbf24",
+                formula: `<div class="mb-2 text-xs text-gray-400 uppercase tracking-wider">Universal Gravitation</div><div class="text-base text-blue-300 font-serif flex items-center mb-3"><span>F<sub>g</sub> = G</span><div class="math-frac"><span class="math-num">M m</span><span class="math-den">r<sup>2</sup></span></div></div><div class="mb-2 text-xs text-gray-400 uppercase tracking-wider mt-3">Vis-viva Equation (Speed)</div><div class="text-base text-blue-300 font-serif flex items-center mb-3"><span>v = &radic;<span style="border-top:1px solid currentColor; padding-top:1px; margin-left:2px;">GM(</span></span><div class="math-frac"><span class="math-num">2</span><span class="math-den">r</span></div><span>-</span><div class="math-frac"><span class="math-num">1</span><span class="math-den">a</span></div><span>)</span></div><div class="mb-2 text-xs text-gray-400 uppercase tracking-wider mt-3">Kepler's 2nd Law (Area)</div><div class="text-base text-blue-300 font-serif flex items-center"><span>A = &pi; a b &nbsp;,&nbsp; </span><div class="math-frac ml-3"><span class="math-num">&Delta;A</span><span class="math-den">&Delta;t</span></div><span>= const</span></div>`
+            },
+            transfer: {
+                title: "Hohmann Transfer Orbit",
+                desc: "An orbital maneuver to transfer a spacecraft between orbits. The spacecraft will continuously loop: thrusting prograde to reach the outer orbit, then retrograde to return to the inner orbit.",
+                r1: 100, r2: 280,
+                color: "#a855f7", size: 5, centerSize: 25, centerColor: "#38bdf8",
+                formula: `<div class="mb-2 text-xs text-gray-400 uppercase tracking-wider">Transfer Orbit Semi-major Axis</div><div class="text-base text-blue-300 font-serif flex items-center mb-4"><span>a<sub>t</sub> = </span><div class="math-frac"><span class="math-num">r<sub>1</sub> + r<sub>2</sub></span><span class="math-den">2</span></div></div><div class="mb-2 text-xs text-gray-400 uppercase tracking-wider mt-4">Delta-v (Impulse)</div><div class="text-base text-blue-300 font-serif flex items-center mb-2"><span>&Delta;v<sub>1</sub> = v<sub>t,peri</sub> - v<sub>1</sub></span></div><div class="text-base text-blue-300 font-serif flex items-center"><span>&Delta;v<sub>2</sub> = v<sub>2</sub> - v<sub>t,apo</sub></span></div>`
+            },
+            threebody: {
+                title: "Three-Body Problem",
+                desc: "A chaotic system of three masses interacting via gravity. While generally unpredictable, certain precise initial conditions create beautiful, stable repeating patterns.",
+                formula: `<div class="mb-2 text-xs text-gray-400 uppercase tracking-wider">N-Body Gravitation</div><div class="text-base text-blue-300 font-serif flex items-center mb-4"><span>F<sub>i</sub> = &Sigma; G</span><div class="math-frac"><span class="math-num">m<sub>i</sub> m<sub>j</sub></span><span class="math-den">r<sub>ij</sub><sup>2</sup></span></div><span class="ml-1">r&#770;<sub>ij</sub></span></div><div class="text-xs text-gray-500 mt-4 border-t border-gray-700/50 pt-2">Requires RK4 numerical integration.<br>No general analytical solution exists.</div>`
+            },
+            geo: {
+                title: "Geosynchronous Orbit (GEO)",
+                desc: "A satellite orbits at an exact altitude where its orbital period matches Earth's rotation (T = 24h). Try dragging the orbit to see it drift out of sync!",
+                a: 300, e: 0,
+                color: "#cbd5e1", size: 6, centerSize: 45, centerColor: "#1e3a8a",
+                formula: `<div class="mb-2 text-xs text-gray-400 uppercase tracking-wider">Geostationary Radius</div><div class="text-base text-blue-300 font-serif flex items-center mb-3"><span>r<sub>geo</sub> = <span style="font-size:1.2em;">&#8731;</span><span style="border-top:1px solid currentColor; padding-top:1px; margin-left:2px;">(</span></span><div class="math-frac"><span class="math-num">G M T<sup>2</sup></span><span class="math-den">4&pi;<sup>2</sup></span></div><span>)</span></div><div class="mb-2 text-xs text-gray-400 uppercase tracking-wider mt-4">Radius vs Earth Radius</div><div class="text-base text-blue-300 font-serif flex items-center"><span>r<sub>geo</sub> &approx; 6.6 R<sub>E</sub></span></div>`
+            },
+            thirdlaw: {
+                title: "Kepler's Third Law",
+                desc: "Multiple planets orbiting the same star. Notice that the ratio of the square of the orbital period (T²) to the cube of the semi-major axis (a³) is identical for all planets.",
+                planets: [
+                    { a: 80, color: "#ef4444", size: 6 },
+                    { a: 150, color: "#10b981", size: 8 },
+                    { a: 250, color: "#8b5cf6", size: 10 }
+                ],
+                centerSize: 20, centerColor: "#fbbf24",
+                formula: `<div class="mb-2 text-xs text-gray-400 uppercase tracking-wider">Kepler's Third Law</div><div class="text-base text-blue-300 font-serif flex items-center mb-4"><div class="math-frac"><span class="math-num">T<sup>2</sup></span><span class="math-den">a<sup>3</sup></span></div><span>=</span><div class="math-frac"><span class="math-num">4&pi;<sup>2</sup></span><span class="math-den">GM</span></div></div><div class="text-xs text-gray-500 mt-4 border-t border-gray-700/50 pt-2">M = Central Mass<br>T = Orbital Period<br>a = Semi-major Axis</div>`
+            }
+        };
+
+        // Transfer state variables
+        let transferState = 0; // 0: inner, 1: transfer, 2: outer
+        let stateTime = 0;
+        let lastPos = {x:0, y:0};
+
+        // Three-body state (RK4 Integration)
+        let nBodyState = new Float64Array(12);
+        let nBodyMasses = [1, 1, 1];
+        let nBodyColors = ['#ef4444', '#3b82f6', '#10b981'];
+        let nBodySizes = [8, 8, 8];
+        let nBodyTrails = [[], [], []];
+        let currentTB = 'figure8';
+        let nBodyScale = 1;
+
+        function initThreeBody(type) {
+            nBodyTrails = [[], [], []];
+            if (type === 'figure8') {
+                nBodyMasses = [1, 1, 1];
+                nBodyColors = ['#ef4444', '#3b82f6', '#10b981'];
+                nBodySizes = [10, 10, 10];
+                nBodyScale = 180;
+                let p1 = [0.97000436, -0.24308753];
+                let v3 = [-0.93240737, -0.86473146];
+                let v1 = [-v3[0]/2, -v3[1]/2];
+                nBodyState.set([
+                    p1[0], p1[1], v1[0], v1[1],
+                    -p1[0], -p1[1], v1[0], v1[1],
+                    0, 0, v3[0], v3[1]
+                ]);
+            } else if (type === 'hierarchical') {
+                nBodyMasses = [1000, 50, 0.1];
+                nBodyColors = ['#fbbf24', '#3b82f6', '#94a3b8'];
+                nBodySizes = [25, 8, 4];
+                nBodyScale = 80;
+                let r_e = 3.0; let v_e = Math.sqrt(1000/r_e);
+                let r_m = 0.4; let v_m = Math.sqrt(50/r_m);
+                let Px = 0;
+                let Py = 1000*0 + 50*v_e + 0.1*(v_e + v_m);
+                let totalM = 1050.1;
+                let vy_c = Py/totalM;
+                nBodyState.set([
+                    0, 0, 0, -vy_c,
+                    r_e, 0, 0, v_e - vy_c,
+                    r_e + r_m, 0, 0, (v_e + v_m) - vy_c
+                ]);
+            } else if (type === 'triangle') {
+                nBodyMasses = [100, 100, 100];
+                nBodyColors = ['#a855f7', '#f97316', '#06b6d4'];
+                nBodySizes = [12, 12, 12];
+                nBodyScale = 100;
+                let R = 1.6;
+                let v = Math.sqrt((Math.sqrt(3)*100)/(3*R));
+                nBodyState.set([
+                    0, -R, v, 0,
+                    R*Math.sqrt(3)/2, R/2, -v*0.5, v*Math.sqrt(3)/2,
+                    -R*Math.sqrt(3)/2, R/2, -v*0.5, -v*Math.sqrt(3)/2
+                ]);
+            } else if (type === 'collinear') {
+                nBodyMasses = [100, 100, 100];
+                nBodyColors = ['#fbbf24', '#ef4444', '#3b82f6'];
+                nBodySizes = [12, 12, 12];
+                nBodyScale = 100;
+                let R = 1.5;
+                let v = Math.sqrt(1.25 * 100 / R);
+                nBodyState.set([
+                    0, 0, 0, 0,
+                    R, 0, 0, v,
+                    -R, 0, 0, -v
+                ]);
+            }
+        }
+
+        function nBodyDerivatives(state) {
+            let dY = new Float64Array(12);
+            for(let i=0; i<3; i++) {
+                let idx = i*4;
+                dY[idx] = state[idx+2];
+                dY[idx+1] = state[idx+3];
+                let ax = 0, ay = 0;
+                for(let j=0; j<3; j++) {
+                    if(i===j) continue;
+                    let jdx = j*4;
+                    let dx = state[jdx] - state[idx];
+                    let dy = state[jdx+1] - state[idx+1];
+                    let distSq = dx*dx + dy*dy;
+                    let dist = Math.sqrt(distSq);
+                    let f = nBodyMasses[j] / (distSq + 0.001); 
+                    ax += f * (dx / dist);
+                    ay += f * (dy / dist);
+                }
+                dY[idx+2] = ax;
+                dY[idx+3] = ay;
+            }
+            return dY;
+        }
+
+        function updateNBody(dt) {
+            let effDt = dt;
+            if (effDt > 0.05) effDt = 0.05; 
+            let subSteps = currentTB === 'figure8' ? 800 : 400; 
+            let h = effDt / subSteps;
+            
+            for(let step=0; step<subSteps; step++) {
+                let k1 = nBodyDerivatives(nBodyState);
+                let s2 = new Float64Array(12);
+                for(let i=0; i<12; i++) s2[i] = nBodyState[i] + k1[i]*h/2;
+                
+                let k2 = nBodyDerivatives(s2);
+                let s3 = new Float64Array(12);
+                for(let i=0; i<12; i++) s3[i] = nBodyState[i] + k2[i]*h/2;
+                
+                let k3 = nBodyDerivatives(s3);
+                let s4 = new Float64Array(12);
+                for(let i=0; i<12; i++) s4[i] = nBodyState[i] + k3[i]*h;
+                
+                let k4 = nBodyDerivatives(s4);
+                
+                for(let i=0; i<12; i++) {
+                    nBodyState[i] += (h/6) * (k1[i] + 2*k2[i] + 2*k3[i] + k4[i]);
+                }
+            }
+        }
+
+        function resetSimulation() {
+            time = 0;
+            currentM = 0;
+            offsetX = 0;
+            offsetY = 0;
+            trails = [];
+            particles = [];
+            launchedSats = [];
+            transferState = 0;
+            stateTime = 0;
+            activeBurn = 0;
+            burnType = '';
+            earthAngle = 0;
+            telExtra.classList.add('hidden');
+            if (currentPreset === 'threebody') {
+                initThreeBody(currentTB);
+            }
+        }
+
+        function spawnParticles(x, y, vx, vy, color, amount = 30) {
+            for(let i=0; i<amount; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: -vx * 0.5 + (Math.random()-0.5)*2,
+                    vy: -vy * 0.5 + (Math.random()-0.5)*2,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= dt * 2;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function drawParticles() {
+            particles.forEach(p => {
+                ctx.globalAlpha = Math.max(0, p.life);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 2 * p.life, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+            const step = 50 * scale;
+            
+            const startX = -offsetX;
+            const endX = width - offsetX;
+            const startY = -offsetY;
+            const endY = height - offsetY;
+            
+            ctx.beginPath();
+            const firstX = Math.floor(startX / step) * step;
+            for (let x = firstX; x < endX; x += step) {
+                ctx.moveTo(x, startY); ctx.lineTo(x, endY);
+            }
+            const firstY = Math.floor(startY / step) * step;
+            for (let y = firstY; y < endY; y += step) {
+                ctx.moveTo(startX, y); ctx.lineTo(endX, y);
+            }
+            ctx.stroke();
+
+            // Axes
+            ctx.strokeStyle = '#334155';
+            ctx.beginPath();
+            ctx.moveTo(startX, centerY); ctx.lineTo(endX, centerY);
+            ctx.moveTo(centerX, startY); ctx.lineTo(centerX, endY);
+            ctx.stroke();
+        }
+
+        function drawArrow(fromx, fromy, tox, toy, color) {
+            const headlen = 10;
+            const dx = tox - fromx;
+            const dy = toy - fromy;
+            const angle = Math.atan2(dy, dx);
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(fromx, fromy);
+            ctx.lineTo(tox, toy);
+            ctx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.moveTo(tox, toy);
+            ctx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.stroke();
+        }
+
+        function drawEllipse(a, e, color, dash = false) {
+            const b = a * Math.sqrt(1 - e * e);
+            const cx = -a * e; // Center of ellipse relative to focus
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            if (dash) ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.ellipse(centerX + cx * scale, centerY, a * scale, b * scale, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawBody(x, y, radius, color, glow = true) {
+            const px = centerX + x * scale;
+            const py = centerY + y * scale;
+            
+            if (glow) {
+                const gradient = ctx.createRadialGradient(px, py, radius*0.2, px, py, radius*2);
+                gradient.addColorStop(0, color);
+                gradient.addColorStop(1, 'transparent');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(px, py, radius*2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(px, py, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function updateTelemetry(v, r) {
+            // Scale values to look realistic
+            telV.innerText = (v * 100).toFixed(2);
+            telR.innerText = (r).toFixed(1);
+        }
+
+        // Main Render Loop
+        let lastTimestamp = 0;
+        function render(timestamp) {
+            let dt = (timestamp - lastTimestamp) / 1000;
+            if (dt > 0.1) dt = 0.016; // Prevent physics glitches if tab is inactive
+            lastTimestamp = timestamp;
+
+            const p = presetData[currentPreset];
+            let currentN = 0;
+            if (currentPreset === 'binary') {
+                const M_tot = (p.m1 + p.m2) * (M_center / 2);
+                currentN = Math.sqrt(M_tot / Math.pow(p.a, 3));
+            } else if (currentPreset !== 'transfer') {
+                currentN = Math.sqrt(M_center / Math.pow(p.a, 3));
+            }
+
+            const omega_earth = Math.sqrt(M_center / Math.pow(GEO_RADIUS, 3));
+            if (!isPaused) {
+                time += dt * timeScale;
+                currentM += currentN * dt * timeScale;
+                earthAngle += omega_earth * dt * timeScale;
+                updateParticles(dt * timeScale);
+            }
+
+            hitboxes = [];
+
+            ctx.clearRect(0, 0, width, height);
+            
+            // Draw twinkling stars
+            stars.forEach(s => {
+                s.alpha += s.speed * s.dir;
+                if (s.alpha >= 1) { s.alpha = 1; s.dir = -1; s.speed = (Math.random() * 0.02) + 0.005; }
+                else if (s.alpha <= 0.1) { s.alpha = 0.1; s.dir = 1; s.speed = (Math.random() * 0.02) + 0.005; }
+                
+                ctx.fillStyle = `rgba(255, 255, 255, ${s.alpha * 0.9})`; // Brighter twinkling starlight
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+
+            drawGrid();
+
+            if (currentPreset === 'circular' || currentPreset === 'elliptical' || currentPreset === 'geo') {
+                const n = currentN;
+                const M = currentM;
+                
+                if (showOrbits) drawEllipse(p.a, p.e, '#334155');
+
+                if (showArea && currentPreset === 'elliptical') {
+                    ctx.fillStyle = 'rgba(16, 185, 129, 0.2)'; // Emerald green semi-transparent
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    
+                    const sweepAngle = Math.PI * 2 * sweepFraction; 
+                    const steps = 40;
+                    for (let i = 0; i <= steps; i++) {
+                        const m_step = M - sweepAngle + (sweepAngle * i / steps);
+                        const pPos = getOrbitalPosition(p.a, p.e, m_step);
+                        ctx.lineTo(centerX + pPos.x * scale, centerY + pPos.y * scale);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+
+                    const startPos = getOrbitalPosition(p.a, p.e, M - sweepAngle);
+                    const endPos = getOrbitalPosition(p.a, p.e, M);
+                    
+                    ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    ctx.lineTo(centerX + startPos.x * scale, centerY + startPos.y * scale);
+                    ctx.moveTo(centerX, centerY);
+                    ctx.lineTo(centerX + endPos.x * scale, centerY + endPos.y * scale);
+                    ctx.stroke();
+
+                    // Calculate exact area mathematically (Area of ellipse = pi*a*b)
+                    const b = p.a * Math.sqrt(1 - p.e * p.e);
+                    const areaValue = (Math.PI * p.a * b) * sweepFraction;
+
+                    // Draw area text floating in the middle of the swept sector
+                    const midM = M - sweepAngle / 2;
+                    const midPos = getOrbitalPosition(p.a, p.e, midM);
+                    const textX = centerX + (midPos.x * scale) * 0.5;
+                    const textY = centerY + (midPos.y * scale) * 0.5;
+                    
+                    ctx.font = 'bold 11px "JetBrains Mono", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    const textStr = `Area: ${areaValue.toFixed(0)}`;
+                    const textWidth = ctx.measureText(textStr).width;
+                    ctx.fillStyle = 'rgba(10, 10, 12, 0.7)';
+                    ctx.fillRect(textX - textWidth/2 - 4, textY - 8, textWidth + 8, 16);
+                    
+                    ctx.fillStyle = '#34d399';
+                    ctx.fillText(textStr, textX, textY);
+
+                    telAreaContainer.classList.remove('hidden');
+                    telArea.innerText = areaValue.toFixed(0);
+                }
+                
+                // Draw Central Mass
+                if (currentPreset === 'geo') {
+                    const r_e = R_EARTH * Math.pow(centerMassMult, 1/3) * scale;
+                    
+                    // Atmosphere glow
+                    const gradient = ctx.createRadialGradient(centerX, centerY, r_e*0.8, centerX, centerY, r_e*1.5);
+                    gradient.addColorStop(0, 'rgba(59, 130, 246, 0.3)');
+                    gradient.addColorStop(1, 'transparent');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, r_e*1.5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Solid Earth
+                    ctx.fillStyle = '#1e3a8a';
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, r_e, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Rotate for Earth's surface
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(earthAngle);
+                    
+                    // Surface marker (e.g., a tracking station on the equator)
+                    ctx.fillStyle = '#22c55e';
+                    ctx.beginPath();
+                    ctx.arc(r_e - 4*scale, 0, 4*scale, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Earth's Zenith Line (Target line for GEO)
+                    ctx.strokeStyle = 'rgba(34, 197, 94, 0.4)';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([8, 8]);
+                    ctx.beginPath();
+                    ctx.moveTo(r_e, 0);
+                    ctx.lineTo(800*scale, 0);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.restore();
+                    
+                    // GEO Reference Orbit
+                    if (showOrbits) {
+                        drawEllipse(GEO_RADIUS, 0, 'rgba(59, 130, 246, 0.3)', true);
+                    }
+                } else if (currentPreset === 'circular') {
+                    const r_p = planetRadius * scale;
+                    const gradient = ctx.createRadialGradient(centerX, centerY, r_p*0.8, centerX, centerY, r_p*1.5);
+                    gradient.addColorStop(0, 'rgba(251, 191, 36, 0.3)');
+                    gradient.addColorStop(1, 'transparent');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, r_p*1.5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = p.centerColor;
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, r_p, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    ctx.lineTo(centerX + r_p, centerY);
+                    ctx.stroke();
+                    ctx.fillStyle = 'white';
+                    ctx.font = '10px "Inter", sans-serif';
+                    ctx.fillText('R', centerX + r_p/2, centerY - 5);
+
+                    const pos = getOrbitalPosition(p.a, p.e, M);
+                    ctx.setLineDash([2, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    ctx.lineTo(centerX + pos.x * scale, centerY + pos.y * scale);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.fillText('r', centerX + (pos.x * scale)/2, centerY + (pos.y * scale)/2 - 5);
+                } else {
+                    drawBody(0, 0, p.centerSize * Math.pow(centerMassMult, 1/3), p.centerColor);
+                }
+                
+                // Calculate Planet Pos
+                const pos = getOrbitalPosition(p.a, p.e, M);
+                const r = Math.sqrt(pos.x*pos.x + pos.y*pos.y);
+                
+                // Velocity vector direction is tangent to ellipse.
+                // For Kepler orbit, velocity vector components:
+                // vx = -sin(E) * a * n / (1 - e*cos(E))
+                // vy = cos(E) * a * sqrt(1-e^2) * n / (1 - e*cos(E))
+                const E = pos.E;
+                const r_factor = 1 - p.e * Math.cos(E);
+                const vx = -Math.sin(E) * p.a * n / r_factor;
+                const vy = Math.cos(E) * p.a * Math.sqrt(1 - p.e * p.e) * n / r_factor;
+                const v_mag = Math.sqrt(vx*vx + vy*vy);
+
+                drawBody(pos.x, pos.y, p.size, p.color);
+                hitboxes.push({ x: pos.x, y: pos.y, r: p.size });
+
+                if (showVectors) {
+                    const vecScale = 30 / v_mag; // Normalize visual length somewhat
+                    drawArrow(
+                        centerX + pos.x * scale, centerY + pos.y * scale,
+                        centerX + (pos.x + vx * vecScale) * scale, centerY + (pos.y + vy * vecScale) * scale,
+                        '#ef4444'
+                    );
+                }
+                
+                if (currentPreset === 'geo') {
+                    // Draw communication link line
+                    let phaseDiff = (M % (Math.PI*2)) - (earthAngle % (Math.PI*2));
+                    phaseDiff = Math.atan2(Math.sin(phaseDiff), Math.cos(phaseDiff)); // Normalize to -PI to PI
+                    
+                    ctx.fillStyle = Math.abs(phaseDiff) < 0.05 ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.25)';
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    let startA = earthAngle;
+                    let endA = earthAngle + phaseDiff;
+                    if (phaseDiff < 0) {
+                        startA = earthAngle + phaseDiff;
+                        endA = earthAngle;
+                    }
+                    ctx.arc(centerX, centerY, 120 * scale, startA, endA, false);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    if (Math.abs(phaseDiff) >= 0.05) {
+                        const midAngle = earthAngle + phaseDiff / 2;
+                        ctx.fillStyle = '#f87171';
+                        ctx.font = 'bold 12px "JetBrains Mono", monospace';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(`Δθ: ${(Math.abs(phaseDiff) * 180 / Math.PI).toFixed(1)}°`, centerX + Math.cos(midAngle)*80*scale, centerY + Math.sin(midAngle)*80*scale);
+                    }
+
+                    const r_e = R_EARTH * Math.pow(centerMassMult, 1/3) * scale;
+                    const stationX = centerX + Math.cos(earthAngle) * r_e;
+                    const stationY = centerY + Math.sin(earthAngle) * r_e;
+                    const satX = centerX + pos.x * scale;
+                    const satY = centerY + pos.y * scale;
+
+                    if (Math.abs(phaseDiff) < 0.05 && Math.abs(p.a - GEO_RADIUS) < 5) {
+                        // Synced: Solid Green Laser Link
+                        ctx.strokeStyle = '#22c55e';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(stationX, stationY);
+                        ctx.lineTo(satX, satY);
+                        ctx.stroke();
+                        
+                        // Signal pulses
+                        ctx.fillStyle = '#4ade80';
+                        const pulseT = (timestamp / 500) % 1;
+                        const px = stationX + (satX - stationX) * pulseT;
+                        const py = stationY + (satY - stationY) * pulseT;
+                        ctx.beginPath();
+                        ctx.arc(px, py, 3, 0, Math.PI*2);
+                        ctx.fill();
+                    } else {
+                        // Out of Sync: Broken Red Link
+                        ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([4, 6]);
+                        ctx.beginPath();
+                        ctx.moveTo(stationX, stationY);
+                        ctx.lineTo(satX, satY);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+                }
+
+                updateTelemetry(v_mag, r);
+                
+                if (currentPreset === 'circular') {
+                    if (!isPaused) {
+                        launchedSats.forEach(sat => {
+                            if (sat.crashed) return;
+                            const subSteps = 20;
+                            const h = (dt * timeScale) / subSteps;
+                            for(let i=0; i<subSteps; i++) {
+                                const rSq = sat.x*sat.x + sat.y*sat.y;
+                                const r = Math.sqrt(rSq);
+                                // 0.99 gives tiny leeway for perfect grazing circular orbits
+                                if (r <= planetRadius * 0.99) {
+                                    sat.crashed = true;
+                                    spawnParticles(centerX + sat.x*scale, centerY + sat.y*scale, sat.vx*scale, sat.vy*scale, '#ef4444', 30);
+                                    break;
+                                }
+                                
+                                // RK4 Integration for perfect elliptical orbits
+                                const getDeriv = (x, y, vx, vy) => {
+                                    const r2 = x*x + y*y;
+                                    const r_mag = Math.sqrt(r2);
+                                    const f_mag = M_center / r2;
+                                    return { dx: vx, dy: vy, dvx: -f_mag * (x / r_mag), dvy: -f_mag * (y / r_mag) };
+                                };
+                                
+                                const k1 = getDeriv(sat.x, sat.y, sat.vx, sat.vy);
+                                const k2 = getDeriv(sat.x + 0.5*h*k1.dx, sat.y + 0.5*h*k1.dy, sat.vx + 0.5*h*k1.dvx, sat.vy + 0.5*h*k1.dvy);
+                                const k3 = getDeriv(sat.x + 0.5*h*k2.dx, sat.y + 0.5*h*k2.dy, sat.vx + 0.5*h*k2.dvx, sat.vy + 0.5*h*k2.dvy);
+                                const k4 = getDeriv(sat.x + h*k3.dx, sat.y + h*k3.dy, sat.vx + h*k3.dvx, sat.vy + h*k3.dvy);
+                                
+                                sat.x += (h/6) * (k1.dx + 2*k2.dx + 2*k3.dx + k4.dx);
+                                sat.y += (h/6) * (k1.dy + 2*k2.dy + 2*k3.dy + k4.dy);
+                                sat.vx += (h/6) * (k1.dvx + 2*k2.dvx + 2*k3.dvx + k4.dvx);
+                                sat.vy += (h/6) * (k1.dvy + 2*k2.dvy + 2*k3.dvy + k4.dvy);
+                            }
+                            if (!sat.crashed) {
+                                const lastT = sat.trail[sat.trail.length - 1];
+                                if (!lastT || Math.hypot(sat.x - lastT.x, sat.y - lastT.y) > 1.5) {
+                                    sat.trail.push({x: sat.x, y: sat.y});
+                                    if (sat.trail.length > 800) sat.trail.shift();
+                                }
+                            }
+                        });
+                    }
+
+                    launchedSats.forEach(sat => {
+                        if (sat.crashed) return;
+                        ctx.strokeStyle = sat.color;
+                        ctx.globalAlpha = 0.6;
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        if (sat.trail.length > 0) {
+                            ctx.moveTo(centerX + sat.trail[0].x*scale, centerY + sat.trail[0].y*scale);
+                            for(let i=1; i<sat.trail.length; i++) {
+                                ctx.lineTo(centerX + sat.trail[i].x*scale, centerY + sat.trail[i].y*scale);
+                            }
+                        }
+                        ctx.stroke();
+                        ctx.globalAlpha = 1.0;
+                        drawBody(sat.x, sat.y, 3, sat.color, false);
+                    });
+
+                    const v1Result = document.getElementById('v1-result');
+                    if (v1Result) {
+                        const v1_real = Math.sqrt(M_center / planetRadius);
+                        const v1_disp = v1_real * 100;
+                        const v2_disp = v1_disp * Math.SQRT2; // Second cosmic velocity
+                        
+                        let statusHTML = '';
+                        if (launchVelocity >= v2_disp) {
+                            statusHTML = `<div class="text-blue-400 mt-1 font-bold">Status: Escape Trajectory!</div>`;
+                        } else if (launchVelocity > v1_disp + 50) {
+                            statusHTML = `<div class="text-green-400 mt-1 font-bold">Status: Elliptical Orbit!</div>`;
+                        } else if (launchVelocity >= v1_disp - 10) {
+                            statusHTML = `<div class="text-green-400 mt-1 font-bold">Status: Circular Orbit!</div>`;
+                        } else {
+                            statusHTML = `<div class="text-red-400 mt-1 font-bold">Status: Will Crash!</div>`;
+                        }
+                        v1Result.innerHTML = `<div class="flex justify-between"><span>Planet R:</span> <span>${planetRadius.toFixed(1)} Mm</span></div>
+                                              <div class="flex justify-between"><span>v<sub>1</sub> (Circ):</span> <span>${v1_disp.toFixed(0)} km/s</span></div>
+                                              <div class="flex justify-between"><span>v<sub>2</sub> (Esc):</span> <span>${v2_disp.toFixed(0)} km/s</span></div>
+                                              <div class="flex justify-between mt-1 border-t border-purple-800/50 pt-1 text-purple-300"><span>Launch v:</span> <span>${launchVelocity.toFixed(0)} km/s</span></div>
+                                              ${statusHTML}`;
+                    }
+                }
+
+                if (currentPreset === 'geo') {
+                    telExtra.classList.remove('hidden');
+                    let status = "";
+                    let statusColor = "";
+                    if (Math.abs(p.a - GEO_RADIUS) < 2) {
+                        status = "SYNCHRONIZED (GEO)";
+                        statusColor = "text-green-400";
+                    } else if (p.a < GEO_RADIUS) {
+                        status = "DRIFTING EAST (Faster than Earth)";
+                        statusColor = "text-yellow-400";
+                    } else {
+                        status = "DRIFTING WEST (Slower than Earth)";
+                        statusColor = "text-red-400";
+                    }
+                    telExtra.innerHTML = `<div class="mb-1 text-gray-400 border-b border-gray-700 pb-1">Earth R: ${(R_EARTH/10).toFixed(1)}k km | GEO R: ${(GEO_RADIUS/10).toFixed(1)}k km</div>
+                    <div class="font-bold ${statusColor} mt-1">${status}</div>`;
+                }
+
+            } else if (currentPreset === 'binary') {
+                const n = currentN;
+                const M = currentM;
+                
+                const m1 = p.m1;
+                const m2 = p.m2;
+                const r1 = p.a * (m2 / (m1 + m2));
+                const r2 = p.a * (m1 / (m1 + m2));
+
+                if (showOrbits) {
+                    drawEllipse(r1, 0, '#334155');
+                    drawEllipse(r2, 0, '#334155');
+                }
+                
+                // Barycenter marker
+                ctx.strokeStyle = '#64748b';
+                ctx.beginPath();
+                ctx.moveTo(centerX - 10, centerY); ctx.lineTo(centerX + 10, centerY);
+                ctx.moveTo(centerX, centerY - 10); ctx.lineTo(centerX, centerY + 10);
+                ctx.stroke();
+
+                // Star 1
+                const x1 = r1 * Math.cos(M);
+                const y1 = r1 * Math.sin(M);
+                const size1 = p.size * Math.sqrt(m1);
+                drawBody(x1, y1, size1, p.color1);
+                
+                // Star 2 (Opposite side)
+                const x2 = -r2 * Math.cos(M);
+                const y2 = -r2 * Math.sin(M);
+                const size2 = p.size * Math.sqrt(m2);
+                drawBody(x2, y2, size2, p.color2);
+                
+                hitboxes.push({ x: x1, y: y1, r: size1 });
+                hitboxes.push({ x: x2, y: y2, r: size2 });
+
+                const vx1 = -Math.sin(M) * r1 * n;
+                const vy1 = Math.cos(M) * r1 * n;
+                
+                const vx2 = Math.sin(M) * r2 * n;
+                const vy2 = -Math.cos(M) * r2 * n;
+
+                if (showVectors) {
+                    const vecScale = 80 / (p.a * n); 
+                    drawArrow(centerX + x1 * scale, centerY + y1 * scale, centerX + (x1 + vx1*vecScale)*scale, centerY + (y1 + vy1*vecScale)*scale, '#ef4444');
+                    drawArrow(centerX + x2 * scale, centerY + y2 * scale, centerX + (x2 + vx2*vecScale)*scale, centerY + (y2 + vy2*vecScale)*scale, '#ef4444');
+                }
+                updateTelemetry(Math.sqrt(vx1*vx1 + vy1*vy1), r1);
+
+            } else if (currentPreset === 'transfer') {
+                const r1 = p.r1;
+                const r2 = p.r2;
+                const a_trans = (r1 + r2) / 2;
+                const e_trans = (r2 - r1) / (r1 + r2);
+                
+                const n1 = Math.sqrt(M_center / Math.pow(r1, 3));
+                const n2 = Math.sqrt(M_center / Math.pow(r2, 3));
+                const n_trans = Math.sqrt(M_center / Math.pow(a_trans, 3));
+
+                const t_inner = Math.PI * 2 / n1; 
+                const t_trans = Math.PI / n_trans; 
+                const t_outer = Math.PI * 2 / n2;
+
+                if (showOrbits) {
+                    drawEllipse(r1, 0, transferState === 0 ? '#60a5fa' : '#334155');
+                    drawEllipse(r2, 0, transferState === 2 ? '#60a5fa' : '#334155');
+                    drawEllipse(a_trans, e_trans, (transferState === 1 || transferState === 3) ? '#a855f7' : '#334155', true);
+                }
+
+                drawBody(0, 0, p.centerSize * Math.pow(centerMassMult, 1/3), p.centerColor);
+
+                let x, y, vx, vy, v_mag;
+                let M;
+
+                if (!isPaused) {
+                    stateTime += dt * timeScale;
+                    if (activeBurn > 0) activeBurn -= dt * timeScale;
+                }
+
+                if (transferState === 0) {
+                    if (stateTime > 3) telExtra.classList.add('hidden');
+                    if (stateTime >= t_inner) {
+                        transferState = 1; stateTime = 0;
+                        telExtra.classList.remove('hidden');
+                        telExtra.innerText = "BURN 1: PROGRADE (Entering Transfer)";
+                        activeBurn = 1.5; burnType = 'accel';
+                    }
+                    M = n1 * stateTime;
+                    x = r1 * Math.cos(M);
+                    y = r1 * Math.sin(M);
+                    vx = -r1 * n1 * Math.sin(M);
+                    vy = r1 * n1 * Math.cos(M);
+                } else if (transferState === 1) {
+                    if (stateTime >= t_trans) {
+                        transferState = 2; stateTime = 0;
+                        telExtra.innerText = "BURN 2: PROGRADE (Circularizing Outer)";
+                        activeBurn = 1.5; burnType = 'accel';
+                    }
+                    M = n_trans * stateTime;
+                    const pos = getOrbitalPosition(a_trans, e_trans, M);
+                    x = pos.x; y = pos.y;
+                    
+                    const E = pos.E;
+                    const r_factor = 1 - e_trans * Math.cos(E);
+                    vx = -Math.sin(E) * a_trans * n_trans / r_factor;
+                    vy = Math.cos(E) * a_trans * Math.sqrt(1 - e_trans * e_trans) * n_trans / r_factor;
+                } else if (transferState === 2) {
+                    if (stateTime > 3) telExtra.classList.add('hidden');
+                    if (stateTime >= t_outer) {
+                        transferState = 3; stateTime = 0;
+                        telExtra.classList.remove('hidden');
+                        telExtra.innerText = "BURN 3: RETROGRADE (Entering Transfer)";
+                        activeBurn = 1.5; burnType = 'decel';
+                    }
+                    M = n2 * stateTime + Math.PI; // Start at apoapsis side
+                    x = r2 * Math.cos(M);
+                    y = r2 * Math.sin(M);
+                    vx = -r2 * n2 * Math.sin(M);
+                    vy = r2 * n2 * Math.cos(M);
+                } else if (transferState === 3) {
+                    if (stateTime >= t_trans) {
+                        transferState = 0; stateTime = 0;
+                        telExtra.innerText = "BURN 4: RETROGRADE (Circularizing Inner)";
+                        activeBurn = 1.5; burnType = 'decel';
+                    }
+                    M = n_trans * stateTime + Math.PI; // Start at apoapsis
+                    const pos = getOrbitalPosition(a_trans, e_trans, M);
+                    x = pos.x; y = pos.y;
+                    
+                    const E = pos.E;
+                    const r_factor = 1 - e_trans * Math.cos(E);
+                    vx = -Math.sin(E) * a_trans * n_trans / r_factor;
+                    vy = Math.cos(E) * a_trans * Math.sqrt(1 - e_trans * e_trans) * n_trans / r_factor;
+                }
+
+                v_mag = Math.sqrt(vx*vx + vy*vy);
+                
+                if (activeBurn > 0) {
+                    const dirX = vx / v_mag;
+                    const dirY = vy / v_mag;
+                    const px = centerX + x * scale;
+                    const py = centerY + y * scale;
+                    
+                    if (burnType === 'accel') {
+                        spawnParticles(px, py, dirX * 120, dirY * 120, '#f97316', 5);
+                        ctx.fillStyle = '#f97316';
+                        ctx.font = 'bold 12px "Inter", sans-serif';
+                        ctx.fillText("ACCELERATING", px + 15, py - 15);
+                    } else {
+                        spawnParticles(px, py, -dirX * 120, -dirY * 120, '#0ea5e9', 5);
+                        ctx.fillStyle = '#0ea5e9';
+                        ctx.font = 'bold 12px "Inter", sans-serif';
+                        ctx.fillText("DECELERATING", px + 15, py - 15);
+                    }
+                }
+
+                drawBody(x, y, p.size, p.color);
+                hitboxes.push({ x: x, y: y, r: p.size });
+
+                if (showVectors) {
+                    const vecScale = 40 / v_mag;
+                    drawArrow(
+                        centerX + x * scale, centerY + y * scale,
+                        centerX + (x + vx * vecScale) * scale, centerY + (y + vy * vecScale) * scale,
+                        '#ef4444'
+                    );
+                }
+                updateTelemetry(v_mag, Math.sqrt(x*x + y*y));
+            } else if (currentPreset === 'threebody') {
+                if (!isPaused) {
+                    updateNBody(dt * timeScale);
+                }
+                
+                let v_max = 0;
+                let r_max = 0;
+
+                for(let i=0; i<3; i++) {
+                    let idx = i*4;
+                    let x = nBodyState[idx] * nBodyScale;
+                    let y = nBodyState[idx+1] * nBodyScale;
+                    let vx = nBodyState[idx+2] * nBodyScale;
+                    let vy = nBodyState[idx+3] * nBodyScale;
+                    
+                    if (!isPaused) {
+                        nBodyTrails[i].push({x, y});
+                        if (nBodyTrails[i].length > 400) nBodyTrails[i].shift();
+                    }
+                    
+                    if (showOrbits && nBodyTrails[i].length > 1) {
+                        ctx.strokeStyle = nBodyColors[i];
+                        ctx.globalAlpha = 0.6;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(centerX + nBodyTrails[i][0].x * scale, centerY + nBodyTrails[i][0].y * scale);
+                        for(let j=1; j<nBodyTrails[i].length; j++) {
+                            ctx.lineTo(centerX + nBodyTrails[i][j].x * scale, centerY + nBodyTrails[i][j].y * scale);
+                        }
+                        ctx.stroke();
+                        ctx.globalAlpha = 1.0;
+                    }
+                    
+                    drawBody(x, y, nBodySizes[i], nBodyColors[i]);
+                    hitboxes.push({ x: x, y: y, r: nBodySizes[i] });
+                    
+                    let v_mag = Math.sqrt(vx*vx + vy*vy);
+                    if (v_mag > v_max) v_max = v_mag;
+                    let r_mag = Math.sqrt(x*x + y*y);
+                    if (r_mag > r_max) r_max = r_mag;
+
+                    if (showVectors) {
+                        let vecScale = currentTB === 'figure8' ? 0.3 : (30 / (v_mag + 0.1));
+                        drawArrow(
+                            centerX + x * scale, centerY + y * scale,
+                            centerX + (x + vx * vecScale) * scale, centerY + (y + vy * vecScale) * scale,
+                            '#ef4444'
+                        );
+                    }
+                }
+                
+                updateTelemetry(v_max / nBodyScale, r_max);
+
+            } else if (currentPreset === 'thirdlaw') {
+                drawBody(0, 0, p.centerSize * Math.pow(centerMassMult, 1/3), p.centerColor);
+                
+                let htmlContent = `<div class="mb-2 text-white font-bold text-sm">Law of Harmonies</div>
+                <div class="grid grid-cols-4 gap-3 border-b border-gray-700 pb-1 text-gray-400 mb-1">
+                    <span>Obj</span><span class="text-right">a³(SU)</span><span class="text-right">T²(SU)</span><span class="text-right">T²/a³</span>
+                </div>`;
+
+                const T_unit = 2 * Math.PI * Math.sqrt(Math.pow(100, 3) / BASE_M_CENTER);
+                
+                p.planets.forEach((planet, idx) => {
+                    const n = Math.sqrt(M_center / Math.pow(planet.a, 3));
+                    const M = n * time;
+                    
+                    if (showOrbits) drawEllipse(planet.a, 0, '#334155');
+                    
+                    const x = planet.a * Math.cos(M);
+                    const y = planet.a * Math.sin(M);
+                    
+                    drawBody(x, y, planet.size, planet.color);
+                    hitboxes.push({ x: x, y: y, r: planet.size });
+                    
+                    const vx = -Math.sin(M) * planet.a * n;
+                    const vy = Math.cos(M) * planet.a * n;
+                    const v_mag = Math.sqrt(vx*vx + vy*vy);
+                    
+                    if (showVectors) {
+                        const vecScale = 30 / v_mag;
+                        drawArrow(centerX + x * scale, centerY + y * scale, centerX + (x + vx * vecScale) * scale, centerY + (y + vy * vecScale) * scale, planet.color);
+                    }
+                    
+                    const T = (2 * Math.PI) / n;
+                    const a_su = planet.a / 100;
+                    const T_su = T / T_unit;
+                    
+                    const a3 = Math.pow(a_su, 3);
+                    const T2 = Math.pow(T_su, 2);
+                    const ratio = T2 / a3;
+                    
+                    htmlContent += `<div class="grid grid-cols-4 gap-3 mt-1" style="color:${planet.color}">
+                        <span>P${idx+1}</span><span class="text-right">${a3.toFixed(2)}</span><span class="text-right">${T2.toFixed(2)}</span><span class="text-right font-bold">${ratio.toFixed(3)}</span>
+                    </div>`;
+                });
+                
+                telExtra.classList.remove('hidden');
+                telExtra.innerHTML = htmlContent;
+                telV.innerText = "---";
+                telR.innerText = "---";
+            }
+
+            drawParticles();
+
+            ctx.restore();
+
+            requestAnimationFrame(render);
+        }
+
+        // Event Listeners
+        buttons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                buttons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentPreset = btn.getAttribute('data-preset');
+                
+                overlayTitle.innerText = presetData[currentPreset].title;
+            overlayDesc.innerText = presetData[currentPreset].desc;
+            formulaContainer.innerHTML = presetData[currentPreset].formula;
+
+            if (currentPreset === 'elliptical') {
+                    areaToggleContainer.classList.remove('hidden');
+                    if (showArea) areaIntervalContainer.classList.remove('hidden');
+                } else {
+                    areaToggleContainer.classList.add('hidden');
+                    areaIntervalContainer.classList.add('hidden');
+                    showArea = false;
+                    toggleArea.checked = false;
+                    telAreaContainer.classList.add('hidden');
+                }
+
+                if (currentPreset === 'circular') {
+                    circularControls.classList.remove('hidden');
+                } else {
+                    circularControls.classList.add('hidden');
+                }
+
+                if (currentPreset === 'binary') {
+                    binaryMassContainer.classList.remove('hidden');
+                    centerMassContainer.classList.add('hidden');
+                    tbControls.classList.add('hidden');
+                    geoControls.classList.add('hidden');
+                } else if (currentPreset === 'threebody') {
+                    binaryMassContainer.classList.add('hidden');
+                    centerMassContainer.classList.add('hidden');
+                    tbControls.classList.remove('hidden');
+                    geoControls.classList.add('hidden');
+                } else if (currentPreset === 'geo') {
+                    binaryMassContainer.classList.add('hidden');
+                    centerMassContainer.classList.remove('hidden');
+                    tbControls.classList.add('hidden');
+                    geoControls.classList.remove('hidden');
+                } else {
+                    binaryMassContainer.classList.add('hidden');
+                    centerMassContainer.classList.remove('hidden');
+                    tbControls.classList.add('hidden');
+                    geoControls.classList.add('hidden');
+                }
+                
+                resetSimulation();
+            });
+        });
+
+        tbButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                tbButtons.forEach(b => {
+                    b.classList.remove('border-blue-500', 'text-blue-400');
+                    b.classList.add('border-gray-700');
+                });
+                btn.classList.remove('border-gray-700');
+                btn.classList.add('border-blue-500', 'text-blue-400');
+                currentTB = btn.getAttribute('data-tb');
+                resetSimulation();
+            });
+        });
+
+        toggleArea.addEventListener('change', (e) => {
+            showArea = e.target.checked;
+            if (!showArea) {
+                telAreaContainer.classList.add('hidden');
+                areaIntervalContainer.classList.add('hidden');
+            } else {
+                areaIntervalContainer.classList.remove('hidden');
+            }
+        });
+
+        areaSlider.addEventListener('input', (e) => {
+            sweepFraction = parseFloat(e.target.value);
+            areaVal.innerText = (sweepFraction * 100).toFixed(1) + '%';
+        });
+
+        mass1Slider.addEventListener('input', (e) => {
+            presetData.binary.m1 = parseFloat(e.target.value);
+            mass1Val.innerText = presetData.binary.m1.toFixed(1) + ' M☉';
+        });
+
+        mass2Slider.addEventListener('input', (e) => {
+            presetData.binary.m2 = parseFloat(e.target.value);
+            mass2Val.innerText = presetData.binary.m2.toFixed(1) + ' M☉';
+        });
+
+        centerMassSlider.addEventListener('input', (e) => {
+            centerMassMult = parseFloat(e.target.value);
+            M_center = BASE_M_CENTER * centerMassMult;
+            centerMassVal.innerText = centerMassMult.toFixed(1) + ' M☉';
+        });
+
+        planetRSlider.addEventListener('input', (e) => {
+            planetRadius = parseFloat(e.target.value);
+            planetRVal.innerText = planetRadius + ' Mm';
+        });
+
+        launchVSlider.addEventListener('input', (e) => {
+            launchVelocity = parseFloat(e.target.value);
+            launchVVal.innerText = launchVelocity + ' km/s';
+        });
+
+        btnLaunch.addEventListener('click', () => {
+            if (currentPreset !== 'circular') return;
+            const v = launchVelocity / 100; // actual physics velocity
+            launchedSats.push({
+                x: 0, y: -planetRadius, // Launch from top
+                vx: v, vy: 0, // Horizontal launch
+                color: '#a855f7',
+                trail: [],
+                crashed: false
+            });
+        });
+
+        speedSlider.addEventListener('input', (e) => {
+            timeScale = parseFloat(e.target.value);
+            speedVal.innerText = timeScale.toFixed(1) + 'x';
+        });
+
+        btnPlay.addEventListener('click', () => {
+            isPaused = !isPaused;
+            if (isPaused) {
+                btnPlay.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg> Play';
+                btnPlay.classList.replace('bg-blue-600', 'bg-green-600');
+                btnPlay.classList.replace('hover:bg-blue-500', 'hover:bg-green-500');
+            } else {
+                btnPlay.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg> Pause';
+                btnPlay.classList.replace('bg-green-600', 'bg-blue-600');
+                btnPlay.classList.replace('hover:bg-green-500', 'hover:bg-blue-500');
+            }
+        });
+
+        btnReset.addEventListener('click', resetSimulation);
+
+        btnSyncGeo.addEventListener('click', () => {
+            if (currentPreset === 'geo') {
+                presetData.geo.a = GEO_RADIUS;
+                currentM = earthAngle; // Snap phase back to perfect alignment
+            }
+        });
+
+        let textHidden = false;
+        btnZen.addEventListener('click', () => {
+            textHidden = !textHidden;
+            if (textHidden) {
+                overlayLeft.style.opacity = '0';
+                overlayRight.style.opacity = '0';
+                iconEyeOpen.classList.add('hidden');
+                iconEyeClosed.classList.remove('hidden');
+            } else {
+                overlayLeft.style.opacity = '1';
+                overlayRight.style.opacity = '1';
+                iconEyeOpen.classList.remove('hidden');
+                iconEyeClosed.classList.add('hidden');
+            }
+        });
+
+        toggleVectors.addEventListener('change', (e) => showVectors = e.target.checked);
+        toggleOrbits.addEventListener('change', (e) => showOrbits = e.target.checked);
+
+        // Drag Interaction
+        canvas.addEventListener('pointerdown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left - centerX - offsetX;
+            const my = e.clientY - rect.top - centerY - offsetY;
+            const d = Math.hypot(mx, my) / scale;
+            const p = presetData[currentPreset];
+            const isTouch = e.pointerType === 'touch';
+            const threshold = (isTouch ? 40 : 20) / scale;
+            const hitPadding = isTouch ? 40 : 15;
+
+            if (currentPreset === 'threebody') {
+                isPanning = true;
+                lastPanX = e.clientX;
+                lastPanY = e.clientY;
+                canvas.style.cursor = 'move';
+                return;
+            } else if (currentPreset === 'transfer') {
+                if (Math.abs(d - p.r1) < threshold) { isDragging = true; dragTarget = 'r1'; }
+                else if (Math.abs(d - p.r2) < threshold) { isDragging = true; dragTarget = 'r2'; }
+                else { isPanning = true; lastPanX = e.clientX; lastPanY = e.clientY; }
+            } else if (currentPreset === 'thirdlaw') {
+                for (let i = 0; i < p.planets.length; i++) {
+                    if (Math.abs(d - p.planets[i].a) < threshold) {
+                        isDragging = true; dragTarget = 'thirdlaw_' + i;
+                        break;
+                    }
+                }
+                if (!isDragging) { isPanning = true; lastPanX = e.clientX; lastPanY = e.clientY; }
+            } else {
+                let hitPlanet = false;
+                for (let hb of hitboxes) {
+                    if (Math.hypot(mx - hb.x * scale, my - hb.y * scale) < hb.r * 2 + hitPadding) {
+                        hitPlanet = true; break;
+                    }
+                }
+                const angle = Math.atan2(my, mx);
+                let nearOrbit = false;
+                if (currentPreset === 'elliptical') {
+                    const r_ellipse = (p.a * (1 - p.e * p.e)) / (1 + p.e * Math.cos(angle));
+                    nearOrbit = Math.abs(d - r_ellipse) < threshold;
+                } else if (currentPreset === 'binary') {
+                    const r1 = p.a * (p.m2 / (p.m1 + p.m2));
+                    const r2 = p.a * (p.m1 / (p.m1 + p.m2));
+                    nearOrbit = Math.abs(d - r1) < threshold || Math.abs(d - r2) < threshold;
+                } else {
+                    nearOrbit = Math.abs(d - p.a) < threshold;
+                }
+                
+                if (hitPlanet || nearOrbit) {
+                    isDragging = true; dragTarget = 'a';
+                } else {
+                    isPanning = true;
+                    lastPanX = e.clientX;
+                    lastPanY = e.clientY;
+                }
+            }
+            if (isDragging) canvas.style.cursor = 'grabbing';
+            else if (isPanning) canvas.style.cursor = 'move';
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (isPanning) {
+                offsetX += e.clientX - lastPanX;
+                offsetY += e.clientY - lastPanY;
+                lastPanX = e.clientX;
+                lastPanY = e.clientY;
+                return;
+            }
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left - centerX - offsetX;
+            const my = e.clientY - rect.top - centerY - offsetY;
+            const d = Math.hypot(mx, my) / scale;
+            const p = presetData[currentPreset];
+            const isTouch = e.pointerType === 'touch';
+            const hitPadding = isTouch ? 40 : 15;
+
+            if (!isDragging) {
+                let hovered = false;
+                const threshold = (isTouch ? 40 : 20) / scale;
+                if (currentPreset === 'threebody') {
+                    hovered = false;
+                } else if (currentPreset === 'transfer') {
+                    if (Math.abs(d - p.r1) < threshold || Math.abs(d - p.r2) < threshold) hovered = true;
+                } else if (currentPreset === 'thirdlaw') {
+                    for (let i = 0; i < p.planets.length; i++) {
+                        if (Math.abs(d - p.planets[i].a) < threshold) { hovered = true; break; }
+                    }
+                } else {
+                    let hitPlanet = false;
+                    for (let hb of hitboxes) {
+                        if (Math.hypot(mx - hb.x * scale, my - hb.y * scale) < hb.r * 2 + hitPadding) {
+                            hitPlanet = true; break;
+                        }
+                    }
+                    const angle = Math.atan2(my, mx);
+                    let nearOrbit = false;
+                    if (currentPreset === 'elliptical') {
+                        const r_ellipse = (p.a * (1 - p.e * p.e)) / (1 + p.e * Math.cos(angle));
+                        nearOrbit = Math.abs(d - r_ellipse) < threshold;
+                    } else if (currentPreset === 'binary') {
+                        const r1 = p.a * (p.m2 / (p.m1 + p.m2));
+                        const r2 = p.a * (p.m1 / (p.m1 + p.m2));
+                        nearOrbit = Math.abs(d - r1) < threshold || Math.abs(d - r2) < threshold;
+                    } else {
+                        nearOrbit = Math.abs(d - p.a) < threshold;
+                    }
+                    if (hitPlanet || nearOrbit) hovered = true;
+                }
+                canvas.style.cursor = hovered ? 'grab' : 'default';
+                return;
+            }
+
+            if (currentPreset === 'transfer') {
+                if (dragTarget === 'r1') p.r1 = Math.max(40, Math.min(d, p.r2 - 30));
+                if (dragTarget === 'r2') p.r2 = Math.max(p.r1 + 30, Math.min(d, 800));
+            } else if (currentPreset === 'thirdlaw') {
+                if (dragTarget && dragTarget.startsWith('thirdlaw_')) {
+                    const idx = parseInt(dragTarget.split('_')[1]);
+                    p.planets[idx].a = Math.max(40, Math.min(800, d));
+                }
+            } else {
+                if (currentPreset === 'elliptical') {
+                    const angle = Math.atan2(my, mx);
+                    p.a = Math.max(60, Math.min(800, d * (1 + p.e * Math.cos(angle)) / (1 - p.e * p.e)));
+                } else if (currentPreset === 'binary') {
+                    const r1 = p.a * (p.m2 / (p.m1 + p.m2));
+                    const r2 = p.a * (p.m1 / (p.m1 + p.m2));
+                    if (Math.abs(d - r1) < Math.abs(d - r2)) {
+                        p.a = Math.max(60, Math.min(800, d * (p.m1 + p.m2) / p.m2));
+                    } else {
+                        p.a = Math.max(60, Math.min(800, d * (p.m1 + p.m2) / p.m1));
+                    }
+                } else {
+                    const minR = currentPreset === 'geo' ? R_EARTH * Math.pow(centerMassMult, 1/3) + 10 : 40;
+                    p.a = Math.max(minR, Math.min(800, d));
+                }
+            }
+        });
+
+        window.addEventListener('pointerup', () => {
+            if (isDragging) {
+                isDragging = false;
+                dragTarget = null;
+                canvas.style.cursor = 'default';
+            }
+            if (isPanning) {
+                isPanning = false;
+                canvas.style.cursor = 'default';
+            }
+        });
+
+        // Start
+        formulaContainer.innerHTML = presetData[currentPreset].formula;
+        requestAnimationFrame(render);
+
+    </script>
+</body>
+</html>

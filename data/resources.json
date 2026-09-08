@@ -191,17 +191,18 @@
     "type": "仿真资源"
   },
   {
-    "id": "r1788868008762qzjs8",
-    "title": "动态平衡",
-    "desc": "探究动态平衡的物理方法，互动仿真实验学习资源。",
-    "book": "b1",
-    "chapter": "b1c3",
-    "section": "b1c3s5",
-    "url": "pages/动态平衡-2.html",
+    "id": "r1788873672802eluxd",
+    "title": "光的干涉",
+    "desc": "",
+    "book": "b4",
+    "chapter": "b4c4",
+    "section": "b4c4s4",
+    "url": "pages/光的干涉.html",
     "tags": [
-      "动态平衡",
+      "光的干涉",
+      "光的干涉",
       "仿真资源"
     ],
-    "type": "仿真资源"
+    "type": "练习"
   }
 ]

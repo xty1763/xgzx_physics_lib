@@ -13,12 +13,15 @@
   {
     "id": "r1788762640995prpgs",
     "title": "波的干涉",
-    "desc": "",
-    "book": "",
-    "chapter": "",
-    "section": "",
+    "desc": "探索波的干涉现象，体验仿真实验，加深对波动理论理解。",
+    "book": "b4",
+    "chapter": "b4c3",
+    "section": "b4c3s4",
     "url": "pages/波的干涉.html",
-    "tags": [],
+    "tags": [
+      "波的干涉",
+      "波的干涉"
+    ],
     "type": "仿真资源"
   },
   {

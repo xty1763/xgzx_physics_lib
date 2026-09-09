@@ -2,180 +2,109 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>高中物理教师智能教学工作台 - 人教版各章节小节教研资源中心</title>
-  <meta name="description" content="高中物理教学资源库 —— 按人教版教材→章→节分类、搜索与类型筛选，支持上传/编辑/删除，含资源助手与智能简介。" />
-  <link rel="stylesheet" href="styles.css?v=20" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>高中物理教学资源库</title>
+  <meta name="description" content="高中物理教学资源库 —— 按章节分类、支持搜索与上传的导航页面。" />
+  <link rel="stylesheet" href="styles.css?v=19" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%232f6fed'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle' fill='white' font-family='Arial'%3E%E7%89%A9%3C/text%3E%3C/svg%3E" />
 </head>
-<body class="dark-theme">
-  <div id="app" class="workbench-layout">
-
-    <!-- Sidebar Navigation (Modules) -->
-    <aside id="sidebar-nav" class="sidebar">
-      <div class="sidebar-header">
-        <div class="brand-logo">
-          <div class="atom-icon">
-            <span class="atom-core"></span>
-            <span class="atom-orbit orbit-1"></span>
-            <span class="atom-orbit orbit-2"></span>
-          </div>
-          <div class="brand-text">
-            <h2>物理教研·工作台</h2>
-            <span class="sub-title">高中物理人教版备课中心</span>
-          </div>
-        </div>
+<body>
+  <header class="topbar">
+    <button class="btn ghost iconbtn" id="navToggle" type="button" title="收起/展开导航栏" aria-label="收起或展开导航栏">☰</button>
+    <div class="brand">
+      <div class="logo">物</div>
+      <div>
+        <div class="name">高中物理教学资源库</div>
+        <div class="sub" id="subjectSub"></div>
       </div>
+    </div>
 
-      <div class="teacher-badge">
-        <div class="teacher-avatar">物</div>
-        <div class="teacher-info">
-          <div class="teacher-name">高中物理教研 <span class="badge-tag">资源库</span></div>
-          <div class="teacher-meta">新钢中学 · 物理教研组 · 部署于 GitHub Pages</div>
-        </div>
-      </div>
+    <div class="searchwrap">
+      <span class="icon">🔍</span>
+      <input id="search" type="search" placeholder="搜索标题、描述、标签或章节…" autocomplete="off" />
+    </div>
 
-      <nav class="nav-menu" id="main-nav-menu">
-        <div class="nav-section-title">核心功能板块</div>
-        <button class="nav-item active" data-module="materials">
-          <span class="nav-icon">📚</span>
-          <span class="nav-label">1. 教学材料上传 (人教版)</span>
-          <span class="nav-count" id="count-materials">…</span>
-        </button>
-        <button class="nav-item" data-module="plans">
-          <span class="nav-icon">📅</span>
-          <span class="nav-label">2. 教学计划安排</span>
-          <span class="nav-count">建设中</span>
-        </button>
-        <button class="nav-item" data-module="goals">
-          <span class="nav-icon">🎯</span>
-          <span class="nav-label">3. 教学目标评估</span>
-          <span class="nav-count">建设中</span>
-        </button>
-        <button class="nav-item" data-module="analytics">
-          <span class="nav-icon">📊</span>
-          <span class="nav-label">4. 班级成绩分析</span>
-          <span class="nav-count">建设中</span>
-        </button>
-        <button class="nav-item" data-module="students">
-          <span class="nav-icon">👥</span>
-          <span class="nav-label">5. 学生重点跟进</span>
-          <span class="nav-count">建设中</span>
-        </button>
-        <button class="nav-item" data-module="innovation">
-          <span class="nav-icon">💡</span>
-          <span class="nav-label">6. 创新思路记录</span>
-          <span class="nav-count">建设中</span>
-        </button>
-        <button class="nav-item" data-module="gaokao">
-          <span class="nav-icon">🏆</span>
-          <span class="nav-label">7. 高考题目分析</span>
-          <span class="nav-count">建设中</span>
-        </button>
-      </nav>
+    <button class="btn primary" id="uploadBtn" type="button" style="display:none;">⬆ 上传资源</button>
+    <button class="btn ghost" id="adminBtn" type="button">🔑 管理员登录</button>
+    <!-- 方案A(多用户授权/Cloudflare Worker)已暂停：隐藏“授权登录”入口，保留代码便于日后恢复 -->
+    <button class="btn ghost" id="workerBtn" type="button" style="display:none;">👥 授权登录</button>
+  </header>
 
-      <div class="sidebar-footer">
-        <div class="quick-stats">
-          <div class="stat-mini">
-            <span class="mini-val" id="stat-books">6全册</span>
-            <span class="mini-lbl">人教教材</span>
-          </div>
-          <div class="stat-mini">
-            <span class="mini-val" id="stat-sections">…</span>
-            <span class="mini-lbl">小节精细库</span>
-          </div>
-          <div class="stat-mini">
-            <span class="mini-val" id="stat-files">…</span>
-            <span class="mini-lbl">已上传资源</span>
-          </div>
-        </div>
-      </div>
+  <div class="layout">
+    <!-- 章节导航 -->
+    <aside class="sidebar">
+      <h2>教材 · 章节</h2>
+      <button class="nav-all active" data-chapter="all" type="button">📚 全部资源</button>
+      <div id="chapterNav"></div>
     </aside>
 
-    <!-- Main Workspace Area -->
-    <main class="workbench-main">
-      <!-- Top Header Bar -->
-      <header id="main-header" class="top-header">
-        <div class="header-left">
-          <div class="module-breadcrumbs">
-            <span class="crumb-root">工作台</span>
-            <span class="crumb-sep">/</span>
-            <span id="header-module-name" class="crumb-current">1. 教学材料上传</span>
-            <span class="crumb-sep">/</span>
-            <span id="header-sub-name" class="crumb-sub">人教版各章节文件浏览目录</span>
-          </div>
-        </div>
-
-        <div class="header-center">
-          <div class="header-search-bar">
-            <span class="search-icon">🔍</span>
-            <input type="text" id="global-search" placeholder="全局搜索标题、描述、标签、教材、章节或类型…" autocomplete="off" />
-          </div>
-        </div>
-
-        <div class="header-right">
-          <div class="current-term-pill" id="term-pill">人教版 · 2019 新课标</div>
-          <button id="quick-add-btn" class="btn btn-primary btn-sm" style="display:none;">
-            <span>+ 上传教学材料</span>
-          </button>
-          <div class="notifications-bell" id="btn-notifications" title="资源助手">
-            <span>🔔</span><span class="bell-dot"></span>
-          </div>
-        </div>
-      </header>
-
-      <!-- Sub-Tabs Navigation Bar (modules 2-7 placeholders) -->
-      <div class="subtabs-bar" id="subtabs-bar" style="display:none;">
-        <div class="subtabs-scroll" id="subtabs-container"></div>
-        <div class="subtabs-actions" id="subtabs-actions"></div>
+    <!-- 主内容 -->
+    <main class="content">
+      <div class="toolbar">
+        <div class="crumb" id="crumb">全部资源 <small id="count"></small></div>
+        <div class="filterrow" id="typeFilter"></div>
       </div>
-
-      <!-- Dynamic Content View Area -->
-      <div class="content-viewport" id="content-viewport"></div>
+      <div class="grid" id="grid"></div>
     </main>
   </div>
 
-  <!-- 上传资源弹窗 -->
-  <div class="modal-backdrop hidden" id="modalMask">
-    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <div class="modal-header">
-        <h3 id="modalTitle">上传资源</h3>
-        <button class="modal-close" id="closeModal" type="button" aria-label="关闭">×</button>
+  <!-- 页脚 -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-meta">
+        <div class="footer-name">⚛ 高中物理教学资源库</div>
+        <div class="footer-school">新钢中学 · 物理教研</div>
       </div>
-      <div class="modal-body">
-        <button class="btn btn-secondary btn-sm" id="autoFillBtn" type="button">✨ 自动识别填表</button>
-        <button class="btn btn-secondary btn-sm" id="aiDescBtn" type="button">✨ 智能简介</button>
-        <div class="form-group">
-          <label class="form-label" for="fTitle">资源名称 *</label>
-          <input id="fTitle" class="form-control" type="text" placeholder="例如：匀变速直线运动演示" />
+      <div class="footer-contacts">
+        <span>📧 联系邮箱：<a href="mailto:1596500035@qq.com">1596500035@qq.com</a></span>
+      </div>
+      <div class="footer-copy">© <span id="year"></span> 新钢中学 · 仅供教学与学习使用 · 部署于 GitHub Pages</div>
+    </div>
+  </footer>
+
+  <!-- 上传弹窗 -->
+  <div class="modal-mask" id="modalMask">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header>
+        <h3 id="modalTitle">上传资源</h3>
+        <button class="close" id="closeModal" type="button" aria-label="关闭">✕</button>
+      </header>
+      <div class="body">
+        <button class="btn ghost" id="autoFillBtn" type="button">✨ 自动识别填表</button>
+        <button class="btn ghost" id="aiDescBtn" type="button">✨ 智能简介</button>
+        <div class="field">
+          <label for="fTitle">资源名称 *</label>
+          <input id="fTitle" type="text" placeholder="例如：匀变速直线运动演示" />
         </div>
-        <div class="form-group">
-          <label class="form-label" for="fType">资源类型</label>
-          <select id="fType" class="form-control"></select>
+        <div class="field">
+          <label for="fType">资源类型</label>
+          <select id="fType"></select>
           <p class="hint" id="typeHint" style="display:none;">试卷不挂具体小节（可不选章节/小节）。</p>
         </div>
-        <div class="form-group">
-          <label class="form-label" for="fBook">教材</label>
-          <select id="fBook" class="form-control"></select>
+        <div class="field">
+          <label for="fBook">教材</label>
+          <select id="fBook"></select>
         </div>
-        <div class="form-group">
-          <label class="form-label" for="fChapter">章节</label>
-          <select id="fChapter" class="form-control"></select>
+        <div class="fieldrow">
+          <div class="field">
+            <label for="fChapter">章节</label>
+            <select id="fChapter"></select>
+          </div>
+          <div class="field">
+            <label for="fSection">小节</label>
+            <select id="fSection"></select>
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label" for="fSection">小节</label>
-          <select id="fSection" class="form-control"></select>
+        <div class="field">
+          <label for="fDesc">一句话描述</label>
+          <textarea id="fDesc" placeholder="简单说明这个资源的内容/用法（可选）"></textarea>
         </div>
-        <div class="form-group">
-          <label class="form-label" for="fDesc">一句话描述</label>
-          <textarea id="fDesc" class="form-control" placeholder="简单说明这个资源的内容/用法（可选）"></textarea>
+        <div class="field">
+          <label for="fTags">标签（用逗号或空格分隔）</label>
+          <input id="fTags" type="text" placeholder="例如：演示 实验 动画" />
         </div>
-        <div class="form-group">
-          <label class="form-label" for="fTags">标签（用逗号或空格分隔）</label>
-          <input id="fTags" class="form-control" type="text" placeholder="例如：演示 实验 动画" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">选择文件</label>
+        <div class="field">
+          <label>选择 HTML 文件</label>
           <div class="dropzone" id="dropzone">
             <div class="big">📄</div>
             <div>点击选择，或把文件拖到这里</div>
@@ -189,70 +118,97 @@
         </div>
         <p class="hint">保存后资源会发布到线上（写入仓库并登记到资源清单），约 1 分钟后所有访客均可访问。</p>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" id="cancelModal" type="button">取消</button>
-        <button class="btn btn-primary" id="saveResource" type="button">保存资源</button>
-      </div>
+      <footer>
+        <button class="btn" id="cancelModal" type="button">取消</button>
+        <button class="btn primary" id="saveResource" type="button">保存资源</button>
+      </footer>
     </div>
   </div>
 
-  <!-- 管理员 / AI 设置弹窗 -->
-  <div class="modal-backdrop hidden" id="adminMask">
-    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
-      <div class="modal-header">
-        <h3 id="adminTitle">管理员登录 / AI 设置</h3>
-        <button class="modal-close" id="closeAdminModal" type="button" aria-label="关闭">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label" for="adminToken">GitHub 访问令牌（只保存在本浏览器，用于发布/编辑/删除资源）</label>
-          <input id="adminToken" class="form-control" type="password" placeholder="github_pat_…" autocomplete="off" />
-          <p class="hint">没有令牌的访客看不到“上传资源”按钮；填入一次后本浏览器即保留并使用它。</p>
+  <!-- 管理员登录弹窗 -->
+  <div class="modal-mask" id="adminMask">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
+      <header>
+        <h3 id="adminTitle">管理员登录</h3>
+        <button class="close" id="closeAdminModal" type="button" aria-label="关闭">✕</button>
+      </header>
+      <div class="body">
+        <div class="field">
+          <label for="adminToken">GitHub 访问令牌（只保存在本浏览器，用于发布资源）</label>
+          <input id="adminToken" type="password" placeholder="ghp_… 或 github_pat_…" autocomplete="off" />
+          <p class="hint">令牌只存在你这台浏览器的 localStorage，不会写进网页。当前<strong>没有</strong>令牌的访客看不到“上传资源”按钮；输入一次后，本浏览器即保留并使用它上传。</p>
         </div>
-        <div class="form-group">
-          <label class="form-label" for="aiEndpoint">AI 接口地址（OpenAI 兼容接口，用于资源助手/智能简介）</label>
-          <input id="aiEndpoint" class="form-control" type="text" placeholder="https://open.bigmodel.cn/api/paas/v4/chat/completions" autocomplete="off" />
+        <div class="field">
+          <label for="aiEndpoint">AI 接口地址（OpenAI 兼容接口，用于资源助手/智能简介）</label>
+          <input id="aiEndpoint" type="text" placeholder="https://open.bigmodel.cn/api/paas/v4/chat/completions" autocomplete="off" />
           <p class="hint">已默认智谱（GLM，国内可达、浏览器可直连）。想要 AI 生效：① 在 <a href="https://open.bigmodel.cn" target="_blank" rel="noopener">open.bigmodel.cn</a>
           用手机号注册并实名；② 在「API 密钥」生成一个 key 复制；③ 把 key 粘到下方「AI Key」，点「登录」。模型默认免费版 <code>glm-4-flash</code>，可换成任一模型 ID。</p>
         </div>
-        <div class="form-group">
-          <label class="form-label" for="aiModel">AI 模型</label>
-          <input id="aiModel" class="form-control" type="text" placeholder="glm-4-flash" autocomplete="off" />
+        <div class="field">
+          <label for="aiModel">AI 模型</label>
+          <input id="aiModel" type="text" placeholder="glm-4-flash" autocomplete="off" />
         </div>
-        <div class="form-group">
-          <label class="form-label" for="aiKey">AI Key（智谱的 API 密钥，仅保存在本浏览器）</label>
-          <input id="aiKey" class="form-control" type="password" placeholder="你的智谱 key" autocomplete="off" />
+        <div class="field">
+          <label for="aiKey">AI Key（智谱的 API 密钥，仅保存在本浏览器）</label>
+          <input id="aiKey" type="password" placeholder="你的智谱 key" autocomplete="off" />
         </div>
         <div id="adminLoggedInRow" style="display:none;">
-          <button class="btn btn-secondary" id="clearTokenBtn" type="button">退出 / 清除本机令牌</button>
+          <button class="btn" id="clearTokenBtn" type="button">退出 / 清除本机令牌</button>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" id="cancelAdminModal" type="button">取消</button>
-        <button class="btn btn-primary" id="adminSave" type="button">登录</button>
-      </div>
+      <footer>
+        <button class="btn" id="cancelAdminModal" type="button">取消</button>
+        <button class="btn primary" id="adminSave" type="button">登录</button>
+      </footer>
     </div>
   </div>
 
-  <!-- 资源助手弹窗 -->
+  <!-- 授权登录弹窗（其他老师，走 Cloudflare Worker） -->
+  <div class="modal-mask" id="workerMask">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="workerTitle">
+      <header>
+        <h3 id="workerTitle">授权登录</h3>
+        <button class="close" id="closeWorkerModal" type="button" aria-label="关闭">✕</button>
+      </header>
+      <div class="body">
+        <div class="field">
+          <label for="workerUser">用户名</label>
+          <input id="workerUser" type="text" autocomplete="username" placeholder="由管理员分配的账号" />
+        </div>
+        <div class="field">
+          <label for="workerPass">密码</label>
+          <input id="workerPass" type="password" autocomplete="current-password" placeholder="密码" />
+        </div>
+        <p class="hint">账号由管理员在 Cloudflare Worker 里分配/维护。登录后可上传、编辑、删除资源（后端持有 GitHub 令牌，安全）。</p>
+        <div id="workeredInRow" style="display:none;">
+          <button class="btn ghost" id="workerLogoutBtn" type="button">退出授权登录</button>
+        </div>
+      </div>
+      <footer>
+        <button class="btn" id="cancelWorkerModal" type="button">取消</button>
+        <button class="btn primary" id="workerSave" type="button">授权登录</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 资源助手 -->
   <button class="assist-fab" id="assistFab" type="button" title="资源助手" aria-label="资源助手">🤖</button>
   <div class="assist-panel" id="assistPanel" hidden>
-    <div class="assist-head">
+    <header>
       <div class="assist-title">🤖 资源助手</div>
-      <button class="close" id="assistClose" type="button" aria-label="关闭">×</button>
-    </div>
+      <button class="close" id="assistClose" type="button" aria-label="关闭">✕</button>
+    </header>
     <div class="assist-body" id="assistMessages"></div>
     <div class="assist-inputrow">
       <input id="assistInput" type="text" placeholder="例如：必修一 第二章 自由落体 课件" autocomplete="off" />
-      <button class="btn btn-primary" id="assistSend" type="button">发送</button>
+      <button class="btn primary" id="assistSend" type="button">发送</button>
     </div>
   </div>
 
-  <!-- Toast Notification System -->
-  <div id="toast-container" class="toast-container"></div>
+  <div class="toast" id="toast"></div>
 
   <!-- 数据与逻辑 -->
-  <script src="data/course-data.js?v=20"></script>
-  <script src="app.js?v=20"></script>
+  <script src="data/course-data.js?v=19"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>

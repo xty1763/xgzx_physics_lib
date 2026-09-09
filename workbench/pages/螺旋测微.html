@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Interactive Micrometer Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css">
+    <style>
+        * {
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #0f172a; /* Slate 900 */
+            color: #f8fafc; /* Slate 50 */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #canvas-container {
+            flex: 1;
+            width: 100%;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            cursor: grab;
+        }
+        canvas:active {
+            cursor: grabbing;
+        }
+        .control-panel {
+            background-color: #1e293b;
+            padding: 1.5rem;
+            border-top: 1px solid #334155;
+            box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 4px;
+        }
+        .btn {
+            background: #334155;
+            color: white;
+            border: none;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .btn:hover {
+            background: #475569;
+        }
+        .btn:active {
+            background: #3b82f6;
+            transform: scale(0.95);
+        }
+        .reading-display {
+            font-family: 'Courier New', Courier, monospace;
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header & Reading -->
+    <div class="absolute top-0 left-0 w-full p-4 z-10 flex justify-between items-start pointer-events-none">
+        <div class="flex flex-col items-start">
+            <h1 class="text-xl md:text-2xl font-bold text-slate-200 drop-shadow-md">Micrometer Simulator</h1>
+            <p class="text-slate-400 text-sm mt-1 drop-shadow-md">Resolution: 0.001 mm (Estimation)</p>
+            <button id="toggle-reading-btn" onclick="toggleReading()" class="mt-4 btn bg-indigo-600 hover:bg-indigo-500 pointer-events-auto text-sm py-2 px-4 shadow-lg transition-colors">
+                <i class="fas fa-eye"></i> Show Reading
+            </button>
+        </div>
+        <div class="bg-slate-800/80 backdrop-blur-sm border border-slate-600 rounded-xl p-4 text-right pointer-events-auto shadow-lg transition-all duration-300" id="reading-panel">
+            <div class="text-sm text-slate-400 mb-1">Current Reading</div>
+            <div class="text-4xl md:text-5xl font-bold text-blue-400 reading-display tracking-wider" id="reading-text">
+                0.000 <span class="text-lg text-slate-500">mm</span>
+            </div>
+            <div class="text-xs text-slate-400 mt-2 flex justify-end gap-2">
+                <span>Main: <span id="main-val" class="text-slate-200">0.000</span></span>
+                <span>+</span>
+                <span>Thimble: <span id="thimble-val" class="text-slate-200">0.000</span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Canvas Area -->
+    <div id="canvas-container">
+        <canvas id="micrometerCanvas"></canvas>
+    </div>
+
+    <!-- Controls -->
+    <div class="control-panel z-10">
+        <div class="max-w-4xl mx-auto">
+            
+            <div class="mb-6">
+                <div class="flex justify-between text-sm text-slate-400 mb-2">
+                    <span>0 mm</span>
+                    <span>Coarse Adjustment</span>
+                    <span>25 mm</span>
+                </div>
+                <input type="range" id="slider" min="0" max="25" step="0.001" value="0">
+            </div>
+
+            <div class="grid grid-cols-4 md:grid-cols-8 gap-2 md:gap-3">
+                <button class="btn col-span-1" onclick="adjustValue(-1.000)" title="-1.000 mm">
+                    <i class="fas fa-angle-double-left"></i> <span class="hidden md:inline text-xs">1.0</span>
+                </button>
+                <button class="btn col-span-1" onclick="adjustValue(-0.100)" title="-0.100 mm">
+                    <i class="fas fa-angle-left"></i> <span class="hidden md:inline text-xs">0.1</span>
+                </button>
+                <button class="btn col-span-1 bg-slate-700 hover:bg-slate-600" onclick="adjustValue(-0.010)" title="-0.010 mm">
+                    <i class="fas fa-minus text-sm"></i> <span class="hidden md:inline text-xs">0.01</span>
+                </button>
+                <button class="btn col-span-1 bg-slate-800 hover:bg-slate-700 border border-slate-600" onclick="adjustValue(-0.001)" title="-0.001 mm">
+                    <i class="fas fa-minus text-xs text-slate-400"></i> <span class="hidden md:inline text-xs text-slate-300">0.001</span>
+                </button>
+                
+                <button class="btn col-span-1 bg-slate-800 hover:bg-slate-700 border border-slate-600" onclick="adjustValue(0.001)" title="+0.001 mm">
+                    <i class="fas fa-plus text-xs text-slate-400"></i> <span class="hidden md:inline text-xs text-slate-300">0.001</span>
+                </button>
+                <button class="btn col-span-1 bg-slate-700 hover:bg-slate-600" onclick="adjustValue(0.010)" title="+0.010 mm">
+                    <i class="fas fa-plus text-sm"></i> <span class="hidden md:inline text-xs">0.01</span>
+                </button>
+                <button class="btn col-span-1" onclick="adjustValue(0.100)" title="+0.100 mm">
+                    <span class="hidden md:inline text-xs">0.1</span> <i class="fas fa-angle-right"></i>
+                </button>
+                <button class="btn col-span-1" onclick="adjustValue(1.000)" title="+1.000 mm">
+                    <span class="hidden md:inline text-xs">1.0</span> <i class="fas fa-angle-double-right"></i>
+                </button>
+            </div>
+            
+            <div class="mt-4 flex justify-center gap-4">
+                <button class="btn bg-blue-600 hover:bg-blue-500 flex-1 md:flex-none md:w-48" onclick="measureRandom()">
+                    <i class="fas fa-cube"></i> Measure Random
+                </button>
+                <button class="btn bg-slate-700 hover:bg-slate-600 flex-1 md:flex-none md:w-32" onclick="setValue(0)">
+                    <i class="fas fa-undo"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('micrometerCanvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const slider = document.getElementById('slider');
+        const readingText = document.getElementById('reading-text');
+        const mainValText = document.getElementById('main-val');
+        const thimbleValText = document.getElementById('thimble-val');
+        const toggleReadingBtn = document.getElementById('toggle-reading-btn');
+
+        let currentValue = 5.783;
+        let isReadingVisible = false;
+
+        function toggleReading() {
+            isReadingVisible = !isReadingVisible;
+            if (isReadingVisible) {
+                toggleReadingBtn.innerHTML = '<i class="fas fa-eye-slash"></i> Hide Reading';
+                toggleReadingBtn.classList.replace('bg-indigo-600', 'bg-slate-600');
+                toggleReadingBtn.classList.replace('hover:bg-indigo-500', 'hover:bg-slate-500');
+            } else {
+                toggleReadingBtn.innerHTML = '<i class="fas fa-eye"></i> Show Reading';
+                toggleReadingBtn.classList.replace('bg-slate-600', 'bg-indigo-600');
+                toggleReadingBtn.classList.replace('hover:bg-slate-500', 'hover:bg-indigo-500');
+            }
+            updateDisplay();
+        }
+        const maxValue = 25.00;
+        
+        // Animation variables
+        let targetValue = currentValue;
+        let isAnimating = false;
+
+        // Visual constants
+        let unit = 15; // pixels per mm (will be recalculated on resize)
+        let centerX, centerY;
+
+        function resize() {
+            const container = document.getElementById('canvas-container');
+            // Support high DPI displays
+            const dpr = window.devicePixelRatio || 1;
+            const rect = container.getBoundingClientRect();
+            
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            
+            ctx.scale(dpr, dpr);
+            canvas.style.width = `${rect.width}px`;
+            canvas.style.height = `${rect.height}px`;
+
+            centerX = rect.width / 2;
+            centerY = rect.height / 2;
+            
+            // Calculate scale so 35mm total (25 max + margins) fits in width
+            unit = Math.min(rect.width / 50, rect.height / 15); 
+            
+            draw();
+        }
+
+        window.addEventListener('resize', resize);
+
+        function updateDisplay() {
+            slider.value = currentValue;
+            
+            // Calculate components for explanation
+            let mainScale = Math.floor(currentValue * 2) / 2;
+            let thimbleScale = currentValue - mainScale;
+            
+            // Handle floating point precision issues
+            mainScale = Math.round(mainScale * 1000) / 1000;
+            thimbleScale = Math.round(thimbleScale * 1000) / 1000;
+            
+            if (isReadingVisible) {
+                const valStr = currentValue.toFixed(3);
+                readingText.innerHTML = `${valStr} <span class="text-lg text-slate-500">mm</span>`;
+                mainValText.innerText = mainScale.toFixed(3);
+                thimbleValText.innerText = thimbleScale.toFixed(3);
+            } else {
+                readingText.innerHTML = `?.??? <span class="text-lg text-slate-500">mm</span>`;
+                mainValText.innerText = '?.???';
+                thimbleValText.innerText = '?.???';
+            }
+        }
+
+        function setValue(val) {
+            targetValue = Math.max(0, Math.min(maxValue, val));
+            if (!isAnimating) {
+                animate();
+            }
+        }
+
+        function adjustValue(delta) {
+            // Round to 3 decimal places to avoid floating point drift
+            setValue(Math.round((targetValue + delta) * 1000) / 1000);
+        }
+
+        slider.addEventListener('input', (e) => {
+            currentValue = parseFloat(e.target.value);
+            targetValue = currentValue;
+            updateDisplay();
+            draw();
+        });
+
+        function measureRandom() {
+            const randomVal = (Math.random() * 20 + 2).toFixed(3);
+            setValue(parseFloat(randomVal));
+        }
+
+        function animate() {
+            isAnimating = true;
+            const diff = targetValue - currentValue;
+            
+            if (Math.abs(diff) < 0.0001) {
+                currentValue = targetValue;
+                updateDisplay();
+                draw();
+                isAnimating = false;
+                return;
+            }
+            
+            // Ease out
+            currentValue += diff * 0.15;
+            updateDisplay();
+            draw();
+            requestAnimationFrame(animate);
+        }
+
+        // --- Drawing Logic ---
+
+        function draw() {
+            // Background
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const sleeveLeftX = centerX - 10 * unit; // Position sleeve somewhat centrally
+            const sleeveRadius = 6 * unit;
+            const thimbleRadius = 7.5 * unit;
+            
+            // 1. Draw Object being measured
+            drawObject(sleeveLeftX);
+
+            // 2. Draw Frame & Anvil (Simplified left part)
+            drawFrame(sleeveLeftX, sleeveRadius);
+
+            // 3. Draw Spindle
+            drawSpindle(sleeveLeftX, sleeveRadius);
+
+            // 4. Draw Sleeve (Main Scale)
+            drawSleeve(sleeveLeftX, sleeveRadius);
+
+            // 5. Draw Thimble (Rotating Scale)
+            drawThimble(sleeveLeftX, thimbleRadius);
+        }
+
+        function drawObject(sleeveLeftX) {
+            const anvilFaceX = sleeveLeftX - 35 * unit;
+            if (currentValue > 0) {
+                ctx.fillStyle = '#3b82f6'; // Blue object
+                ctx.strokeStyle = '#2563eb';
+                ctx.lineWidth = 2;
+                
+                const objWidth = currentValue * unit;
+                const objHeight = 12 * unit;
+                const objX = anvilFaceX;
+                const objY = centerY - objHeight / 2;
+                
+                // Draw a 3D looking block
+                ctx.fillRect(objX, objY, objWidth, objHeight);
+                ctx.strokeRect(objX, objY, objWidth, objHeight);
+                
+                // Highlights
+                ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                ctx.fillRect(objX, objY, objWidth, objHeight * 0.2);
+            }
+        }
+
+        function drawFrame(sleeveLeftX, sleeveRadius) {
+            const anvilFaceX = sleeveLeftX - 35 * unit;
+            
+            // Anvil
+            ctx.fillStyle = '#94a3b8'; // Light metal
+            ctx.fillRect(anvilFaceX - 5 * unit, centerY - 3 * unit, 5 * unit, 6 * unit);
+            
+            // Frame curve (simplified as a thick line)
+            ctx.beginPath();
+            ctx.moveTo(anvilFaceX - 5 * unit, centerY);
+            ctx.lineTo(anvilFaceX - 15 * unit, centerY);
+            ctx.arc(anvilFaceX - 15 * unit, centerY + 15 * unit, 15 * unit, 1.5 * Math.PI, 0.5 * Math.PI, true);
+            ctx.lineTo(sleeveLeftX + 5 * unit, centerY + 30 * unit);
+            ctx.lineTo(sleeveLeftX + 5 * unit, centerY + sleeveRadius);
+            
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 8 * unit;
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+            
+            // Frame inner detail
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 6 * unit;
+            ctx.stroke();
+        }
+
+        function drawSpindle(sleeveLeftX, sleeveRadius) {
+            const spindleFaceX = sleeveLeftX - 35 * unit + currentValue * unit;
+            const spindleRadius = 3 * unit;
+            
+            // Spindle rod
+            const gradient = ctx.createLinearGradient(0, centerY - spindleRadius, 0, centerY + spindleRadius);
+            gradient.addColorStop(0, '#cbd5e1');
+            gradient.addColorStop(0.5, '#f8fafc');
+            gradient.addColorStop(1, '#94a3b8');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(spindleFaceX, centerY - spindleRadius, sleeveLeftX - spindleFaceX, spindleRadius * 2);
+            
+            // Spindle face line
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(spindleFaceX, centerY - spindleRadius, 2, spindleRadius * 2);
+        }
+
+        function drawSleeve(sleeveLeftX, sleeveRadius) {
+            const sleeveLength = 30 * unit; // Enough to show 25mm
+            
+            // Sleeve body
+            const gradient = ctx.createLinearGradient(0, centerY - sleeveRadius, 0, centerY + sleeveRadius);
+            gradient.addColorStop(0, '#94a3b8');
+            gradient.addColorStop(0.2, '#e2e8f0');
+            gradient.addColorStop(0.8, '#cbd5e1');
+            gradient.addColorStop(1, '#64748b');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(sleeveLeftX, centerY - sleeveRadius, sleeveLength, sleeveRadius * 2);
+
+            // Datum line (Central horizontal line)
+            ctx.beginPath();
+            ctx.moveTo(sleeveLeftX, centerY);
+            ctx.lineTo(sleeveLeftX + 26 * unit, centerY); // Draw slightly past 25mm
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Main scale ticks
+            ctx.fillStyle = '#0f172a';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.font = `bold ${unit * 1.2}px Arial`;
+
+            for (let i = 0; i <= 25; i++) {
+                const x = sleeveLeftX + i * unit;
+                
+                // Top ticks (Full mm)
+                ctx.beginPath();
+                ctx.moveTo(x, centerY);
+                let tickHeight = (i % 5 === 0) ? unit * 2.5 : unit * 1.5;
+                ctx.lineTo(x, centerY - tickHeight);
+                ctx.stroke();
+
+                // Numbers for full mm
+                if (i % 5 === 0) {
+                    ctx.fillText(i.toString(), x, centerY - tickHeight - 2);
+                }
+
+                // Bottom ticks (Half mm)
+                if (i < 25) {
+                    const halfX = x + 0.5 * unit;
+                    ctx.beginPath();
+                    ctx.moveTo(halfX, centerY);
+                    ctx.lineTo(halfX, centerY + unit * 1.5);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function drawThimble(sleeveLeftX, thimbleRadius) {
+            const thimbleX = sleeveLeftX + currentValue * unit;
+            const thimbleLength = 40 * unit;
+            const bevelWidth = 4 * unit;
+            
+            // 1. Thimble Body Polygon (including bevel)
+            ctx.beginPath();
+            ctx.moveTo(thimbleX, centerY - thimbleRadius * 0.8); // Bevel start top
+            ctx.lineTo(thimbleX + bevelWidth, centerY - thimbleRadius); // Bevel end top
+            ctx.lineTo(thimbleX + thimbleLength, centerY - thimbleRadius);
+            ctx.lineTo(thimbleX + thimbleLength, centerY + thimbleRadius);
+            ctx.lineTo(thimbleX + bevelWidth, centerY + thimbleRadius); // Bevel end bottom
+            ctx.lineTo(thimbleX, centerY + thimbleRadius * 0.8); // Bevel start bottom
+            ctx.closePath();
+
+            // Gradient for 3D cylinder effect
+            const gradient = ctx.createLinearGradient(0, centerY - thimbleRadius, 0, centerY + thimbleRadius);
+            gradient.addColorStop(0, '#64748b');
+            gradient.addColorStop(0.3, '#cbd5e1');
+            gradient.addColorStop(0.7, '#94a3b8');
+            gradient.addColorStop(1, '#475569');
+            
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            // Thimble edge line
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Knurling pattern (grips) on the right side
+            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+            ctx.lineWidth = 2;
+            for(let i = bevelWidth + 5 * unit; i < thimbleLength; i += unit) {
+                ctx.beginPath();
+                ctx.moveTo(thimbleX + i, centerY - thimbleRadius);
+                ctx.lineTo(thimbleX + i, centerY + thimbleRadius);
+                ctx.stroke();
+            }
+
+            // 2. Draw Rotating Scale on the bevel
+            // Calculate which mark is at the center line (0 degrees)
+            // 1 full rotation = 0.5mm = 50 marks.
+            // Value increases -> thimble moves right -> we turn it counter-clockwise (opening).
+            // Counter-clockwise means numbers below center move up to center.
+            // So numbers on thimble increase downwards.
+            
+            const thimbleValue = (currentValue % 0.5) * 100;
+            
+            ctx.fillStyle = '#0f172a';
+            ctx.strokeStyle = '#0f172a';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.font = `${unit * 1.2}px Arial`;
+
+            // Draw 50 marks around the cylinder
+            for (let i = 0; i < 50; i++) {
+                // Calculate angular distance from the center line
+                let diff = i - thimbleValue;
+                
+                // Wrap around shortest path (-25 to +25)
+                while (diff > 25) diff -= 50;
+                while (diff < -25) diff += 50;
+                
+                // Convert to angle (50 marks = 2*PI, so 1 mark = 2*PI/50 = PI/25)
+                // Positive diff means mark 'i' is larger than 'thimbleValue'
+                // Since numbers increase downwards, larger numbers should have positive angles (below center)
+                const angle = diff * (Math.PI / 25);
+                
+                // Only draw if it's on the front half of the cylinder (visible)
+                // Limit slightly more than PI/2 to avoid drawing on the exact edge where it looks messy
+                if (Math.abs(angle) < Math.PI / 2.2) {
+                    // Y position based on sine (projection of cylinder onto 2D plane)
+                    // Use the bevel radius for exact positioning
+                    const y = centerY + Math.sin(angle) * (thimbleRadius * 0.8);
+                    
+                    const isMajor = (i % 5 === 0);
+                    const tickLength = isMajor ? unit * 3 : unit * 1.5;
+                    
+                    ctx.beginPath();
+                    // Draw tick on the bevel
+                    ctx.moveTo(thimbleX, y);
+                    ctx.lineTo(thimbleX + tickLength, y);
+                    ctx.lineWidth = isMajor ? 1.5 : 1;
+                    ctx.stroke();
+                    
+                    // Draw text for major marks
+                    if (isMajor) {
+                        // Adjust X position slightly based on angle to follow the bevel contour
+                        const textX = thimbleX + tickLength + unit;
+                        
+                        // Squish text vertically near the edges for 3D perspective effect
+                        const scaleY = Math.cos(angle);
+                        
+                        ctx.save();
+                        ctx.translate(textX, y);
+                        ctx.scale(1, Math.max(0.3, scaleY)); // Don't squash completely to 0
+                        ctx.fillText(i.toString(), 0, 0);
+                        ctx.restore();
+                    }
+                }
+            }
+        }
+
+        // Initialize
+        resize();
+        updateDisplay();
+        
+        // Add touch/mouse drag support on canvas for fun (coarse adjustment)
+        let isDragging = false;
+        let lastX = 0;
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            lastX = e.clientX;
+        });
+        window.addEventListener('mouseup', () => isDragging = false);
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const deltaX = e.clientX - lastX;
+            // 1 pixel drag = roughly 0.01 mm change for finer control
+            adjustValue(deltaX * 0.01);
+            lastX = e.clientX;
+        });
+
+        // Touch equivalents
+        canvas.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            lastX = e.touches[0].clientX;
+        }, {passive: true});
+        window.addEventListener('touchend', () => isDragging = false);
+        window.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            const deltaX = e.touches[0].clientX - lastX;
+            adjustValue(deltaX * 0.01);
+            lastX = e.touches[0].clientX;
+        }, {passive: true});
+
+    </script>
+</body>
+</html>

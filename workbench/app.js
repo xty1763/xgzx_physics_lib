@@ -8,7 +8,7 @@
 (function () {
   "use strict";
 
-  const ASSET_V = 23;
+  const ASSET_V = 24;
   const PEP = window.PEP_TEXTBOOKS || [];
   const COURSE = window.COURSE || { books: [], resourceTypes: [] };
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev";
@@ -19,22 +19,11 @@
   // ---------- 状态 ----------
   const state = { bookId: null, chapterId: null, sectionId: null, cat: "all", secTag: "all", search: "", view: "grid", treeSearch: "" };
   const treeExpanded = new Set();
-  const OLD_BOOK_BY_PEP = { 0: "b1", 1: "b2", 2: "b3", 3: "b4", 4: "b5", 5: "b6" };
-  function pepToOld(bookId, chapterId, sectionId) {
-    const bi = PEP.findIndex((b) => b.id === bookId); const oldBook = OLD_BOOK_BY_PEP[bi];
-    if (!oldBook) return {};
-    const ob = COURSE.books.find((b) => b.id === oldBook); if (!ob) return { book: oldBook };
-    const pec = pepChapter(chapterId);
-    const och = (pec && ob.chapters.find((c) => norm(c.title) === norm(pec.title))) || ob.chapters[0];
-    const pes = pepSection(sectionId);
-    const osec = (pes && och && och.sections.find((s) => norm(s.title) === norm(pes.title))) || (och && och.sections[0]);
-    return { book: oldBook, chapter: och ? och.id : "", section: osec ? osec.id : "" };
-  }
-  function openUploadAtCurrent() { const o = pepToOld(state.bookId, state.chapterId, state.sectionId); openModal(null, o.book, o.chapter, o.section); }
+  function openUploadAtCurrent() { openModal(null, state.bookId, state.chapterId, state.sectionId); }
   function toggleExpandAll() {
-    const book = pepBook(state.bookId) || PEP[0];
+    const book = bookOf(state.bookId) || COURSE.books[0];
     const allOpen = book.chapters.every((c) => treeExpanded.has(c.id));
-    if (allOpen) treeExpanded.clear(); else book.chapters.forEach((c) => treeExpanded.add(c.id));
+    if (allOpen) treeExpanded.clear(); else { treeExpanded.add(state.chapterId); book.chapters.forEach((c) => treeExpanded.add(c.id)); }
     render();
   }
   let currentModule = "materials";
@@ -49,9 +38,14 @@
   const bookTitle = (id) => (COURSE.books.find((b) => b.id === id) || {}).title || "";
   const chapterTitle = (id) => { for (const b of COURSE.books) for (const c of b.chapters) if (c.id === id) return c.title; return ""; };
   const sectionTitle = (id) => { for (const b of COURSE.books) for (const c of b.chapters) { const s = c.sections.find((x) => x.id === id); if (s) return s.title; } return ""; };
-  const pepBook = (bid) => PEP.find((b) => b.id === bid);
-  const pepChapter = (cid) => { for (const b of PEP) for (const c of b.chapters) if (c.id === cid) return c; return null; };
-  const pepSection = (sid) => { for (const b of PEP) for (const c of b.chapters) { const s = c.sections.find((x) => x.id === sid); if (s) return s; } return null; };
+  const bookOf = (id) => COURSE.books.find((b) => b.id === id);
+  const courseChapter = (id) => { for (const b of COURSE.books) for (const c of b.chapters) if (c.id === id) return c; return null; };
+  const courseSection = (id) => { for (const b of COURSE.books) for (const c of b.chapters) { const s = c.sections.find((x) => x.id === id); if (s) return s; } return null; };
+  // 设计稿元信息索引：按“规范化小节名”匹配，给完整目录补 难度/课时/目标/核心概念/公式
+  const _pepByTitle = {};
+  (PEP || []).forEach((b) => b.chapters.forEach((c) => c.sections.forEach((s) => { const k = norm(s.title); if (k) _pepByTitle[k] = s; })));
+  function pepMeta(title) { return _pepByTitle[norm(title)] || null; }
+  function enrichSection(sec) { const m = pepMeta(sec && sec.title); return { sec: sec, diff: (m && m.difficulty) || "", hours: (m && m.hours) || "", target: (m && m.target) || "", concepts: (m && m.keyConcepts) || [], formulas: (m && m.formulas) || [] }; }
 
   function toast(msg, bad) {
     const c = $("#toast-container"); if (!c) return;
@@ -66,16 +60,9 @@
   function tagOf(type) { if (type === "教案") return "名校公开课"; if (type === "课件") return "动态课件"; if (type === "练习") return "分层作业"; if (type === "试卷") return "模拟试题"; if (type === "仿真资源") return "创新实验"; return "教学资源"; }
   const BOOK_IDX = { b1: 0, b2: 1, b3: 2, b4: 3, b5: 4, b6: 5 };
   function mapResource(r) {
-    const bi = BOOK_IDX[r.book]; if (bi == null) return null;
-    const db = PEP[bi]; if (!db) return null;
-    const ob = COURSE.books.find((b) => b.id === r.book) || COURSE.books[0];
-    const och = ob && (ob.chapters.find((c) => c.id === r.chapter) || ob.chapters[0]);
-    const osec = och && (och.sections.find((s) => s.id === r.section) || och.sections[0]);
-    const ch = (db.chapters.find((c) => och && norm(c.title) === norm(och.title))) || db.chapters[0];
-    const sec = (ch && osec && ch.sections.find((s) => norm(s.title) === norm(osec.title))) || (ch && ch.sections[0]);
     const ext = (r.url || "").split(".").pop().toLowerCase();
     return Object.assign({}, r, {
-      bookId: db.id, chapterId: ch.id, sectionId: sec ? sec.id : "",
+      bookId: r.book || "", chapterId: r.chapter || "", sectionId: r.section || "",
       pepKind: ext, category: categoryOf(r.type), tag: tagOf(r.type),
       keypoints: (r.tags && r.tags.length) ? r.tags.slice() : [String(r.title || "").replace(/\.[a-z0-9]+$/i, "")],
       downloads: 0, author: "物理教研组",
@@ -111,7 +98,7 @@
   function openPreview(s) {
     if (!s) return;
     previewId = s.id;
-    const sec = pepSection(s.sectionId);
+    const sec = courseSection(s.sectionId);
     const kps = (s.keypoints || []).length ? '<div class="key-concepts-chips">' + s.keypoints.slice(0, 8).map((k) => '<span class="concept-chip">🔹 ' + htmlEscape(k) + "</span>").join("") + "</div>" : "";
     $("#previewTitle").textContent = s.title || "资源详情";
     $("#previewBody").innerHTML = '<div class="file-tags-row" style="margin-bottom:12px;"><span class="tag-pill">' + htmlEscape(s.tag || "") + "</span><span class=\"tag-pill\">" + htmlEscape(s.category === "lesson" ? "教案" : s.category === "slide" ? "课件" : s.category === "exercise" ? "练习" : "实验") + '</span></div>' +
@@ -187,7 +174,6 @@
   function populateBookSelect() { const sel = $("#fBook"); sel.innerHTML = '<option value="">暂不分教材</option>'; COURSE.books.forEach((b) => { const o = document.createElement("option"); o.value = b.id; o.textContent = b.title; sel.appendChild(o); }); }
   function populateChapterSelect() { const sel = $("#fChapter"); sel.innerHTML = '<option value="">暂不选章</option>'; (bookOf($("#fBook").value) || {}).chapters.forEach((c) => { const o = document.createElement("option"); o.value = c.id; o.textContent = c.title; sel.appendChild(o); }); populateSectionSelect(); }
   function populateSectionSelect() { const sel = $("#fSection"); sel.innerHTML = '<option value="">未指定小节</option>'; if (isPaperType()) { sel.disabled = true; return; } const ch = (bookOf($("#fBook").value) || { chapters: [] }).chapters.find((c) => c.id === $("#fChapter").value); if (ch) ch.sections.forEach((s) => { const o = document.createElement("option"); o.value = s.id; o.textContent = s.title; sel.appendChild(o); }); }
-  function bookOf(bid) { return COURSE.books.find((b) => b.id === bid); }
   function refreshAdminUI() { const owner = !!getPublishToken(); const has = owner || !!getWorkerToken(); const u = $("#quick-add-btn"); if (u) u.style.display = has ? "" : "none"; const row = $("#adminLoggedInRow"); if (row) row.style.display = owner ? "block" : "none"; }
   function openModal(res, presetBook, presetChapter, presetSection) {
     editingId = res ? res.id : null; populateTypeSelect(); populateBookSelect();
@@ -329,15 +315,10 @@
   function openPreviewSet(s, isModule) { previewIsModule = !!isModule; openPreview(s); }
 
   function smartDefault() {
-    if (!state.bookId || !store.some((s) => s.bookId === state.bookId)) {
-      const b = PEP.find((x) => store.some((s) => s.bookId === x.id)) || PEP[0];
-      state.bookId = b ? b.id : PEP[0].id;
-    }
-    const book = pepBook(state.bookId) || PEP[0];
-    if (!state.chapterId || !store.some((s) => s.chapterId === state.chapterId)) {
-      const ch = book.chapters.find((c) => store.some((s) => s.chapterId === c.id)) || book.chapters[0];
-      state.chapterId = ch ? ch.id : book.chapters[0].id; state.sectionId = null;
-    }
+    if (!state.bookId || !resources.some((r) => r.book === state.bookId)) { const b = COURSE.books.find((x) => resources.some((r) => r.book === x.id)) || COURSE.books[0]; state.bookId = b ? b.id : COURSE.books[0].id; }
+    const book = bookOf(state.bookId) || COURSE.books[0];
+    if (!state.chapterId || !resources.some((r) => r.chapter === state.chapterId)) { const ch = book.chapters.find((c) => resources.some((r) => r.chapter === c.id)) || book.chapters[0]; state.chapterId = ch ? ch.id : book.chapters[0].id; state.sectionId = null; }
+    if (state.chapterId) treeExpanded.add(state.chapterId);
   }
 
   function bookCount(bookId) { return store.filter((s) => s.bookId === bookId).length; }
@@ -358,56 +339,62 @@
 
   function buildCard(s) {
     const r = show(s);
-    const sec = pepSection(s.sectionId);
+    const sec = courseSection(s.sectionId);
     let actions = "";
     if (getPublishToken()) actions = '<button class="btn btn-secondary btn-xs" data-act="edit" data-id="' + r.id + '">✏️ 编辑</button><button class="btn btn-secondary btn-xs" style="color:var(--accent-rose);" data-act="del" data-id="' + r.id + '">🗑 删除</button>';
     const kp = (s.keypoints || []).slice(0, 3).map((k) => '<span class="tag-pill">' + htmlEscape(k) + "</span>").join("");
-    return '<article class="pep-file-card" data-id="' + r.id + '">' +
+    const diff = (pepMeta(sec && sec.title) || {}).difficulty || "";
+    const catColor = { lesson: "#38bdf8", slide: "#f43f5e", exercise: "#10b981", experiment: "#8b5cf6" }[s.category] || "#38bdf8";
+    const catLabel = s.category === "lesson" ? "教案" : s.category === "slide" ? "课件" : s.category === "exercise" ? "练习" : "实验";
+    return '<article class="pep-file-card" data-id="' + r.id + '" style="border-left:3px solid ' + catColor + ';">' +
       '<div class="card-top-row">' + iconBadge(s.pepKind) +
-      '<div class="file-title-wrap"><div class="file-item-name">' + htmlEscape(r.title || "未命名资源") + '</div><span class="file-section-badge">' + htmlEscape(s.category === "lesson" ? "教案" : s.category === "slide" ? "课件" : s.category === "exercise" ? "练习" : "实验") + "</span>" + (kp ? '<div class="file-tags-row">' + kp + "</div>" : "") + "</div></div>" +
+      '<div class="file-title-wrap"><div class="file-item-name">' + htmlEscape(r.title || "未命名资源") + '</div><span class="file-section-badge" style="color:' + catColor + ';">' + catLabel + "</span>" + (kp ? '<div class="file-tags-row">' + kp + "</div>" : "") + "</div></div>" +
       (r.desc ? '<p style="font-size:12px;color:var(--text-muted);line-height:1.5;">' + htmlEscape(r.desc) + "</p>" : "<p></p>") +
-      '<div class="file-card-footer"><span class="section-badge">' + htmlEscape(s.tag || "") + " · " + htmlEscape((sec && sec.difficulty) || "") + '</span><div class="file-actions-row"><button class="btn btn-primary btn-xs" data-act="open" data-id="' + r.id + '">↗ 打开</button>' + actions + "</div></div>" +
+      '<div class="file-card-footer"><span class="section-badge">' + htmlEscape(s.tag || "") + " · " + htmlEscape(diff || (sec && sec.title) || "") + '</span><div class="file-actions-row"><button class="btn btn-primary btn-xs" data-act="open" data-id="' + r.id + '">↗ 打开</button>' + actions + "</div></div>" +
       "</article>";
   }
 
   function renderMaterials() {
     smartDefault();
-    const book = pepBook(state.bookId) || PEP[0];
-    const activeChapter = pepChapter(state.chapterId) || book.chapters[0];
+    const book = bookOf(state.bookId) || COURSE.books[0];
+    const activeChapter = courseChapter(state.chapterId) || book.chapters[0];
     if (state.sectionId && !activeChapter.sections.some((s) => s.id === state.sectionId)) state.sectionId = null;
     const vis = visibleStore();
 
     const catLabels = { all: "全部类型", lesson: "教案", slide: "课件", exercise: "练习", experiment: "实验" };
     const catBtns = '<div class="category-filter-group">' + Object.keys(catLabels).map((k) => '<button class="cat-btn' + (state.cat === k ? " active" : "") + '" data-cat="' + k + '">' + catLabels[k] + "</button>").join("") + '</div><div class="view-mode-group"><button class="view-btn' + (state.view === "grid" ? " active" : "") + '" data-view="grid">▦ 卡片</button><button class="view-btn' + (state.view === "list" ? " active" : "") + '" data-view="list">☰ 列表</button></div>';
 
+    const chHead = (ch) => { const code = (ch.title.match(/^第[一二三四五六七八九十]+章/) || [""])[0]; const tit = ch.title.replace(/^第[一二三四五六七八九十]+章\s*/, ""); return code ? code + " " + tit : tit; };
+    const secTitle = (s) => s.title;
     const treeHtml = book.chapters.map((ch) => {
-      const open = treeExpanded.has(ch.id) || ch.id === state.chapterId; const selCh = ch.id === state.chapterId;
+      const open = treeExpanded.has(ch.id); const selCh = ch.id === state.chapterId;
       let secs = ch.sections;
-      if (state.treeSearch.trim()) { const q = state.treeSearch.trim().toLowerCase(); secs = secs.filter((s) => (s.title + " " + s.code + " " + (s.keyConcepts || []).join(" ")).toLowerCase().indexOf(q) > -1); }
-      if (state.secTag === "core") secs = secs.filter((s) => /重点|核心考点|高考热点/.test(s.difficulty || ""));
-      else if (state.secTag === "exp") secs = secs.filter((s) => /实验|探究/.test(s.difficulty || ""));
-      else if (state.secTag === "hard") secs = secs.filter((s) => /难点|核心考点/.test(s.difficulty || ""));
-      return '<div class="chapter-node ' + (open ? "expanded" : "") + (selCh ? " selected-chapter" : "") + '"><div class="chapter-head" data-chapter-id="' + ch.id + '"><span class="chapter-toggle-icon">▶</span><div class="chapter-title-wrap"><div class="chapter-code-title"><span>' + ch.code + " " + ch.title + '</span></div><div class="chapter-meta"><span>' + ch.sections.length + "个小节</span><span class=\"chapter-count-tag\">" + chCount(ch.id) + "份</span></div></div></div>" +
+      if (state.treeSearch.trim()) { const q = state.treeSearch.trim().toLowerCase(); secs = secs.filter((s) => (s.title + " " + (enrichSection(s).concepts || []).join(" ")).toLowerCase().indexOf(q) > -1); }
+      if (state.secTag === "core") secs = secs.filter((s) => /重点|核心考点|高考热点/.test(enrichSection(s).diff || ""));
+      else if (state.secTag === "exp") secs = secs.filter((s) => /实验|探究/.test(enrichSection(s).diff || ""));
+      else if (state.secTag === "hard") secs = secs.filter((s) => /难点|核心考点/.test(enrichSection(s).diff || ""));
+      return '<div class="chapter-node ' + (open ? "expanded" : "") + (selCh ? " selected-chapter" : "") + '"><div class="chapter-head" data-chapter-id="' + ch.id + '"><span class="chapter-toggle-icon">▶</span><div class="chapter-title-wrap"><div class="chapter-code-title"><span>' + chHead(ch) + '</span></div><div class="chapter-meta"><span>' + ch.sections.length + "个小节</span><span class=\"chapter-count-tag\">" + chCount(ch.id) + "份</span></div></div></div>" +
         '<div class="section-list">' +
         '<div class="section-node' + (selCh && state.sectionId === null ? " active-section" : "") + '" data-chapter-id="' + ch.id + '" data-section-id=""><span class="section-bullet"></span><span class="section-title">📂 全章资源</span><span class="section-badge">' + chCount(ch.id) + "</span></div>" +
-        secs.map((s) => { const act = selCh && state.sectionId === s.id; return '<div class="section-node' + (act ? " active-section" : "") + '" data-chapter-id="' + ch.id + '" data-section-id="' + s.id + '"><span class="section-bullet"></span><span class="section-title">' + s.code + " " + s.title + '</span><span class="' + difficultyClass(s.difficulty) + '">' + s.difficulty + '</span><span class="section-badge">' + secCount(ch.id, s.id) + "</span></div>"; }).join("") +
+        secs.map((s) => { const act = selCh && state.sectionId === s.id; const d = enrichSection(s).diff; return '<div class="section-node' + (act ? " active-section" : "") + '" data-chapter-id="' + ch.id + '" data-section-id="' + s.id + '"><span class="section-bullet"></span><span class="section-title">' + secTitle(s) + '</span>' + (d ? '<span class="' + difficultyClass(d) + '">' + d + "</span>" : "") + '<span class="section-badge">' + secCount(ch.id, s.id) + "</span></div>"; }).join("") +
         "</div></div>";
     }).join("");
 
-    const activeSec = state.sectionId ? pepSection(state.sectionId) : null;
-    const overview = '<div class="section-overview-card"><div class="section-path-nav"><div class="section-path-crumbs"><span>人教版高中物理</span><span>&gt;</span><span>' + book.name + '</span><span>&gt;</span><span>' + activeChapter.code + " " + activeChapter.title + '</span>' + (activeSec ? '<span>&gt;</span><strong>' + activeSec.code + " " + activeSec.title + "</strong>" : '<span>&gt;</span><strong>(全章汇总)</strong>') + '</div></div>' +
-      '<div class="section-overview-main"><div class="section-heading-block"><h2><span>' + (activeSec ? activeSec.code + "：" + activeSec.title : activeChapter.code + "：" + activeChapter.title) + '</span><span class="section-highlight-badge">' + (activeSec ? activeSec.difficulty : "共" + activeChapter.sections.length + "小节") + '</span></h2><div class="section-meta-row"><div class="section-meta-item"><span>课时建议:</span><strong>' + (activeSec ? activeSec.hours : "8-10课时") + "</strong></div><div class=\"section-meta-item\"><span>所属大单元:</span><strong>" + book.name + " · " + activeChapter.title + '</strong></div><div class="section-meta-item"><span>当前范围资源:</span><strong style="color:var(--primary);">' + vis.length + " 份</strong></div></div></div></div>" +
-      '<div class="section-teaching-targets"><div class="target-title"><span>🎯</span><span>小节课标要求与素养导向：</span></div><div class="target-desc">' + ((activeSec && activeSec.target) || activeChapter.desc || "") + '</div>' + (activeSec ? '<div class="key-concepts-chips"><span style="font-size:11px;color:var(--text-dim);margin-right:4px;">核心概念:</span>' + (activeSec.keyConcepts || []).map((kc) => '<span class="concept-chip">🔹 ' + htmlEscape(kc) + "</span>").join("") + (activeSec.formulas || []).map((f) => '<span class="formula-badge">📐 ' + htmlEscape(f) + "</span>").join("") + "</div>" : "") + "</div></div>";
+    const activeSec = state.sectionId ? courseSection(state.sectionId) : null;
+    const enr = enrichSection(activeSec);
+    const overview = '<div class="section-overview-card"><div class="section-path-nav"><div class="section-path-crumbs"><span>人教版高中物理</span><span>&gt;</span><span>' + book.title + '</span><span>&gt;</span><span>' + activeChapter.title + '</span>' + (activeSec ? '<span>&gt;</span><strong>' + activeSec.title + "</strong>" : '<span>&gt;</span><strong>(全章汇总)</strong>') + '</div></div>' +
+      '<div class="section-overview-main"><div class="section-heading-block"><h2><span>' + (activeSec ? activeSec.title : activeChapter.title) + '</span><span class="section-highlight-badge">' + (enr.diff || "共" + activeChapter.sections.length + "小节") + '</span></h2><div class="section-meta-row"><div class="section-meta-item"><span>课时建议:</span><strong>' + (enr.hours || "—") + "</strong></div><div class=\"section-meta-item\"><span>所属大单元:</span><strong>" + book.title + " · " + activeChapter.title + '</strong></div><div class="section-meta-item"><span>当前范围资源:</span><strong style="color:var(--primary);">' + vis.length + " 份</strong></div></div></div></div>" +
+      '<div class="section-teaching-targets"><div class="target-title"><span>🎯</span><span>小节课标要求与素养导向：</span></div><div class="target-desc">' + ((enr.target || activeChapter.desc) || "") + '</div>' + (enr.concepts.length ? '<div class="key-concepts-chips"><span style="font-size:11px;color:var(--text-dim);margin-right:4px;">核心概念:</span>' + enr.concepts.map((kc) => '<span class="concept-chip">🔹 ' + htmlEscape(kc) + "</span>").join("") + enr.formulas.map((f) => '<span class="formula-badge">📐 ' + htmlEscape(f) + "</span>").join("") + "</div>" : "") + "</div></div>";
 
-    const uploadZone = '<div class="chapter-upload-zone" id="chapter-dropzone"><div class="upload-zone-left"><div class="upload-zone-icon"><span>📤</span></div><div class="upload-zone-text"><h4>精准上传教学材料至当前【' + (activeSec ? activeSec.code + " " + activeSec.title : activeChapter.code) + '】</h4><p>支持 HTML/PDF/Word/PPT/Excel/图片/视频/压缩包，保存即发布到线上并登记到资源清单。</p></div></div><div class="upload-zone-right"><button class="btn btn-primary btn-sm" id="btn-open-upload-modal"><span>+ 精准上传到本节</span></button></div></div>';
+    const uploadZone = '<div class="chapter-upload-zone" id="chapter-dropzone"><div class="upload-zone-left"><div class="upload-zone-icon"><span>📤</span></div><div class="upload-zone-text"><h4>精准上传教学材料至当前【' + (activeSec ? activeSec.title : activeChapter.title) + '】</h4><p>支持 HTML/PDF/Word/PPT/Excel/图片/视频/压缩包，保存即发布到线上并登记到资源清单。</p></div></div><div class="upload-zone-right"><button class="btn btn-primary btn-sm" id="btn-open-upload-modal"><span>+ 精准上传到本节</span></button></div></div>';
 
-    const sc = '<div class="section-node' + (state.secTag === "all" ? " active-section" : "") + '" data-sec-tag="all">全部小节</div>';
     const cardsHtml = state.view === "grid" ? '<div class="pep-files-grid">' + (vis.length ? vis.map(buildCard).join("") : emptyHtml()) + "</div>" : buildTable(vis);
 
     const allExpanded = book.chapters.length && book.chapters.every((c) => treeExpanded.has(c.id));
     const treeSearchEsc = (state.treeSearch || "").replace(/"/g, "&quot;");
+    const bookBadge = (t) => t.replace(/必修|选择性|册/g, "").slice(0, 2);
     $("#content-viewport").innerHTML = '<div class="pep-module-wrap">' +
-      '<div class="pep-book-tabs">' + PEP.map((b) => '<button class="pep-book-tab' + (b.id === state.bookId ? " active" : "") + '" data-book-id="' + b.id + '"><span class="book-tab-badge">' + b.shortName.replace(/必修|选择性|册/g, "").slice(0, 2) + '</span><div class="book-tab-info"><span class="book-tab-title">' + b.name + '</span><span class="book-tab-sub">' + b.chapters.reduce((x, c) => x + c.sections.length, 0) + "小节 (" + bookCount(b.id) + "份)</span></div></button>").join("") + "</div>" +
+      '<div class="pep-book-tabs">' + COURSE.books.map((b) => '<button class="pep-book-tab' + (b.id === state.bookId ? " active" : "") + '" data-book-id="' + b.id + '"><span class="book-tab-badge">' + bookBadge(b.title) + '</span><div class="book-tab-info"><span class="book-tab-title">' + b.title + '</span><span class="book-tab-sub">' + b.chapters.reduce((x, c) => x + c.sections.length, 0) + "小节 (" + bookCount(b.id) + "份)</span></div></button>").join("") + "</div>" +
       '<div class="pep-main-layout"><div class="pep-tree-panel"><div class="tree-header"><div class="tree-title-row"><span>📂</span><h3>教材小节精准目录</h3></div><div style="display:flex;gap:4px;"><button class="btn btn-secondary btn-xs" id="btn-expand-all' + '" title="全部展开/收起">' + (allExpanded ? "收起" : "展开") + '</button></div></div>' +
       '<div class="tree-search-wrap"><span class="tree-search-icon">🔍</span><input type="text" id="tree-filter-input" placeholder="输入小节名/考点检索..." value="' + treeSearchEsc + '" /></div>' +
       '<div class="tree-filter-pills"><button class="tree-filter-pill ' + (state.secTag === "all" ? "active" : "") + '" data-sec-tag="all">全部小节</button><button class="tree-filter-pill ' + (state.secTag === "core" ? "active" : "") + '" data-sec-tag="core">重点/热点</button><button class="tree-filter-pill ' + (state.secTag === "exp" ? "active" : "") + '" data-sec-tag="exp">实验探究</button><button class="tree-filter-pill ' + (state.secTag === "hard" ? "active" : "") + '" data-sec-tag="hard">核心难点</button></div>' +
@@ -415,7 +402,7 @@
       '<div class="pep-content-panel">' + overview + uploadZone + '<div class="pep-toolbar">' + catBtns + "</div><div class=\"pep-files-container\">" + cardsHtml + "</div></div></div></div>";
   }
   function emptyHtml() { return '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-dim);"><div style="font-size:40px;margin-bottom:10px;">🗂️</div><b>暂无匹配的资源</b><br/>试试调整搜索关键词或分类筛选。</div>'; }
-  function buildTable(list) { if (!list.length) return emptyHtml(); const rows = list.map((s) => { const r = show(s); const sec = pepSection(s.sectionId); let a = '<button class="btn btn-primary btn-xs" data-act="open" data-id="' + r.id + '">打开</button>'; if (getPublishToken()) a += '<button class="btn btn-secondary btn-xs" data-act="edit" data-id="' + r.id + '">编辑</button><button class="btn btn-secondary btn-xs" style="color:var(--accent-rose);" data-act="del" data-id="' + r.id + '">删除</button>'; return "<tr data-id='" + r.id + "'><td>" + htmlEscape(r.title || "") + "</td><td>" + htmlEscape(s.tag || "") + "</td><td>" + htmlEscape((sec && sec.title) || "") + "</td><td class=\"td-actions\">" + a + "</td></tr>"; }).join(""); return '<table class="pep-files-table"><thead><tr><th>资源名称</th><th>标签</th><th>所属小节</th><th>操作</th></tr></thead><tbody>' + rows + "</tbody></table>"; }
+  function buildTable(list) { if (!list.length) return emptyHtml(); const rows = list.map((s) => { const r = show(s); const sec = courseSection(s.sectionId); let a = '<button class="btn btn-primary btn-xs" data-act="open" data-id="' + r.id + '">打开</button>'; if (getPublishToken()) a += '<button class="btn btn-secondary btn-xs" data-act="edit" data-id="' + r.id + '">编辑</button><button class="btn btn-secondary btn-xs" style="color:var(--accent-rose);" data-act="del" data-id="' + r.id + '">删除</button>'; return "<tr data-id='" + r.id + "'><td>" + htmlEscape(r.title || "") + "</td><td>" + htmlEscape(s.tag || "") + "</td><td>" + htmlEscape((sec && sec.title) || "") + "</td><td class=\"td-actions\">" + a + "</td></tr>"; }).join(""); return '<table class="pep-files-table"><thead><tr><th>资源名称</th><th>标签</th><th>所属小节</th><th>操作</th></tr></thead><tbody>' + rows + "</tbody></table>"; }
 
   function onTreeOrCardClick(e) {
     const b = e.target.closest(".pep-book-tab"); if (b) { state.bookId = b.getAttribute("data-book-id"); state.chapterId = null; state.sectionId = null; treeExpanded.clear(); render(); return; }
@@ -455,5 +442,6 @@
 
   document.addEventListener("DOMContentLoaded", () => { const hm = /\bm=([a-z]+)/.exec((location.hash || "").replace(/^#/, "")); if (hm && MODULE_INFO[hm[1]]) currentModule = hm[1]; bindEvents(); refreshAdminUI(); render(); loadAll().catch((e) => toast("初始化失败：" + (e && e.message), true)); });
 })();
+
 
 

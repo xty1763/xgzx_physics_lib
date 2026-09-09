@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Boat Crossing River Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css">
+    <style>
+        * {
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0f172a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #p5-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        #ui-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 320px;
+            max-height: calc(100vh - 20px);
+            z-index: 10;
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow-y: auto;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .input-container {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button {  
+            opacity: 1;
+        }
+        .btn {
+            transition: all 0.2s;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        #stats-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+            background: rgba(15, 23, 42, 0.8);
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+        .legend-color {
+            width: 12px;
+            height: 4px;
+            border-radius: 2px;
+        }
+        
+        @media (max-width: 768px) {
+            #ui-panel {
+                top: auto;
+                bottom: 0;
+                right: 0;
+                width: 100%;
+                max-height: 45vh;
+                border-radius: 20px 20px 0 0;
+                border-bottom: none;
+                border-left: none;
+                border-right: none;
+            }
+            #stats-panel {
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body class="text-white">
+
+    <!-- Stats Panel -->
+    <div id="stats-panel" class="flex flex-col gap-1 shadow-lg">
+        <div class="font-bold text-lg text-blue-400 mb-1 border-b border-gray-600 pb-1">Telemetry</div>
+        <div class="flex justify-between gap-4"><span class="text-gray-400">Time (t):</span> <span id="stat-time" class="font-mono text-white">0.00 s</span></div>
+        <div class="flex justify-between gap-4"><span class="text-gray-400">Drift (x):</span> <span id="stat-drift" class="font-mono text-white">0.00 m</span></div>
+        <div class="flex justify-between gap-4"><span class="text-gray-400">V_total:</span> <span id="stat-vtotal" class="font-mono text-white">0.00 m/s</span></div>
+        
+        <div class="mt-2 pt-2 border-t border-gray-600 flex flex-col gap-1">
+            <div class="legend-item"><div class="legend-color bg-red-500"></div> V_boat (relative to water)</div>
+            <div class="legend-item"><div class="legend-color bg-blue-500"></div> V_water</div>
+            <div class="legend-item"><div class="legend-color bg-green-500"></div> V_total (relative to bank)</div>
+        </div>
+    </div>
+
+    <!-- UI Controls -->
+    <div id="ui-panel" class="p-5 flex flex-col gap-4">
+        <h1 class="text-xl font-bold text-center border-b border-gray-700 pb-3 mb-2 flex items-center justify-center gap-2">
+            <i class="fa-solid fa-ship text-blue-400"></i> Physics Engine
+        </h1>
+
+        <!-- Controls -->
+        <div class="grid grid-cols-3 gap-2 mb-2">
+            <button id="btn-play" class="btn bg-blue-600 hover:bg-blue-500 text-white py-2 px-2 rounded font-semibold text-sm flex flex-col items-center justify-center gap-1">
+                <i class="fa-solid fa-play"></i> Play
+            </button>
+            <button id="btn-pause" class="btn bg-amber-600 hover:bg-amber-500 text-white py-2 px-2 rounded font-semibold text-sm flex flex-col items-center justify-center gap-1">
+                <i class="fa-solid fa-pause"></i> Pause
+            </button>
+            <button id="btn-reset" class="btn bg-gray-600 hover:bg-gray-500 text-white py-2 px-2 rounded font-semibold text-sm flex flex-col items-center justify-center gap-1">
+                <i class="fa-solid fa-rotate-left"></i> Reset
+            </button>
+        </div>
+
+        <!-- Presets -->
+        <div class="grid grid-cols-2 gap-2 mb-2">
+            <button id="btn-short-time" class="btn bg-indigo-600/50 hover:bg-indigo-500/80 border border-indigo-500 text-white py-2 px-2 rounded text-xs font-semibold">
+                Shortest Time
+            </button>
+            <button id="btn-short-dist" class="btn bg-teal-600/50 hover:bg-teal-500/80 border border-teal-500 text-white py-2 px-2 rounded text-xs font-semibold">
+                Shortest Distance
+            </button>
+        </div>
+
+        <!-- Number Inputs & Modes -->
+        <div class="input-container">
+            <label class="text-sm text-gray-300">Water Velocity Mode</label>
+            <select id="sel-water-mode" class="w-full bg-slate-700 text-white rounded p-1.5 text-sm border border-slate-600 focus:outline-none focus:border-blue-500">
+                <option value="constant">Constant Velocity</option>
+                <option value="accelerated">Uniform Acceleration</option>
+                <option value="parabolic">Center-Fast (Parabolic)</option>
+            </select>
+        </div>
+
+        <div id="mode-constant" class="input-container">
+            <label class="text-sm text-blue-300">Water Speed (V_w, m/s)</label>
+            <input type="number" id="input-vw" value="2.0" step="0.1" class="w-full bg-slate-700 text-white rounded p-1.5 text-sm border border-slate-600 focus:outline-none focus:border-blue-500">
+        </div>
+
+        <div id="mode-accelerated" class="hidden grid grid-cols-2 gap-2 mb-2">
+            <div class="input-container mb-0">
+                <label class="text-sm text-blue-300">Initial V_w (m/s)</label>
+                <input type="number" id="input-vw0" value="1.0" step="0.1" class="w-full bg-slate-700 text-white rounded p-1.5 text-sm border border-slate-600 focus:outline-none focus:border-blue-500">
+            </div>
+            <div class="input-container mb-0">
+                <label class="text-sm text-blue-300">Accel (m/s²)</label>
+                <input type="number" id="input-aw" value="0.5" step="0.1" class="w-full bg-slate-700 text-white rounded p-1.5 text-sm border border-slate-600 focus:outline-none focus:border-blue-500">
+            </div>
+        </div>
+
+        <div id="mode-parabolic" class="hidden input-container">
+            <label class="text-sm text-blue-300">Center Max Speed (m/s)</label>
+            <input type="number" id="input-vwmax" value="5.0" step="0.1" class="w-full bg-slate-700 text-white rounded p-1.5 text-sm border border-slate-600 focus:outline-none focus:border-blue-500">
+        </div>
+
+        <hr class="border-gray-600 my-1">
+
+        <div class="grid grid-cols-2 gap-2">
+            <div class="input-container mb-0">
+                <label class="text-sm text-red-300">Boat Speed (V_b)</label>
+                <input type="number" id="input-vb" value="4.0" step="0.1" class="w-full bg-slate-700 text-white rounded p-1.5 text-sm border border-slate-600 focus:outline-none focus:border-blue-500">
+            </div>
+            <div class="input-container mb-0">
+                <label class="text-sm text-purple-300">Angle (-90 to 90)</label>
+                <input type="number" id="input-angle" value="0" step="1" class="w-full bg-slate-700 text-white rounded p-1.5 text-sm border border-slate-600 focus:outline-none focus:border-blue-500">
+            </div>
+            <div class="input-container mb-0">
+                <label class="text-sm text-gray-300">River Width (m)</label>
+                <input type="number" id="input-width" value="100" step="5" class="w-full bg-slate-700 text-white rounded p-1.5 text-sm border border-slate-600 focus:outline-none focus:border-blue-500">
+            </div>
+            <div class="input-container mb-0">
+                <label class="text-sm text-gray-300">Boat Length (m)</label>
+                <input type="number" id="input-length" value="10" step="1" class="w-full bg-slate-700 text-white rounded p-1.5 text-sm border border-slate-600 focus:outline-none focus:border-blue-500">
+            </div>
+        </div>
+    </div>
+
+    <div id="p5-container"></div>
+
+    <script>
+        // Physics & Simulation State
+        let simState = 0; // 0: Ready, 1: Playing, 2: Finished
+        let t = 0;
+        let boatPos = {x: 0, y: 0};
+        let path = [];
+        let waterParticles = [];
+        
+        // Parameters
+        let waterMode = 'constant';
+        let Vw_const, Vw0, Aw, Vw_max;
+        let Vb, angleDeg, riverWidth, boatLength;
+        let scaleFactor = 3; // pixels per meter
+        let bottomBankY;
+        let startX;
+        let cameraOffsetX = 0;
+
+        // UI Elements
+        const elWaterMode = document.getElementById('sel-water-mode');
+        const elVw = document.getElementById('input-vw');
+        const elVw0 = document.getElementById('input-vw0');
+        const elAw = document.getElementById('input-aw');
+        const elVwMax = document.getElementById('input-vwmax');
+        const elVb = document.getElementById('input-vb');
+        const elAngle = document.getElementById('input-angle');
+        const elWidth = document.getElementById('input-width');
+        const elLength = document.getElementById('input-length');
+
+        const divModeConstant = document.getElementById('mode-constant');
+        const divModeAccelerated = document.getElementById('mode-accelerated');
+        const divModeParabolic = document.getElementById('mode-parabolic');
+
+        const statTime = document.getElementById('stat-time');
+        const statDrift = document.getElementById('stat-drift');
+        const statVtotal = document.getElementById('stat-vtotal');
+
+        function setup() {
+            let canvas = createCanvas(windowWidth, windowHeight);
+            canvas.parent('p5-container');
+            
+            // Initialize random but evenly distributed water waves
+            for(let i=0; i<180; i++) {
+                waterParticles.push({
+                    x: random(-1000, 3000),
+                    yNorm: random(0.02, 0.98), // normalized river width
+                    speedOffset: 1.0, // Keep speed matching physics exactly
+                    length: random(25, 55), // Random length around an average
+                    phase: random(0, TWO_PI), // Random individual phase
+                    amp: random(1.5, 3.5) // Random amplitude around an average
+                });
+            }
+
+            // Bind UI Events
+            document.getElementById('btn-play').addEventListener('click', () => { if(simState === 0) resetSim(); simState = 1; });
+            document.getElementById('btn-pause').addEventListener('click', () => { if(simState === 1) simState = 0; });
+            document.getElementById('btn-reset').addEventListener('click', resetSim);
+
+            elWaterMode.addEventListener('change', (e) => {
+                waterMode = e.target.value;
+                divModeConstant.classList.add('hidden');
+                divModeAccelerated.classList.add('hidden');
+                divModeParabolic.classList.add('hidden');
+                if (waterMode === 'constant') divModeConstant.classList.remove('hidden');
+                if (waterMode === 'accelerated') divModeAccelerated.classList.remove('hidden');
+                if (waterMode === 'parabolic') divModeParabolic.classList.remove('hidden');
+                if(simState === 0 || simState === 2) resetSim();
+            });
+
+            document.getElementById('btn-short-time').addEventListener('click', () => {
+                elAngle.value = 0;
+                if(simState !== 1) resetSim();
+            });
+
+            document.getElementById('btn-short-dist').addEventListener('click', () => {
+                readParams();
+                if (Vb === 0) return;
+                
+                let effectiveVw = Vw_const;
+                if (waterMode === 'accelerated') effectiveVw = Vw0;
+                if (waterMode === 'parabolic') effectiveVw = Vw_max * 0.66; // rough average for parabolic
+                
+                let optAngle = 0;
+                if (Vb >= effectiveVw) {
+                    optAngle = -degrees(asin(effectiveVw / Vb));
+                } else {
+                    optAngle = -degrees(asin(Vb / effectiveVw));
+                }
+                elAngle.value = Math.round(optAngle);
+                if(simState !== 1) resetSim();
+            });
+
+            // Add listeners to inputs to reset if not playing
+            [elVw, elVw0, elAw, elVwMax, elVb, elAngle, elWidth, elLength].forEach(el => {
+                el.addEventListener('input', () => {
+                    if(simState === 0 || simState === 2) resetSim();
+                });
+            });
+
+            resetSim();
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+            if(simState === 0 || simState === 2) resetSim();
+        }
+
+        function readParams() {
+            waterMode = elWaterMode.value;
+            Vw_const = parseFloat(elVw.value) || 0;
+            Vw0 = parseFloat(elVw0.value) || 0;
+            Aw = parseFloat(elAw.value) || 0;
+            Vw_max = parseFloat(elVwMax.value) || 0;
+            Vb = parseFloat(elVb.value) || 0;
+            angleDeg = parseFloat(elAngle.value) || 0;
+            riverWidth = parseFloat(elWidth.value) || 100;
+            boatLength = parseFloat(elLength.value) || 10;
+        }
+
+        function getCurrentVw(y_pos, current_t) {
+            if (waterMode === 'constant') {
+                return Vw_const;
+            } else if (waterMode === 'accelerated') {
+                return Vw0 + Aw * current_t;
+            } else if (waterMode === 'parabolic') {
+                let dist = bottomBankY - y_pos;
+                let u = dist / (riverWidth * scaleFactor);
+                if (u < 0) u = 0;
+                if (u > 1) u = 1;
+                return 4 * Vw_max * u * (1 - u);
+            }
+            return 0;
+        }
+
+        function resetSim() {
+            readParams();
+            t = 0;
+            path = [];
+            simState = 0;
+            
+            // Adjust scale factor based on screen and river width to ensure it fits vertically
+            let availableHeight = height * 0.7; // Leave room for UI on mobile
+            if (windowWidth > 768) availableHeight = height * 0.8;
+            
+            scaleFactor = availableHeight / (riverWidth + 40); // 40 is margin
+            if (scaleFactor > 8) scaleFactor = 8;
+            if (scaleFactor < 1) scaleFactor = 1;
+
+            bottomBankY = height * 0.85;
+            if (windowWidth <= 768) bottomBankY = height * 0.55; // Higher on mobile to avoid UI overlap
+
+            startX = width * 0.2;
+            boatPos = { x: startX, y: bottomBankY };
+            cameraOffsetX = 0;
+            
+            updateStats(0, 0, 0);
+        }
+
+        function updatePhysics() {
+            if (simState !== 1) return;
+
+            let angleRad = radians(angleDeg);
+            
+            let currentVw = getCurrentVw(boatPos.y, t);
+
+            // Velocity components
+            let V_bx = Vb * sin(angleRad);
+            let V_by = -Vb * cos(angleRad); // negative because y goes down in p5
+            
+            let V_tx = currentVw + V_bx;
+            let V_ty = V_by;
+
+            let dt = deltaTime / 1000; // time in seconds since last frame
+            if (dt > 0.1) dt = 0.1; // prevent huge jumps if tab is inactive
+
+            // Update position (physics space mapped to screen space)
+            boatPos.x += V_tx * dt * scaleFactor;
+            boatPos.y += V_ty * dt * scaleFactor;
+            t += dt;
+
+            // Record path
+            if (frameCount % 3 === 0) {
+                path.push({x: boatPos.x, y: boatPos.y});
+            }
+
+            // Calculate physics values for stats
+            let driftDistance = (boatPos.x - startX) / scaleFactor;
+            let vTotalMag = sqrt(V_tx*V_tx + V_ty*V_ty);
+            updateStats(t, driftDistance, vTotalMag);
+
+            // Check Finish condition
+            // The boat is considered finished when its front tip touches the top bank
+            let topBankY = bottomBankY - riverWidth * scaleFactor;
+            let tipY = boatPos.y - (boatLength/2) * cos(angleRad) * scaleFactor;
+            
+            if (tipY <= topBankY) {
+                simState = 2;
+                // For non-constant speeds, exact analytical finish time is complex, 
+                // so we rely on the frame-by-frame integration for drift.
+                let finalDrift = (boatPos.x - startX) / scaleFactor;
+                updateStats(t, finalDrift, vTotalMag);
+            }
+        }
+
+        function updateStats(time, drift, vtotal) {
+            statTime.innerText = time.toFixed(2) + " s";
+            statDrift.innerText = drift.toFixed(2) + " m";
+            statVtotal.innerText = vtotal.toFixed(2) + " m/s";
+        }
+
+        function draw() {
+            background('#0f172a');
+            
+            readParams();
+            updatePhysics();
+
+            // Camera follow logic
+            let targetCameraX = boatPos.x - startX;
+            if (targetCameraX > width * 0.4) {
+                cameraOffsetX = lerp(cameraOffsetX, targetCameraX - width * 0.4, 0.1);
+            } else if (targetCameraX < -width * 0.2) {
+                cameraOffsetX = lerp(cameraOffsetX, targetCameraX + width * 0.2, 0.1);
+            }
+
+            push();
+            translate(-cameraOffsetX, 0);
+
+            let topBankY = bottomBankY - riverWidth * scaleFactor;
+            let viewLeft = cameraOffsetX - 200;
+            let viewWidth = width + 400;
+
+            // Draw Land (Top Bank)
+            noStroke();
+            let topGrad = drawingContext.createLinearGradient(0, topBankY - 100, 0, topBankY);
+            topGrad.addColorStop(0, '#064e3b'); // Deep green
+            topGrad.addColorStop(0.85, '#15803d'); // Grass green
+            topGrad.addColorStop(1, '#eab308'); // Sandy shore
+            drawingContext.fillStyle = topGrad;
+            rect(viewLeft, topBankY - 2000, viewWidth, 2000);
+
+            // Draw Land (Bottom Bank)
+            let botGrad = drawingContext.createLinearGradient(0, bottomBankY, 0, bottomBankY + 100);
+            botGrad.addColorStop(0, '#eab308'); // Sandy shore
+            botGrad.addColorStop(0.15, '#15803d'); // Grass green
+            botGrad.addColorStop(1, '#064e3b'); // Deep green
+            drawingContext.fillStyle = botGrad;
+            rect(viewLeft, bottomBankY, viewWidth, 2000);
+
+            // Draw Water Area with Depth Gradient
+            let waterGrad = drawingContext.createLinearGradient(0, topBankY, 0, bottomBankY);
+            waterGrad.addColorStop(0, '#38bdf8'); // Shallow light blue
+            waterGrad.addColorStop(0.2, '#0284c7'); // Mid blue
+            waterGrad.addColorStop(0.5, '#0369a1'); // Deep blue center
+            waterGrad.addColorStop(0.8, '#0284c7'); // Mid blue
+            waterGrad.addColorStop(1, '#38bdf8'); // Shallow light blue
+            drawingContext.fillStyle = waterGrad;
+            rect(viewLeft, topBankY, viewWidth, riverWidth * scaleFactor);
+
+            // Draw Precise Physics Grid Over Water (Surveyor Style)
+            stroke('rgba(255, 255, 255, 0.15)');
+            strokeWeight(1);
+            let gridStep = 10 * scaleFactor;
+            let startGridX = floor(viewLeft / gridStep) * gridStep;
+            for(let x = startGridX; x <= viewLeft + viewWidth; x += gridStep) {
+                line(x, topBankY, x, bottomBankY);
+            }
+            for(let y = 0; y <= riverWidth; y += 10) {
+                let py = topBankY + y * scaleFactor;
+                line(viewLeft, py, viewLeft + viewWidth, py);
+            }
+
+            // Draw Water Flow Particles (Clean Streamlines)
+            stroke('rgba(255, 255, 255, 0.4)');
+            noFill();
+            strokeCap(ROUND);
+            for (let p of waterParticles) {
+                let py = topBankY + p.yNorm * (riverWidth * scaleFactor);
+                
+                // Animate particles based on local water speed
+                let localVw = getCurrentVw(py, simState === 1 ? t : 0);
+                let pSpeed = localVw * p.speedOffset * scaleFactor * (deltaTime/1000);
+                if (simState === 1) p.x += pSpeed;
+                else p.x += pSpeed * 0.2; // Slow movement when paused
+
+                // Wrap around smoothly
+                if (p.x > cameraOffsetX + width + 100) p.x = cameraOffsetX - 100;
+                if (p.x < cameraOffsetX - 100) p.x = cameraOffsetX + width + 100;
+
+                // Draw randomized but evenly distributed wave segment
+                strokeWeight(1.5);
+                beginShape();
+                let waveFreq = 0.15; 
+                
+                // Animate phase to create a gentle ripple effect
+                if (simState === 1) p.phase -= (deltaTime/1000) * 2;
+                else p.phase -= (deltaTime/1000) * 0.5;
+                
+                for (let lx = 0; lx <= p.length; lx += 2) {
+                    let wx = p.x + lx;
+                    // Decouple from global space, use local length (lx) and individual phase
+                    let wy = py + sin(lx * waveFreq + p.phase) * p.amp;
+                    vertex(wx, wy);
+                }
+                endShape();
+            }
+
+            // Draw Precise Markers on Banks
+            stroke('#f8fafc');
+            strokeWeight(2);
+            fill('#f8fafc');
+            textSize(11);
+            textAlign(CENTER, TOP);
+            
+            // Draw exact boundary lines
+            stroke('#fbbf24'); // Amber boundary line
+            line(viewLeft, topBankY, viewLeft + viewWidth, topBankY);
+            line(viewLeft, bottomBankY, viewLeft + viewWidth, bottomBankY);
+
+            stroke('#f8fafc');
+            for(let x = -500; x <= 2000; x += 50) {
+                let px = startX + x * scaleFactor;
+                // Bottom bank markers
+                line(px, bottomBankY, px, bottomBankY + 8);
+                // Top bank markers
+                line(px, topBankY, px, topBankY - 8);
+                
+                if (x % 100 === 0) {
+                    noStroke();
+                    text(x + "m", px, bottomBankY + 12);
+                    textAlign(CENTER, BOTTOM);
+                    text(x + "m", px, topBankY - 12);
+                    textAlign(CENTER, TOP);
+                    stroke('#f8fafc');
+                }
+            }
+
+            // Draw Start Line and Target Line
+            stroke(255, 255, 255, 100);
+            strokeWeight(1);
+            drawingContext.setLineDash([5, 5]);
+            line(startX, bottomBankY, startX, topBankY); // Perpendicular reference
+            drawingContext.setLineDash([]);
+
+            // Draw Path
+            noFill();
+            stroke('#fcd34d'); // Yellow path
+            strokeWeight(2);
+            beginShape();
+            for (let pt of path) {
+                vertex(pt.x, pt.y);
+            }
+            if (simState === 1) vertex(boatPos.x, boatPos.y);
+            endShape();
+
+            // Draw Boat
+            push();
+            translate(boatPos.x, boatPos.y);
+            rotate(radians(angleDeg));
+            
+            let bl = boatLength * scaleFactor;
+            let bw = bl * 0.4; // Boat width ratio
+
+            // Boat Shadow
+            drawingContext.shadowColor = 'rgba(0, 0, 0, 0.4)';
+            drawingContext.shadowBlur = 12;
+            drawingContext.shadowOffsetX = 4;
+            drawingContext.shadowOffsetY = 4;
+
+            // Hull
+            fill('#f8fafc');
+            stroke('#334155');
+            strokeWeight(2);
+            beginShape();
+            vertex(0, -bl/2); // Tip
+            vertex(bw/2, -bl/4);
+            vertex(bw/2, bl/2);
+            vertex(-bw/2, bl/2);
+            vertex(-bw/2, -bl/4);
+            endShape(CLOSE);
+
+            // Reset Shadow for other elements
+            drawingContext.shadowColor = 'transparent';
+            drawingContext.shadowBlur = 0;
+            drawingContext.shadowOffsetX = 0;
+            drawingContext.shadowOffsetY = 0;
+            
+            // Cabin
+            fill('#94a3b8');
+            noStroke();
+            rect(-bw/3, 0, bw*0.66, bl/3, 2);
+            pop();
+
+            // Draw Vectors
+            let currentVw = getCurrentVw(boatPos.y, t);
+            if (Vb > 0 || currentVw > 0) {
+                let angleRad = radians(angleDeg);
+                let vScale = 15; // Vector visual scale (pixels per m/s)
+                
+                let vbx_px = Vb * sin(angleRad) * vScale;
+                let vby_px = -Vb * cos(angleRad) * vScale;
+                let vwx_px = currentVw * vScale;
+                let vwy_px = 0;
+                
+                let vtx_px = vbx_px + vwx_px;
+                let vty_px = vby_px + vwy_px;
+
+                // Draw V_boat (Red)
+                drawArrow(boatPos.x, boatPos.y, vbx_px, vby_px, '#ef4444');
+                
+                // Draw V_water (Blue) - starting from tip of V_boat to show addition
+                drawArrow(boatPos.x + vbx_px, boatPos.y + vby_px, vwx_px, vwy_px, '#3b82f6');
+                
+                // Draw V_total (Green)
+                drawArrow(boatPos.x, boatPos.y, vtx_px, vty_px, '#22c55e');
+            }
+
+            pop(); // End translation
+
+            // Status Overlay
+            if (simState === 2) {
+                fill(0, 0, 0, 150);
+                rect(0, 0, width, height);
+                fill(255);
+                textAlign(CENTER, CENTER);
+                textSize(32);
+                text("Simulation Finished", width/2, height/2 - 20);
+                textSize(16);
+                fill('#94a3b8');
+                text(`Time: ${t.toFixed(2)}s | Drift: ${((boatPos.x - startX)/scaleFactor).toFixed(2)}m`, width/2, height/2 + 20);
+            }
+        }
+
+        function drawArrow(x, y, dx, dy, colorStr) {
+            let len = sqrt(dx*dx + dy*dy);
+            if (len < 0.1) return;
+            
+            push();
+            translate(x, y);
+            rotate(atan2(dy, dx));
+            
+            stroke(colorStr);
+            strokeWeight(3);
+            fill(colorStr);
+            
+            line(0, 0, len, 0);
+            
+            // Arrowhead
+            let arrowSize = min(8, len * 0.3);
+            translate(len, 0);
+            triangle(0, 0, -arrowSize, arrowSize/2, -arrowSize, -arrowSize/2);
+            pop();
+        }
+    </script>
+</body>
+</html>

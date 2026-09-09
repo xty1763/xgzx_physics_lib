@@ -2,12 +2,14 @@
   {
     "id": "r178876252931582voe",
     "title": "波的叠加",
-    "desc": "",
+    "desc": "探索波叠加原理，直观演示波动叠加现象。",
     "book": "b4",
     "chapter": "b4c3",
-    "section": "b4c3s1",
+    "section": "b4c3s4",
     "url": "pages/波的叠加.html",
-    "tags": [],
+    "tags": [
+      "波的叠加"
+    ],
     "type": "仿真资源"
   },
   {

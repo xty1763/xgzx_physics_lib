@@ -8,7 +8,7 @@
 (function () {
   "use strict";
 
-  const ASSET_V = 22;
+  const ASSET_V = 23;
   const PEP = window.PEP_TEXTBOOKS || [];
   const COURSE = window.COURSE || { books: [], resourceTypes: [] };
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev";
@@ -17,8 +17,26 @@
   const BASE_DIR = "workbench/";
 
   // ---------- 状态 ----------
-  const state = { bookId: null, chapterId: null, sectionId: null, cat: "all", secTag: "all", search: "", view: "grid" };
+  const state = { bookId: null, chapterId: null, sectionId: null, cat: "all", secTag: "all", search: "", view: "grid", treeSearch: "" };
   const treeExpanded = new Set();
+  const OLD_BOOK_BY_PEP = { 0: "b1", 1: "b2", 2: "b3", 3: "b4", 4: "b5", 5: "b6" };
+  function pepToOld(bookId, chapterId, sectionId) {
+    const bi = PEP.findIndex((b) => b.id === bookId); const oldBook = OLD_BOOK_BY_PEP[bi];
+    if (!oldBook) return {};
+    const ob = COURSE.books.find((b) => b.id === oldBook); if (!ob) return { book: oldBook };
+    const pec = pepChapter(chapterId);
+    const och = (pec && ob.chapters.find((c) => norm(c.title) === norm(pec.title))) || ob.chapters[0];
+    const pes = pepSection(sectionId);
+    const osec = (pes && och && och.sections.find((s) => norm(s.title) === norm(pes.title))) || (och && och.sections[0]);
+    return { book: oldBook, chapter: och ? och.id : "", section: osec ? osec.id : "" };
+  }
+  function openUploadAtCurrent() { const o = pepToOld(state.bookId, state.chapterId, state.sectionId); openModal(null, o.book, o.chapter, o.section); }
+  function toggleExpandAll() {
+    const book = pepBook(state.bookId) || PEP[0];
+    const allOpen = book.chapters.every((c) => treeExpanded.has(c.id));
+    if (allOpen) treeExpanded.clear(); else book.chapters.forEach((c) => treeExpanded.add(c.id));
+    render();
+  }
   let currentModule = "materials";
   let store = [];                 // 设计格式的资源(映射后)
   let resources = [];             // 原始 resources.json(旧模型)
@@ -171,10 +189,10 @@
   function populateSectionSelect() { const sel = $("#fSection"); sel.innerHTML = '<option value="">未指定小节</option>'; if (isPaperType()) { sel.disabled = true; return; } const ch = (bookOf($("#fBook").value) || { chapters: [] }).chapters.find((c) => c.id === $("#fChapter").value); if (ch) ch.sections.forEach((s) => { const o = document.createElement("option"); o.value = s.id; o.textContent = s.title; sel.appendChild(o); }); }
   function bookOf(bid) { return COURSE.books.find((b) => b.id === bid); }
   function refreshAdminUI() { const owner = !!getPublishToken(); const has = owner || !!getWorkerToken(); const u = $("#quick-add-btn"); if (u) u.style.display = has ? "" : "none"; const row = $("#adminLoggedInRow"); if (row) row.style.display = owner ? "block" : "none"; }
-  function openModal(res) {
+  function openModal(res, presetBook, presetChapter, presetSection) {
     editingId = res ? res.id : null; populateTypeSelect(); populateBookSelect();
     if (res) { $("#fTitle").value = res.title || ""; $("#fDesc").value = res.desc || ""; $("#fTags").value = (res.tags || []).join(" "); if (res.type) $("#fType").value = res.type; refreshTypeUI(); if (res.book) $("#fBook").value = res.book; populateChapterSelect(); if (res.chapter) $("#fChapter").value = res.chapter; populateSectionSelect(); if (res.section) $("#fSection").value = res.section; $("#modalTitle").textContent = "编辑资源"; $("#saveResource").textContent = "保存修改"; }
-    else { $("#fTitle").value = ""; $("#fDesc").value = ""; $("#fTags").value = ""; refreshTypeUI(); populateChapterSelect(); $("#modalTitle").textContent = "上传资源"; $("#saveResource").textContent = "保存资源"; }
+    else { $("#fTitle").value = ""; $("#fDesc").value = ""; $("#fTags").value = ""; refreshTypeUI(); populateChapterSelect(); if (presetBook) { $("#fBook").value = presetBook; populateChapterSelect(); } if (presetChapter) { $("#fChapter").value = presetChapter; populateSectionSelect(); } if (presetSection) $("#fSection").value = presetSection; $("#modalTitle").textContent = "上传资源"; $("#saveResource").textContent = "保存资源"; }
     clearPendingFile(); $("#modalMask").classList.remove("hidden"); setTimeout(() => $("#fTitle").focus(), 50);
   }
   function closeModal() { $("#modalMask").classList.add("hidden"); }
@@ -365,6 +383,7 @@
     const treeHtml = book.chapters.map((ch) => {
       const open = treeExpanded.has(ch.id) || ch.id === state.chapterId; const selCh = ch.id === state.chapterId;
       let secs = ch.sections;
+      if (state.treeSearch.trim()) { const q = state.treeSearch.trim().toLowerCase(); secs = secs.filter((s) => (s.title + " " + s.code + " " + (s.keyConcepts || []).join(" ")).toLowerCase().indexOf(q) > -1); }
       if (state.secTag === "core") secs = secs.filter((s) => /重点|核心考点|高考热点/.test(s.difficulty || ""));
       else if (state.secTag === "exp") secs = secs.filter((s) => /实验|探究/.test(s.difficulty || ""));
       else if (state.secTag === "hard") secs = secs.filter((s) => /难点|核心考点/.test(s.difficulty || ""));
@@ -385,9 +404,12 @@
     const sc = '<div class="section-node' + (state.secTag === "all" ? " active-section" : "") + '" data-sec-tag="all">全部小节</div>';
     const cardsHtml = state.view === "grid" ? '<div class="pep-files-grid">' + (vis.length ? vis.map(buildCard).join("") : emptyHtml()) + "</div>" : buildTable(vis);
 
+    const allExpanded = book.chapters.length && book.chapters.every((c) => treeExpanded.has(c.id));
+    const treeSearchEsc = (state.treeSearch || "").replace(/"/g, "&quot;");
     $("#content-viewport").innerHTML = '<div class="pep-module-wrap">' +
       '<div class="pep-book-tabs">' + PEP.map((b) => '<button class="pep-book-tab' + (b.id === state.bookId ? " active" : "") + '" data-book-id="' + b.id + '"><span class="book-tab-badge">' + b.shortName.replace(/必修|选择性|册/g, "").slice(0, 2) + '</span><div class="book-tab-info"><span class="book-tab-title">' + b.name + '</span><span class="book-tab-sub">' + b.chapters.reduce((x, c) => x + c.sections.length, 0) + "小节 (" + bookCount(b.id) + "份)</span></div></button>").join("") + "</div>" +
-      '<div class="pep-main-layout"><div class="pep-tree-panel"><div class="tree-header"><div class="tree-title-row"><span>📂</span><h3>教材小节精准目录</h3></div></div>' +
+      '<div class="pep-main-layout"><div class="pep-tree-panel"><div class="tree-header"><div class="tree-title-row"><span>📂</span><h3>教材小节精准目录</h3></div><div style="display:flex;gap:4px;"><button class="btn btn-secondary btn-xs" id="btn-expand-all' + '" title="全部展开/收起">' + (allExpanded ? "收起" : "展开") + '</button></div></div>' +
+      '<div class="tree-search-wrap"><span class="tree-search-icon">🔍</span><input type="text" id="tree-filter-input" placeholder="输入小节名/考点检索..." value="' + treeSearchEsc + '" /></div>' +
       '<div class="tree-filter-pills"><button class="tree-filter-pill ' + (state.secTag === "all" ? "active" : "") + '" data-sec-tag="all">全部小节</button><button class="tree-filter-pill ' + (state.secTag === "core" ? "active" : "") + '" data-sec-tag="core">重点/热点</button><button class="tree-filter-pill ' + (state.secTag === "exp" ? "active" : "") + '" data-sec-tag="exp">实验探究</button><button class="tree-filter-pill ' + (state.secTag === "hard" ? "active" : "") + '" data-sec-tag="hard">核心难点</button></div>' +
       '<div class="tree-nodes-container">' + treeHtml + "</div></div>" +
       '<div class="pep-content-panel">' + overview + uploadZone + '<div class="pep-toolbar">' + catBtns + "</div><div class=\"pep-files-container\">" + cardsHtml + "</div></div></div></div>";
@@ -405,7 +427,8 @@
     const card = e.target.closest(".pep-file-card");
     if (card && !e.target.closest("button")) { const s = store.find((x) => x.id === card.getAttribute("data-id")); if (s) openPreview(s); return; }
     const mf = e.target.closest("[data-modfile-open]"); if (mf) { openModuleFile(mf.getAttribute("data-modfile-open")); return; }
-    if (e.target.closest("#btn-open-upload-modal")) { openModal(); return; }
+    if (e.target.closest("#btn-expand-all")) { toggleExpandAll(); return; }
+    if (e.target.closest("#btn-open-upload-modal")) { openUploadAtCurrent(); return; }
   }
 
   function bindEvents() {
@@ -413,6 +436,7 @@
     let deb;
     $("#global-search").addEventListener("input", (e) => { clearTimeout(deb); deb = setTimeout(() => { state.search = e.target.value.trim(); render(); }, 150); });
     $("#content-viewport").addEventListener("click", onTreeOrCardClick);
+    $("#content-viewport").addEventListener("input", (e) => { if (e.target && e.target.id === "tree-filter-input") { state.treeSearch = e.target.value.trim(); render(); } });
     $("#quick-add-btn").onclick = () => openModal(); $("#btn-notifications").onclick = openAdminModal;
     $("#closeModal").onclick = closeModal; $("#cancelModal").onclick = closeModal; let mm = $("#modalMask"); if (mm) mm.addEventListener("click", (e) => { if (e.target === mm) closeModal(); });
     $("#fType").addEventListener("change", () => { refreshTypeUI(); populateSectionSelect(); });
@@ -431,4 +455,5 @@
 
   document.addEventListener("DOMContentLoaded", () => { const hm = /\bm=([a-z]+)/.exec((location.hash || "").replace(/^#/, "")); if (hm && MODULE_INFO[hm[1]]) currentModule = hm[1]; bindEvents(); refreshAdminUI(); render(); loadAll().catch((e) => toast("初始化失败：" + (e && e.message), true)); });
 })();
+
 

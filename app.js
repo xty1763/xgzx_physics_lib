@@ -1,100 +1,180 @@
 /*
- * 高中物理教师智能教学工作台 —— 应用逻辑
+ * 高中物理教学资源库 —— 前端逻辑
  * 依赖：data/course-data.js 提供 window.COURSE
  *       data/resources.json 提供资源清单（前端 fetch，前后端共用）
- * 界面为深色工作台：左侧 7 个模块导航，模块1=人教资源库（教材→章→节 + 文件卡片），模块2~7=建设中占位。
- * 上传/编辑/删除 走站长 GitHub 令牌直连；自动识别填表 + 资源助手 + 智能简介(可选大模型)。
  */
 (function () {
   "use strict";
 
   // ---------- 状态 ----------
-  const state = { book: null, chapter: null, section: null, search: "", type: "all" };
-  let currentModule = "materials";
-  let currentView = "grid";           // grid | list
-  let treeSearch = "";                // 目录树内的搜索
-  const openChapters = new Set();
-  let baseList = [];
-  let resources = [];
-  let uploadedList = [];             // 保留（历史 IndexedDB 上传），多数场景为空
-  const objUrlCache = {};
-  const previewUrls = {};            // 本会话刚保存的文件，可立刻打开
-  let pendingFile = null;
-  let editingId = null;
-  const ASSET_V = 20;
-  const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev";
+  const state = {
+    book: null,      // null=全部教材，或教材 id
+    chapter: null,   // null 或章节 id
+    section: null,   // null 或小节 id
+    search: "",
+    type: "all"      // "all" 或资源类型
+  };
+
+  const openBooks = new Set();       // 默认收起教材，点开后才展开，便于选择
+  const openChapters = new Set();    // 展开的章节
+  let baseList = [];                 // 当前展示的资源（清单 + 本地上传）
+  let resources = [];                // 资源清单（来自 data/resources.json，前端与后端共用）
+  let uploadedList = [];             // 本地上传（历史遗留，仅本地可见）
+  const objUrlCache = {};            // id -> objectURL（只在上传资源用）
+  const previewUrls = {};            // id -> objectURL（本会话刚保存的资源，可立刻打开，无需等 GitHub Pages）
+  let pendingFile = null;            // 当前选中的待上传文件
+  let editingId = null;              // 正在编辑的资源 id（null = 新增）
+  const ASSET_V = 19;                // 资源版本号（缓存破）
+  const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"; // 方案A 后端（Cloudflare Worker）
   const WORKER_TOKEN_KEY = "worker_token";
-  const TOKEN_KEY = "gh_publish_token";
+  const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
 
   const $ = (sel) => document.querySelector(sel);
-  const $$ = (sel) => Array.prototype.slice.call(document.querySelectorAll(sel));
+  const NAV_KEY = "nav_collapsed";
+
+  // 当前有效身份：优先“授权用户”(Worker 会话)，否则“站长”(GitHub 令牌)
+  function getWorkerToken() {
+    try { return localStorage.getItem(WORKER_TOKEN_KEY) || ""; } catch (e) { return ""; }
+  }
+  function setWorkerToken(t) { try { localStorage.setItem(WORKER_TOKEN_KEY, t); } catch (e) {} }
+  function clearWorkerToken() { try { localStorage.removeItem(WORKER_TOKEN_KEY); } catch (e) {} }
+  const canUpload = () => !!(getWorkerToken() || getPublishToken());
+
+  // 收起/展开左侧导航栏（记住偏好）
+  function applyNavState() {
+    const hidden = (function () {
+      try { return localStorage.getItem(NAV_KEY) === "1"; } catch (e) { return false; }
+    })();
+    document.querySelector(".layout").classList.toggle("no-sidebar", hidden);
+    const btn = $("#navToggle");
+    if (btn) btn.textContent = hidden ? "☰ 导航" : "☰";
+  }
 
   // ---------- 工具 ----------
   const bookOf = (id) => COURSE.books.find((b) => b.id === id);
   const allChapters = COURSE.books.reduce((acc, b) => acc.concat(b.chapters), []);
   const chapterOf = (id) => allChapters.find((c) => c.id === id);
-  const sectionOf = (id) => { for (const b of COURSE.books) for (const c of b.chapters) { const s = c.sections.find((x) => x.id === id); if (s) return s; } return null; };
+  const sectionOf = (id) => {
+    for (const b of COURSE.books) {
+      for (const c of b.chapters) {
+        const s = c.sections.find((x) => x.id === id);
+        if (s) return s;
+      }
+    }
+    return null;
+  };
   const bookTitle = (id) => (bookOf(id) || {}).title || "";
   const chapterTitle = (id) => (chapterOf(id) || {}).title || "";
   const sectionTitle = (id) => (sectionOf(id) || {}).title || "";
   const chaptersOfBook = (bookId) => (bookOf(bookId) || {}).chapters || [];
-  const bookOfChapter = (chapterId) => { for (const b of COURSE.books) for (const c of b.chapters) if (c.id === chapterId) return b.id; return null; };
+  const bookOfChapter = (chapterId) => {
+    for (const b of COURSE.books) for (const c of b.chapters) if (c.id === chapterId) return b.id;
+    return null;
+  };
 
-  let toastTimer;
   function toast(msg, bad) {
-    const c = $("#toast-container");
-    if (!c) return;
-    const t = document.createElement("div");
-    t.className = "toast-item";
-    t.innerHTML = '<span style="font-size:16px;">' + (bad ? "⚠️" : "✅") + "</span> <span>" + String(msg).replace(/[<>&]/g, (m) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[m])) + "</span>";
-    c.appendChild(t);
-    setTimeout(() => { t.style.opacity = "0"; t.style.transform = "translateX(40px)"; t.style.transition = "all .3s ease"; setTimeout(() => t.remove(), 300); }, 3200);
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.toggle("bad", !!bad);
+    t.classList.add("show");
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove("show"), 2600);
+  }
+
+  // ---------- IndexedDB ----------
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open("phys_resource_lib", 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains("uploads")) {
+          const store = db.createObjectStore("uploads", { keyPath: "id" });
+          store.createIndex("createdAt", "createdAt");
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function getAllUploads() {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("uploads", "readonly");
+      const req = tx.objectStore("uploads").getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function saveUpload(rec) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("uploads", "readwrite");
+      tx.objectStore("uploads").put(rec);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function deleteUpload(id) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("uploads", "readwrite");
+      tx.objectStore("uploads").delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
   }
 
   // ---------- 资源列表 ----------
   async function loadAll() {
+    // 即使 IndexedDB 不可用（如 file:// 预览），也要能渲染预置资源
+    let uploaded = [];
+    try {
+      uploaded = await getAllUploads();
+    } catch (e) {
+      uploaded = [];
+    }
+    // 拉取资源清单（JSON）；cache:no-store 避免浏览器缓存旧清单，导致保存后“不显示/被覆盖”
     try {
       const res = await fetch("data/resources.json?v=" + ASSET_V, { cache: "no-store" });
       if (!res.ok) throw new Error("加载清单失败");
       resources = await res.json();
       if (!Array.isArray(resources)) resources = [];
-    } catch (e) { resources = []; }
-    baseList = [...resources];
-    hydrateCounts();
+    } catch (e) {
+      resources = [];
+    }
+    uploadedList = uploaded;
+    baseList = [...resources, ...uploaded];
     render();
-    // 非阻塞地合并历史 IndexedDB 本地上传（多数为空，仅为兼容）
-    try {
-      const uploaded = await getAllUploads();
-      uploadedList = uploaded;
-      baseList = [...resources, ...uploadedList];
-      hydrateCounts();
-      render();
-    } catch (e) { /* 忽略 IndexedDB 异常 */ }
   }
 
-  function hydrateCounts() {
-    const sections = COURSE.books.reduce((a, b) => a + b.chapters.reduce((x, c) => x + c.sections.length, 0), 0);
-    const el = $("#stat-sections"); if (el) el.textContent = sections + "节";
-    const ef = $("#stat-files"); if (ef) ef.textContent = baseList.length + "份";
-    const em = $("#count-materials"); if (em) em.textContent = COURSE.books.length + "册 / " + baseList.length + "份";
+  function isUploaded(r) {
+    return Object.prototype.hasOwnProperty.call(r, "content");
   }
 
-  // 本会话刚保存的文件预览（管理员立刻可打开，无需等 GitHub Pages）
+  // 为上传资源生成可点击的 object URL（复用缓存）；本会话刚保存的资源优先用本地预览（无需等部署）
+  function openable(r) {
+    if (previewUrls[r.id]) return Object.assign({}, r, { url: previewUrls[r.id] });
+    if (r.url) return r;
+    if (isUploaded(r) && r.content) {
+      if (!objUrlCache[r.id]) {
+        objUrlCache[r.id] = URL.createObjectURL(
+          new Blob([r.content], { type: "text/html" })
+        );
+      }
+      return Object.assign({}, r, { url: objUrlCache[r.id] });
+    }
+    return r;
+  }
+
+  // 记录本会话刚保存的文件预览（管理员立刻可打开）
   function setPreview(id, blob) {
     if (!id || !blob) return;
     if (previewUrls[id]) { try { URL.revokeObjectURL(previewUrls[id]); } catch (e) {} }
     previewUrls[id] = URL.createObjectURL(blob);
   }
-  function openable(r) {
-    if (previewUrls[r.id]) return Object.assign({}, r, { url: previewUrls[r.id] });
-    if (r.url) return r;
-    if (isUploaded(r) && r.content) {
-      if (!objUrlCache[r.id]) objUrlCache[r.id] = URL.createObjectURL(new Blob([r.content], { type: "text/html" }));
-      return Object.assign({}, r, { url: objUrlCache[r.id] });
-    }
-    return r;
-  }
-  function isUploaded(r) { return Object.prototype.hasOwnProperty.call(r, "content"); }
 
   function visible() {
     let list = baseList;
@@ -102,78 +182,420 @@
     if (state.chapter) list = list.filter((r) => r.chapter === state.chapter);
     if (state.section) list = list.filter((r) => r.section === state.section);
     if (state.type !== "all") list = list.filter((r) => r.type === state.type);
+
     const q = state.search.trim().toLowerCase();
-    if (q) list = list.filter((r) => [r.title, r.desc, (r.tags || []).join(" "), bookTitle(r.book), chapterTitle(r.chapter), sectionTitle(r.section), r.type || ""].filter(Boolean).join(" ").toLowerCase().includes(q));
+    if (q) {
+      list = list.filter((r) => {
+        const hay = [
+          r.title,
+          r.desc,
+          (r.tags || []).join(" "),
+          bookTitle(r.book),
+          chapterTitle(r.chapter),
+          sectionTitle(r.section),
+          r.type || "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(q);
+      });
+    }
     return list;
   }
 
-  // ---------- IndexedDB（历史遗留本地上传，保持向后兼容） ----------
-  function openDB() {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open("phys_resource_lib", 1);
-      req.onupgradeneeded = () => { const db = req.result; if (!db.objectStoreNames.contains("uploads")) db.createObjectStore("uploads", { keyPath: "id" }); };
-      req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+  // 类型筛选项（全部类型 + COURSE.resourceTypes）
+  function typeOptions() {
+    return ["all"].concat(COURSE.resourceTypes || []);
+  }
+
+  // ---------- 渲染 ----------
+  function renderChapterNav() {
+    const wrap = $("#chapterNav");
+    wrap.innerHTML = "";
+
+    COURSE.books.forEach((book) => {
+      const bookCount = baseList.filter((r) => r.book === book.id).length;
+      const bookOpen = openBooks.has(book.id);
+      const bwrap = document.createElement("div");
+      bwrap.className = "book" + (bookOpen ? " is-open" : "");
+
+      const bhead = document.createElement("button");
+      bhead.className = "book-head";
+      bhead.type = "button";
+      bhead.innerHTML =
+        "<span>" + book.title + "</span>" +
+        "<span class='count'>" + bookCount + "</span>" +
+        "<span class='chev'>▶</span>";
+      bhead.onclick = () => {
+        // 点未选中的教材：选中它并展开章节；点已选中的教材：切换章节列表展开/收起
+        if (state.book !== book.id) {
+          state.book = book.id;
+          state.chapter = null;
+          state.section = null;
+          openBooks.add(book.id);
+        } else if (openBooks.has(book.id)) {
+          openBooks.delete(book.id);
+        } else {
+          openBooks.add(book.id);
+        }
+        render();
+      };
+      bwrap.appendChild(bhead);
+
+      const chWrap = document.createElement("div");
+      chWrap.className = "chapters";
+      book.chapters.forEach((ch) => {
+        const chCount = baseList.filter((r) => r.chapter === ch.id).length;
+        const chOpen = openChapters.has(ch.id);
+        const cwrap = document.createElement("div");
+        cwrap.className =
+          "chapter" + (state.chapter === ch.id ? " active" : "") + (chOpen ? " is-open" : "");
+
+        const chead = document.createElement("button");
+        chead.className = "chapter-head";
+        chead.type = "button";
+        chead.innerHTML =
+          "<span>" + (state.chapter === ch.id ? "📖 " : "") + ch.title + "</span>" +
+          "<span class='count'>" + chCount + "</span>" +
+          "<span class='chev'>▶</span>";
+        chead.onclick = () => {
+          // 点未选中的章节：选中它并展开小节；点已选中的章节：切换小节展开/收起
+          if (state.chapter !== ch.id) {
+            state.chapter = ch.id;
+            state.section = null;
+            if (state.book !== book.id) state.book = book.id;
+            openBooks.add(book.id);
+            openChapters.add(ch.id);
+          } else if (openChapters.has(ch.id)) {
+            openChapters.delete(ch.id);
+          } else {
+            openChapters.add(ch.id);
+          }
+          render();
+        };
+        cwrap.appendChild(chead);
+
+        const sec = document.createElement("div");
+        sec.className = "sections";
+        ch.sections.forEach((s) => {
+          const sbtn = document.createElement("button");
+          sbtn.className = "section" + (state.section === s.id ? " active" : "");
+          sbtn.type = "button";
+          sbtn.textContent = s.title;
+          sbtn.onclick = () => {
+            state.book = book.id;
+            state.chapter = ch.id;
+            state.section = s.id;
+            render();
+          };
+          sec.appendChild(sbtn);
+        });
+        cwrap.appendChild(sec);
+        chWrap.appendChild(cwrap);
+      });
+
+      bwrap.appendChild(chWrap);
+      wrap.appendChild(bwrap);
+    });
+
+    $(".nav-all").classList.toggle("active", !state.book && !state.chapter);
+  }
+
+  function renderCrumb() {
+    const n = visible().length;
+
+    const parts = [];
+    if (state.book) {
+      parts.push(bookTitle(state.book));
+      if (state.chapter) {
+        parts.push(chapterTitle(state.chapter));
+        if (state.section) parts.push(sectionTitle(state.section));
+      }
+    }
+    const title = parts.length ? parts.shift() : "全部资源";
+    const sub = parts.length ? " <small>/ " + parts.join(" / ") + "</small>" : "";
+    // 一并输出数量，避免依赖会被覆盖的 #count 元素
+    $("#crumb").innerHTML =
+      title + sub + ' <small class="crumb-count">' + n + " 个资源</small>";
+  }
+
+  function renderTypeFilters() {
+    const wrap = $("#typeFilter");
+    const opts = typeOptions();
+    const typeLabels = { all: "全部类型" };
+    wrap.innerHTML = "";
+    opts.forEach((t) => {
+      const b = document.createElement("button");
+      b.className = "chip" + (state.type === t ? " active" : "");
+      b.type = "button";
+      b.textContent = typeLabels[t] || t;
+      b.onclick = () => {
+        state.type = t;
+        render();
+      };
+      wrap.appendChild(b);
     });
   }
-  async function getAllUploads() {
-    const db = await openDB();
-    return new Promise((resolve, reject) => { const req = db.transaction("uploads", "readonly").objectStore("uploads").getAll(); req.onsuccess = () => resolve(req.result || []); req.onerror = () => reject(req.error); });
+
+  function buildCard(raw) {
+    const r = openable(raw);
+    const card = document.createElement("article");
+    card.className = "card";
+
+    const typeBadge =
+      '<span class="type' + (isUploaded(r) ? " uploaded" : "") + '">' +
+      (r.type || "资源") +
+      "</span>";
+
+    const metaParts = [];
+    if (bookTitle(r.book)) metaParts.push(bookTitle(r.book));
+    if (chapterTitle(r.chapter)) metaParts.push(chapterTitle(r.chapter));
+    if (r.section && sectionTitle(r.section)) metaParts.push(sectionTitle(r.section));
+    const meta =
+      '<div class="meta">' +
+      (metaParts.length
+        ? metaParts.map((p) => "<b>" + p + "</b>").join(" · ")
+        : "<b>未分教材</b>") +
+      "</div>";
+
+    const tags =
+      r.tags && r.tags.length
+        ? '<div class="tags">' +
+          r.tags.map((t) => '<span class="tag">' + t + "</span>").join("") +
+          "</div>"
+        : "";
+
+    card.innerHTML =
+      typeBadge +
+      "<h3>" +
+      (r.title || "未命名资源") +
+      "</h3>" +
+      (r.desc ? "<p>" + r.desc + "</p>" : "<p></p>") +
+      meta +
+      tags +
+      '<div class="open">↗ 打开资源</div>';
+
+    card.onclick = () => openResource(r);
+
+    // 仅管理员可见：编辑 / 删除
+    if (getPublishToken()) {
+      const actions = document.createElement("div");
+      actions.className = "card-actions";
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "btn ghost";
+      edit.textContent = "✏️ 编辑";
+      edit.onclick = (e) => {
+        e.stopPropagation();
+        openModal(r);
+      };
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "btn ghost danger";
+      del.textContent = "🗑 删除";
+      del.onclick = (e) => {
+        e.stopPropagation();
+        handleDelete(r);
+      };
+      actions.appendChild(edit);
+      actions.appendChild(del);
+      card.appendChild(actions);
+    }
+    return card;
+  }
+
+  async function handleDelete(r) {
+    if (!window.confirm("确定要删除资源「" + r.title + "」吗？这会从线上仓库移除。")) return;
+    try {
+      // 优先用站长 GitHub 令牌直连（国内可达、可靠）；仅授权老师(只有 Worker 令牌)才走 Worker
+      if (getPublishToken()) await deleteResource(r);
+      else if (getWorkerToken()) await workerDelete(r);
+      else throw new Error("请先登录（管理员或授权登录）");
+      toast("已删除");
+    } catch (e) {
+      toast("删除失败：" + e.message, true);
+    }
+  }
+
+  // 平铺渲染资源卡片；范围由左侧栏/类型/搜索决定（选择章节后只显示该章节内容）
+  function renderGrid() {
+    const grid = $("#grid");
+    const list = visible();
+    grid.innerHTML = "";
+
+    if (!list.length) {
+      const e = document.createElement("div");
+      e.className = "empty";
+      e.innerHTML = "<b>暂无匹配的资源</b><br/>试试调整搜索关键词或分类筛选。";
+      grid.appendChild(e);
+      return;
+    }
+
+    list.forEach((raw) => grid.appendChild(buildCard(raw)));
+  }
+
+  function render() {
+    renderChapterNav();
+    renderCrumb();
+    renderTypeFilters();
+    renderGrid();
   }
 
   function openResource(r) {
-    if (r && r.url) window.open(r.url, "_blank", "noopener"); else toast("该资源暂无可打开的地址", true);
+    if (r.url) {
+      window.open(r.url, "_blank", "noopener");
+    } else {
+      toast("该资源暂无可打开的地址", true);
+    }
+  }
+
+  async function removeUpload(r) {
+    if (!window.confirm("确定要删除上传资源「" + r.title + "」吗？")) return;
+    try {
+      await deleteUpload(r.id);
+      if (objUrlCache[r.id]) {
+        URL.revokeObjectURL(objUrlCache[r.id]);
+        delete objUrlCache[r.id];
+      }
+      await loadAll();
+      toast("已删除");
+    } catch (e) {
+      toast("删除失败：" + e.message, true);
+    }
   }
 
   // ---------- 在线发布（GitHub Contents API） ----------
-  const PUBLISH_OWNER = "xty1763", PUBLISH_REPO = "xgzx_physics_lib", PUBLISH_BRANCH = "main";
-  function getPublishToken() { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; } }
-  function setPublishToken(t) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} }
-  const getWorkerToken = () => { try { return localStorage.getItem(WORKER_TOKEN_KEY) || ""; } catch (e) { return ""; } };
+  const PUBLISH_OWNER = "xty1763";
+  const PUBLISH_REPO = "xgzx_physics_lib";
+  const PUBLISH_BRANCH = "main";
+  const TOKEN_KEY = "gh_publish_token";
 
-  function ghHeaders(token) { return { Authorization: "Bearer " + token, "User-Agent": "physics-lib", Accept: "application/vnd.github+json" }; }
-  function b64(text) { return btoa(unescape(encodeURIComponent(text))); }
-  function fromB64(b) { return decodeURIComponent(escape(atob(b.replace(/\n/g, "")))); }
-  function esc(s) { return String(s == null ? "" : s).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r/g, "").replace(/\n/g, "\\n"); }
-  function slugPath(name, ext) {
-    const fileExt = ext && /^\.[a-z0-9]+$/i.test(ext) ? ext.toLowerCase() : ".html";
-    const base = String(name || "").replace(/\.[a-zA-Z0-9]+$/, "").replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "resource";
-    return base + fileExt;
+  function getPublishToken() {
+    try {
+      return localStorage.getItem(TOKEN_KEY) || "";
+    } catch (e) {
+      return "";
+    }
   }
+  function setPublishToken(t) {
+    try {
+      localStorage.setItem(TOKEN_KEY, t);
+    } catch (e) {}
+  }
+
+  function ghHeaders(token) {
+    return {
+      Authorization: "Bearer " + token,
+      "User-Agent": "physics-lib",
+      Accept: "application/vnd.github+json",
+    };
+  }
+
+  // 带超时的 fetch：避免网络卡住导致“保存/删除一直转圈/无反应”
   async function ghFetch(url, opts, timeout) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeout || 30000);
-    try { return await fetch(url, Object.assign({}, opts, { signal: ctrl.signal })); }
-    catch (e) { if (e && e.name === "AbortError") throw new Error("连接 GitHub 超时，请检查网络后重试"); throw e; }
-    finally { clearTimeout(timer); }
+    try {
+      return await fetch(url, Object.assign({}, opts, { signal: ctrl.signal }));
+    } catch (e) {
+      if (e && e.name === "AbortError") throw new Error("连接 GitHub 超时，请检查网络后重试");
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
   }
+
+  function b64(text) {
+    return btoa(unescape(encodeURIComponent(text)));
+  }
+  function fromB64(b) {
+    return decodeURIComponent(escape(atob(b.replace(/\n/g, ""))));
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/\r/g, "")
+      .replace(/\n/g, "\\n");
+  }
+
+  // 用资源标题生成文件名（保留中文，下载时按标题显示；只替换非法字符）
+  function slugPath(name, ext) {
+    const fileExt = ext && /^\.[a-z0-9]+$/i.test(ext) ? ext.toLowerCase() : ".html";
+    const base =
+      String(name || "")
+        .replace(/\.[a-zA-Z0-9]+$/, "")     // 去掉已有扩展名
+        .replace(/[\\/:*?"<>|]/g, "-")      // 非法文件名字符
+        .replace(/\s+/g, "-")               // 空格 -> -
+        .replace(/-+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 50) || "resource";
+    return base + fileExt;
+  }
+
   async function ghGetContents(token, path) {
-    const res = await ghFetch("https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO + "/contents/" + path + "?ref=" + PUBLISH_BRANCH, { headers: ghHeaders(token) });
+    const url =
+      "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO +
+      "/contents/" + path + "?ref=" + PUBLISH_BRANCH;
+    const res = await ghFetch(url, { headers: ghHeaders(token) });
     if (!res.ok) throw new Error("读取仓库文件失败（" + res.status + "）");
-    const data = await res.json(); return { sha: data.sha, text: fromB64(data.content) };
+    const data = await res.json();
+    return { sha: data.sha, text: fromB64(data.content) };
   }
-  async function ghGetSha(token, path) {
-    const res = await ghFetch("https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO + "/contents/" + path + "?ref=" + PUBLISH_BRANCH, { headers: ghHeaders(token) });
-    if (!res.ok) throw new Error("读取文件失败（" + res.status + "）"); return (await res.json()).sha;
-  }
+
+  // contentB64 为文件字节的 base64（HTML/二进制均适用）
   async function ghPutFile(token, path, contentB64, message, sha) {
     const body = { message: message, branch: PUBLISH_BRANCH, content: contentB64 };
     if (sha) body.sha = sha;
-    const res = await ghFetch("https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO + "/contents/" + path, { method: "PUT", headers: Object.assign({}, ghHeaders(token), { "Content-Type": "application/json" }), body: JSON.stringify(body) });
-    if (!res.ok) { let msg = ""; try { msg = (await res.json()).message || ""; } catch (e) {} throw new Error("写入失败（" + res.status + (msg ? " " + msg : "") + "）"); }
+    const res = await ghFetch(
+      "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO +
+        "/contents/" + path,
+      {
+        method: "PUT",
+        headers: Object.assign({}, ghHeaders(token), {
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify(body),
+      }
+    );
+    if (!res.ok) {
+      let msg = "";
+      try {
+        msg = (await res.json()).message || "";
+      } catch (e) {}
+      throw new Error("写入失败（" + res.status + (msg ? " " + msg : "") + "）");
+    }
     return await res.json();
   }
-  async function ghDeleteFile(token, path, message) {
-    const sha = await ghGetSha(token, path);
-    const res = await ghFetch("https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO + "/contents/" + path, { method: "DELETE", headers: Object.assign({}, ghHeaders(token), { "Content-Type": "application/json" }), body: JSON.stringify({ message: message, sha: sha, branch: PUBLISH_BRANCH }) });
-    if (!res.ok) throw new Error("删除文件失败（" + res.status + "）"); return await res.json();
+
+  // 在清单源文件中追加一条资源对象
+  function manifestInsert(source, entryText) {
+    const idx = source.lastIndexOf("];");
+    if (idx === -1) throw new Error("无法定位资源清单");
+    const head = source.slice(0, idx).replace(/\s+$/, "");
+    const tail = source.slice(idx);
+    const hasEntries = /}\s*$/.test(head);
+    const sep = hasEntries ? ",\n  " : "\n  ";
+    return head + sep + entryText + "\n" + tail;
   }
-  async function saveResources(token, message) {
-    const newJson = JSON.stringify(resources, null, 2);
-    for (let attempt = 0; attempt < 4; attempt++) {
-      try { const cur = await ghGetContents(token, "data/resources.json"); await ghPutFile(token, "data/resources.json", b64(newJson), message, cur.sha); return; }
-      catch (e) { if (e.message && /409|does not match/i.test(e.message)) continue; throw e; }
-    }
-    throw new Error("保存清单冲突，请稍后重试");
+
+  function buildEntryText(rec, path) {
+    const tags = (rec.tags || []).map((t) => '"' + esc(t) + '"').join(", ");
+    return [
+      "{",
+      '    id: "' + esc(rec.id) + '",',
+      '    title: "' + esc(rec.title) + '",',
+      '    desc: "' + esc(rec.desc) + '",',
+      '    book: "' + esc(rec.book || "") + '",',
+      '    chapter: "' + esc(rec.chapter || "") + '",',
+      '    section: "' + esc(rec.section || "") + '",',
+      '    url: "' + esc(path) + '",',
+      "    tags: [" + tags + "],",
+      '    type: "' + esc(rec.type || "练习") + '"',
+      "  }",
+    ].join("\n");
   }
 
   async function publishResource(rec) {
@@ -182,208 +604,348 @@
     const message = "新增资源：" + rec.title;
     let path = "pages/" + slugPath(rec.title, rec.fileExt);
     for (let dup = 0; dup < 30; dup++) {
-      try { await ghPutFile(token, path, rec.contentB64, message); break; }
-      catch (e) {
+      try {
+        await ghPutFile(token, path, rec.contentB64, message);
+        break;
+      } catch (e) {
         if (/409|422|already exists|sha was not supplied|does not match/i.test(e.message) && dup < 29) {
-          const dot = path.lastIndexOf("."), stem = dot > -1 ? path.slice(0, dot) : path, dotExt = dot > -1 ? path.slice(dot) : "";
+          const dot = path.lastIndexOf(".");
+          const stem = dot > -1 ? path.slice(0, dot) : path;
+          const dotExt = dot > -1 ? path.slice(dot) : "";
           path = stem + "-" + (dup + 2) + dotExt;
-        } else throw e;
+        } else {
+          throw e;
+        }
       }
     }
-    resources.push({ id: rec.id, title: rec.title, desc: rec.desc || "", book: rec.book || "", chapter: rec.chapter || "", section: rec.section || "", url: path, tags: rec.tags || [], type: rec.type || "练习" });
+    resources.push({
+      id: rec.id, title: rec.title, desc: rec.desc || "", book: rec.book || "",
+      chapter: rec.chapter || "", section: rec.section || "", url: path,
+      tags: rec.tags || [], type: rec.type || "练习",
+    });
     await saveResources(token, "登记资源：" + rec.title);
+    // 本会话里立刻可打开（无需等 GitHub Pages 部署）
     if (rec._blob) setPreview(rec.id, rec._blob);
     return path;
   }
 
+  // ---------- 清单序列化 / 编辑 / 删除 ----------
+  function entryToJs(e) {
+    const tags = (e.tags || []).map((t) => '"' + esc(t) + '"').join(", ");
+    return (
+      "{\n" +
+      '    id: "' + esc(e.id) + '",\n' +
+      '    title: "' + esc(e.title || "") + '",\n' +
+      '    desc: "' + esc(e.desc || "") + '",\n' +
+      '    book: "' + esc(e.book || "") + '",\n' +
+      '    chapter: "' + esc(e.chapter || "") + '",\n' +
+      '    section: "' + esc(e.section || "") + '",\n' +
+      '    url: "' + esc(e.url || "") + '",\n' +
+      "    tags: [" + tags + "],\n" +
+      '    type: "' + esc(e.type || "练习") + '"\n' +
+      "  }"
+    );
+  }
+
+  // 把当前 resources 数组保存到 data/resources.json（供站长的 GitHub 令牌直接写入）
+  async function saveResources(token, message) {
+    const newJson = JSON.stringify(resources, null, 2);
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const cur = await ghGetContents(token, "data/resources.json");
+        await ghPutFile(token, "data/resources.json", b64(newJson), message, cur.sha);
+        return;
+      } catch (e) {
+        if (e.message && /409|does not match/i.test(e.message)) continue;
+        throw e;
+      }
+    }
+    throw new Error("保存清单冲突，请稍后重试");
+  }
+
+  // 只取文件的 sha，不解码内容（二进制文件解码会抛错）
+  async function ghGetSha(token, path) {
+    const url =
+      "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO +
+      "/contents/" + path + "?ref=" + PUBLISH_BRANCH;
+    const res = await ghFetch(url, { headers: ghHeaders(token) });
+    if (!res.ok) throw new Error("读取文件失败（" + res.status + "）");
+    const data = await res.json();
+    return data.sha;
+  }
+
+  async function ghDeleteFile(token, path, message) {
+    const sha = await ghGetSha(token, path);
+    const res = await ghFetch(
+      "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO + "/contents/" + path,
+      {
+        method: "DELETE",
+        headers: Object.assign({}, ghHeaders(token), { "Content-Type": "application/json" }),
+        body: JSON.stringify({ message: message, sha: sha, branch: PUBLISH_BRANCH }),
+      }
+    );
+    if (!res.ok) throw new Error("删除文件失败（" + res.status + "）");
+    return await res.json();
+  }
+
+  // 删除资源：从清单移除并删除 pages/ 下的文件
+  async function deleteResource(res) {
+    const token = getPublishToken();
+    if (!token) throw new Error("请先登录管理员");
+    if (res.url && res.url.indexOf("pages/") === 0) {
+      try { await ghDeleteFile(token, res.url, "删除资源：" + res.title); }
+      catch (e) { if (!/404|422|失败/.test(e.message)) throw e; }
+    }
+    if (previewUrls[res.id]) { try { URL.revokeObjectURL(previewUrls[res.id]); } catch (e) {} delete previewUrls[res.id]; }
+    resources = resources.filter((e) => e.id !== res.id);
+    await saveResources(token, "删除资源：" + res.title);
+    baseList = [...resources, ...uploadedList];
+    render();
+  }
+
+  // 编辑资源：更新清单字段，并可选换新文件
   async function updateResource(rec) {
     const token = getPublishToken();
     if (!token) throw new Error("请先登录管理员");
     const idx = resources.findIndex((e) => e.id === rec.id);
     const old = resources[idx];
     if (!old) throw new Error("找不到要编辑的资源");
+
     let url = old.url || "";
     if (rec.contentB64) {
+      // 目标文件：优先沿用/覆盖，避免与其它资源重名冲突
       let path = "pages/" + slugPath(rec.title, rec.fileExt);
-      const taken = (p) => resources.some((x) => x.id !== rec.id && x.url === p);
-      if (taken(path)) { for (let i = 2; i < 30; i++) { const dot = path.lastIndexOf("."), stem = dot > -1 ? path.slice(0, dot) : path, dotExt = dot > -1 ? path.slice(dot) : "", cand = stem + "-" + i + dotExt; if (!taken(cand)) { path = cand; break; } } }
-      let sha = null; try { sha = await ghGetSha(token, path); } catch (e) { sha = null; }
+      const takenByOther = (p) => resources.some((x) => x.id !== rec.id && x.url === p);
+      if (takenByOther(path)) {
+        for (let i = 2; i < 30; i++) {
+          const dot = path.lastIndexOf(".");
+          const stem = dot > -1 ? path.slice(0, dot) : path;
+          const dotExt = dot > -1 ? path.slice(dot) : "";
+          const cand = stem + "-" + i + dotExt;
+          if (!takenByOther(cand)) { path = cand; break; }
+        }
+      }
+      // 取目标的 sha（存在则覆盖；不存在(404)则新建）
+      let sha = null;
+      try { sha = await ghGetSha(token, path); } catch (e) { sha = null; }
       await ghPutFile(token, path, rec.contentB64, "更新资源文件：" + rec.title, sha || undefined);
       url = path;
-      if (rec._blob) setPreview(rec.id, rec._blob);
-      if (old.url && old.url !== path && old.url.indexOf("pages/") === 0) { try { await ghDeleteFile(token, old.url, "移除旧文件：" + rec.title); } catch (e) {} }
+      if (rec._blob) setPreview(rec.id, rec._blob);   // 本会话立刻可打开
+      if (old.url && old.url !== path && old.url.indexOf("pages/") === 0) {
+        try { await ghDeleteFile(token, old.url, "移除旧文件：" + rec.title); } catch (e) {}
+      }
     }
-    resources[idx] = { id: old.id, title: rec.title, desc: rec.desc || "", book: rec.book || "", chapter: rec.chapter || "", section: rec.section || "", url: url, tags: rec.tags || [], type: rec.type || "练习" };
+
+    resources[idx] = {
+      id: old.id, title: rec.title, desc: rec.desc || "", book: rec.book || "",
+      chapter: rec.chapter || "", section: rec.section || "", url: url,
+      tags: rec.tags || [], type: rec.type || "练习",
+    };
     await saveResources(token, "编辑资源：" + rec.title);
-    baseList = [...resources, ...uploadedList]; hydrateCounts(); render();
+    baseList = [...resources, ...uploadedList];
+    render();
   }
 
-  async function deleteResource(res) {
-    const token = getPublishToken();
-    if (!token) throw new Error("请先登录管理员");
-    if (res.url && res.url.indexOf("pages/") === 0) { try { await ghDeleteFile(token, res.url, "删除资源：" + res.title); } catch (e) { if (!/404|422|失败/.test(e.message)) throw e; } }
-    if (previewUrls[res.id]) { try { URL.revokeObjectURL(previewUrls[res.id]); } catch (e) {} delete previewUrls[res.id]; }
-    resources = resources.filter((e) => e.id !== res.id);
-    await saveResources(token, "删除资源：" + res.title);
-    baseList = [...resources, ...uploadedList]; hydrateCounts(); render();
-  }
-
-  async function handleDelete(r) {
-    if (!window.confirm("确定要删除资源「" + r.title + "」吗？这会从线上仓库移除。")) return;
-    try {
-      if (getPublishToken()) await deleteResource(r);
-      else throw new Error("请先登录（管理员）");
-      toast("已删除");
-    } catch (e) { toast("删除失败：" + e.message, true); }
-  }
-
-  // 授权老师走 Worker（方案A 已暂停，仅为兼容保留）
+  // ---- 授权用户走 Cloudflare Worker（后端持有 GitHub 令牌） ----
   async function workerPost(action, payload) {
-    const token = getWorkerToken(); if (!token) throw new Error("请先通过“授权登录”");
-    const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 15000);
+    const token = getWorkerToken();
+    if (!token) throw new Error("请先通过“授权登录”");
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
     try {
-      const res = await fetch(WORKER_URL + "/" + action, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.assign({ token: token }, payload)), signal: ctrl.signal });
+      const res = await fetch(WORKER_URL + "/" + action, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.assign({ token: token }, payload)),
+        signal: ctrl.signal,
+      });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || ("请求失败（" + res.status + "）")); return data;
-    } catch (e) { if (e.name === "AbortError") throw new Error("连接后端超时"); throw e; }
-    finally { clearTimeout(timer); }
+      if (!res.ok) throw new Error(data.error || ("请求失败（" + res.status + "）"));
+      return data;
+    } catch (e) {
+      if (e.name === "AbortError") throw new Error("连接后端超时（请检查 Workers 连接）");
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
   }
-  async function workerUpdate(rec) { await workerPost("update", rec); await loadAll(); }
-  async function workerDelete(res) { await workerPost("delete", { id: res.id, url: res.url, title: res.title }); await loadAll(); }
+  async function workerDelete(res) {
+    await workerPost("delete", { id: res.id, url: res.url, title: res.title });
+    await loadAll();
+  }
+  async function workerUpdate(rec) {
+    await workerPost("update", rec);
+    await loadAll();
+  }
 
   // ---------- 上传弹窗 ----------
-  function isPaperType() { return $("#fType").value === "试卷"; }
+  const mask = $("#modalMask");
+
+  const isPaperType = () => $("#fType").value === "试卷";
+
   function populateTypeSelect() {
-    const sel = $("#fType"); sel.innerHTML = "";
-    COURSE.resourceTypes.forEach((t) => { const o = document.createElement("option"); o.value = t; o.textContent = t; sel.appendChild(o); });
+    const sel = $("#fType");
+    sel.innerHTML = "";
+    COURSE.resourceTypes.forEach((t) => {
+      const o = document.createElement("option");
+      o.value = t;
+      o.textContent = t;
+      sel.appendChild(o);
+    });
     refreshTypeUI();
   }
-  function refreshTypeUI() { const paper = isPaperType(); $("#typeHint").style.display = paper ? "block" : "none"; $("#fSection").disabled = paper; }
-  function populateBookSelect() {
-    const sel = $("#fBook"); sel.innerHTML = '<option value="">暂不分教材</option>';
-    COURSE.books.forEach((b) => { const o = document.createElement("option"); o.value = b.id; o.textContent = b.title; sel.appendChild(o); });
-  }
-  function populateChapterSelect() {
-    const sel = $("#fChapter"); sel.innerHTML = '<option value="">暂不选章</option>';
-    chaptersOfBook($("#fBook").value).forEach((c) => { const o = document.createElement("option"); o.value = c.id; o.textContent = c.title; sel.appendChild(o); });
-    populateSectionSelect();
-  }
-  function populateSectionSelect() {
-    const sel = $("#fSection"); sel.innerHTML = '<option value="">未指定小节</option>';
-    if (isPaperType()) { sel.disabled = true; return; }
-    const ch = chapterOf($("#fChapter").value);
-    if (ch) ch.sections.forEach((s) => { const o = document.createElement("option"); o.value = s.id; o.textContent = s.title; sel.appendChild(o); });
-  }
-  function refreshAdminUI() {
-    const owner = !!getPublishToken(); const has = owner || !!getWorkerToken();
-    const ubtn = $("#quick-add-btn"); if (ubtn) ubtn.style.display = has ? "" : "none";
-    const row = $("#adminLoggedInRow"); if (row) row.style.display = owner ? "block" : "none";
-  }
-  function openModal(res) {
-    editingId = res ? res.id : null;
-    populateTypeSelect(); populateBookSelect();
-    if (res) {
-      $("#fTitle").value = res.title || ""; $("#fDesc").value = res.desc || ""; $("#fTags").value = (res.tags || []).join(" ");
-      if (res.type) $("#fType").value = res.type; refreshTypeUI();
-      if (res.book) $("#fBook").value = res.book; populateChapterSelect();
-      if (res.chapter) $("#fChapter").value = res.chapter; populateSectionSelect();
-      if (res.section) $("#fSection").value = res.section;
-      $("#modalTitle").textContent = "编辑资源"; $("#saveResource").textContent = "保存修改";
-    } else {
-      $("#fTitle").value = ""; $("#fDesc").value = ""; $("#fTags").value = "";
-      refreshTypeUI(); populateChapterSelect();
-      $("#modalTitle").textContent = "上传资源"; $("#saveResource").textContent = "保存资源";
-    }
-    clearPendingFile();
-    $("#modalMask").classList.remove("hidden");
-    setTimeout(() => $("#fTitle").focus(), 50);
-  }
-  function closeModal() { $("#modalMask").classList.add("hidden"); }
 
-  const FILE_RE = /\.(html?|htm|pdf|docx?|pptx?|xlsx?|txt|md|png|jpe?g|webp|gif|mp4|zip)$/i;
-  function setPendingFile(file) {
-    if (!file) return clearPendingFile();
-    if (!FILE_RE.test(file.name)) { toast("不支持的文件类型（支持 HTML/PDF/Word/PPT/Excel/图片/视频/压缩包等）", true); return; }
-    pendingFile = file;
-    $("#fileName").textContent = file.name + "（" + (file.size / 1024).toFixed(1) + " KB）";
-    $("#filePill").style.display = "flex";
-    if (!$("#fTitle").value) $("#fTitle").value = file.name.replace(/\.[^.]+$/, "");
-    smartFill(false);
+  function refreshTypeUI() {
+    const paper = isPaperType();
+    $("#typeHint").style.display = paper ? "block" : "none";
+    $("#fSection").disabled = paper;
   }
-  function clearPendingFile() { pendingFile = null; $("#fileInput").value = ""; $("#filePill").style.display = "none"; $("#fileName").textContent = ""; }
-  function readFileAsBase64(file) {
-    return new Promise((resolve, reject) => {
-      const fr = new FileReader();
-      fr.onload = () => { const u = String(fr.result || ""), c = u.indexOf(","); resolve(c > -1 ? u.slice(c + 1) : u); };
-      fr.onerror = () => reject(fr.error); fr.readAsDataURL(file);
+
+  function populateBookSelect() {
+    const sel = $("#fBook");
+    sel.innerHTML = '<option value="">暂不分教材</option>';
+    COURSE.books.forEach((b) => {
+      const o = document.createElement("option");
+      o.value = b.id;
+      o.textContent = b.title;
+      sel.appendChild(o);
     });
   }
 
-  let saving = false;
-  async function saveResource() {
-    const btn = $("#saveResource");
-    if (saving) return;
-    const title = $("#fTitle").value.trim();
-    if (!title) { toast("请填写资源名称", true); return; }
-    const editing = !!editingId;
-    const isPaper = isPaperType();
-    const em = pendingFile && /\.[^.]*$/.exec(pendingFile.name);
-    const fileExt = pendingFile ? (em ? em[0].toLowerCase() : ".html") : undefined;
-    const rec = { id: editingId || ("r" + Date.now() + Math.random().toString(36).slice(2, 7)), title, book: $("#fBook").value, chapter: $("#fChapter").value, section: isPaper ? "" : $("#fSection").value, desc: $("#fDesc").value.trim(), tags: $("#fTags").value.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean), type: isPaper ? "试卷" : $("#fType").value, fileExt, contentB64: null, createdAt: Date.now(), _blob: pendingFile };
-    const isWorker = !!getWorkerToken() && !getPublishToken();
-    if (!isWorker && !getPublishToken()) { toast("请先登录（管理员）", true); openAdminModal(); return; }
-    saving = true; btn.disabled = true; const origLabel = editing ? "保存修改" : "保存资源"; btn.textContent = "上传中…"; toast("正在保存，请稍候…");
-    try {
-      if (pendingFile) {
-        if (pendingFile.size > 50 * 1024 * 1024) throw new Error("文件过大（超过50MB），请压缩后再上传");
-        if (pendingFile.size > 20 * 1024 * 1024) toast("文件较大，上传会稍慢…");
-        const b = await readFileAsBase64(pendingFile).catch(() => null);
-        if (!b) { toast("读取文件失败，请重试", true); return; }
-        rec.contentB64 = b;
-      }
-      if (editing) {
-        if (isWorker) { await workerUpdate(rec); await loadAll(); } else { await updateResource(rec); }
-        closeModal(); toast("已保存修改"); return;
-      }
-      if (!pendingFile) { toast("请先选择一个文件", true); return; }
-      if (isWorker) { await workerPost("upload", rec); await loadAll(); closeModal(); toast("已发布到线上（授权用户）"); }
-      else {
-        await publishResource(rec);
-        baseList = [...resources, ...uploadedList]; hydrateCounts(); render(); closeModal();
-        toast("已发布：卡片已出现，约1分钟后其它访客也能看到");
-      }
-    } catch (e) { toast((editing ? "保存失败：" : "发布失败：") + (e && e.message), true); }
-    finally { saving = false; btn.disabled = false; btn.textContent = origLabel; }
+  function populateChapterSelect() {
+    const sel = $("#fChapter");
+    sel.innerHTML = '<option value="">暂不选章</option>';
+    chaptersOfBook($("#fBook").value).forEach((c) => {
+      const o = document.createElement("option");
+      o.value = c.id;
+      o.textContent = c.title;
+      sel.appendChild(o);
+    });
+    populateSectionSelect();
   }
 
-  // ---------- 自动识别填表（标题/文件名 + 文件内容） ----------
+  function populateSectionSelect() {
+    const sel = $("#fSection");
+    sel.innerHTML = '<option value="">未指定小节</option>';
+    if (isPaperType()) {
+      sel.disabled = true;
+      return;
+    }
+    const ch = chapterOf($("#fChapter").value);
+    if (ch) {
+      ch.sections.forEach((s) => {
+        const o = document.createElement("option");
+        o.value = s.id;
+        o.textContent = s.title;
+        sel.appendChild(o);
+      });
+    }
+  }
+
+  // 根据是否有本地令牌，显示/隐藏上传按钮
+  function refreshAdminUI() {
+    const owner = !!getPublishToken();
+    const worker = !!getWorkerToken();
+    const has = owner || worker;
+    $("#uploadBtn").style.display = has ? "" : "none";
+    $("#adminBtn").textContent = owner ? "⚙ 管理员设置" : "🔑 管理员登录";
+    $("#adminLoggedInRow").style.display = owner ? "block" : "none";
+    if ($("#workeredInRow")) $("#workeredInRow").style.display = worker ? "block" : "none";
+  }
+
+  function openModal(res) {
+    editingId = res ? res.id : null;
+    populateTypeSelect();
+    populateBookSelect();
+
+    if (res) {
+      // 编辑模式：回填现有字段
+      $("#fTitle").value = res.title || "";
+      $("#fDesc").value = res.desc || "";
+      $("#fTags").value = (res.tags || []).join(" ");
+      if (res.type) $("#fType").value = res.type;
+      refreshTypeUI();
+      if (res.book) $("#fBook").value = res.book;
+      populateChapterSelect();
+      if (res.chapter) $("#fChapter").value = res.chapter;
+      populateSectionSelect();
+      if (res.section) $("#fSection").value = res.section;
+      var dzSmall = $("#dropzone small");
+      if (dzSmall) dzSmall.textContent = "选新文件可替换内容（不选则保留原文件）";
+      $("#modalTitle").textContent = "编辑资源";
+      $("#saveResource").textContent = "保存修改";
+    } else {
+      // 新增：整体清空表单，避免残留上一个资源的章节/类型等内容
+      $("#fTitle").value = "";
+      $("#fDesc").value = "";
+      $("#fTags").value = "";
+      $("#modalTitle").textContent = "上传资源";
+      $("#saveResource").textContent = "保存资源";
+      refreshTypeUI();               // 重置“试卷”提示与章节禁用
+      populateChapterSelect();       // 重建章节 & 小节下拉，避免残留上一个资源
+      var dzSmall2 = $("#dropzone small");
+      if (dzSmall2) dzSmall2.textContent = "支持 HTML / PDF / Word / PPT / Excel / 图片 / 视频 / 压缩包等";
+    }
+    clearPendingFile();
+    mask.classList.add("show");
+    setTimeout(() => $("#fTitle").focus(), 50);
+  }
+
+  function closeModal() {
+    mask.classList.remove("show");
+  }
+
+  // 依据 标题/文件名 + 文件内容 自动识别 章节/类型/标签 并预填（free，无外部模型）
   const TEXT_EXT_RE = /^(html?|htm|md|txt)$/;
-  function extOf(name) { const m = /\.([a-z0-9]+)$/i.exec(name || ""); return m ? m[1].toLowerCase() : ""; }
+  function extOf(name) {
+    const m = /\.([a-z0-9]+)$/i.exec(name || "");
+    return m ? m[1].toLowerCase() : "";
+  }
+  // 只读文件头部约100KB作为文本样本（快，用于内容识别；二进制文件跳过）
   function readTextSample(file) {
     return new Promise((resolve) => {
       if (!file) return resolve("");
-      try { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result || "")); fr.onerror = () => resolve(""); fr.readAsText(file.slice(0, 102400)); } catch (e) { resolve(""); }
+      try {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result || ""));
+        fr.onerror = () => resolve("");
+        fr.readAsText(file.slice(0, 102400));
+      } catch (e) {
+        resolve("");
+      }
     });
   }
+
   async function smartFill(force) {
     const title = $("#fTitle").value.trim() || (pendingFile ? pendingFile.name : "");
     if (!title) return;
     const ext = pendingFile ? extOf(pendingFile.name) : "";
+    // 文本类文件读取头部一小段内容作辅助（HTML/文本）；毫秒级，不阻塞界面
     let content = "";
-    if (pendingFile && TEXT_EXT_RE.test(ext)) content = await readTextSample(pendingFile);
+    if (pendingFile && TEXT_EXT_RE.test(ext)) {
+      content = await readTextSample(pendingFile);
+    }
     const searchStr = (title + " " + content).trim();
+
     const type = detectType(title, ext, content);
     let bookId = detectBook(searchStr);
     const loc = detectLoc(title, content, bookId);
-    if (force || !$("#fType").value) { if (type) { $("#fType").value = type; refreshTypeUI(); } }
+
+    if (force || !$("#fType").value) {
+      if (type) { $("#fType").value = type; refreshTypeUI(); }
+    }
+    // 若识别到章节但没识别到教材，则根据章节反推教材
     if (loc && loc.chapter && !bookId) bookId = bookOfChapter(loc.chapter);
     if ((force || !$("#fBook").value) && bookId) $("#fBook").value = bookId;
     populateChapterSelect();
     if ((force || !$("#fChapter").value) && loc && loc.chapter) $("#fChapter").value = loc.chapter;
     populateSectionSelect();
     if (force && loc && loc.section) $("#fSection").value = loc.section;
+
     const topic = removeNoise(title);
-    const secName = loc && loc.section ? sectionTitle(loc.section).replace(/^\s*\d+(\.\d+)*\s*/, "") : (loc && loc.chapter ? chapterTitle(loc.chapter).replace(/^第[一二三四五六七八九十]+章\s*/, "") : "");
+    const secName = loc && loc.section
+      ? sectionTitle(loc.section).replace(/^\s*\d+(\.\d+)*\s*/, "")
+      : (loc && loc.chapter ? chapterTitle(loc.chapter).replace(/^第[一二三四五六七八九十]+章\s*/, "") : "");
     const existing = $("#fTags").value.split(/[,，\s]+/).filter(Boolean);
     const tags = [];
     if (topic) tags.push(topic);
@@ -391,6 +953,247 @@
     if (type) tags.push(type);
     $("#fTags").value = tags.concat(existing.filter((t) => tags.indexOf(t) < 0)).join(" ");
     toast("已自动识别并预填（可再修改）");
+  }
+
+  // ---------- 管理员登录 ----------
+  const adminMask = $("#adminMask");
+
+  function openAdminModal() {
+    $("#adminToken").value = getPublishToken();
+    const ai = getAiConf();
+    if ($("#aiEndpoint")) $("#aiEndpoint").value = ai.endpoint || "";
+    if ($("#aiModel")) $("#aiModel").value = ai.model || "";
+    if ($("#aiKey")) $("#aiKey").value = ai.key || "";
+    refreshAdminUI();
+    adminMask.classList.add("show");
+    setTimeout(() => $("#adminToken").focus(), 50);
+  }
+
+  function closeAdminModal() {
+    adminMask.classList.remove("show");
+  }
+
+  function saveAdmin() {
+    const t = $("#adminToken").value.trim();
+    if (!t) {
+      toast("请输入 GitHub 访问令牌", true);
+      return;
+    }
+    setPublishToken(t);
+    // 一并保存 AI 设置（可选）
+    setAiConf({
+      endpoint: $("#aiEndpoint") ? $("#aiEndpoint").value.trim() : aiConf.endpoint,
+      model: $("#aiModel") ? $("#aiModel").value.trim() : aiConf.model,
+      key: $("#aiKey") ? $("#aiKey").value.trim() : aiConf.key,
+    });
+    closeAdminModal();
+    refreshAdminUI();
+    render(); // 立即让卡片出现“编辑/删除”
+    toast("已登录，上传与编辑入口已开启");
+  }
+
+  function clearToken() {
+    if (!window.confirm("确定要清除本机保存的管理员令牌吗？清除后上传入口会隐藏。")) return;
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch (e) {}
+    closeAdminModal();
+    refreshAdminUI();
+    render(); // 移除卡片上的“编辑/删除”
+    toast("已退出，上传入口已隐藏");
+  }
+
+  // ---------- 授权登录（其他老师，走 Cloudflare Worker） ----------
+  const workerMask = $("#workerMask");
+  function openWorkerModal() {
+    workerMask.classList.add("show");
+    setTimeout(() => $("#workerUser").focus(), 50);
+  }
+  function closeWorkerModal() {
+    workerMask.classList.remove("show");
+  }
+  async function saveWorkerLogin() {
+    const u = $("#workerUser").value.trim();
+    const p = $("#workerPass").value;
+    if (!u || !p) {
+      toast("请输入授权账号和密码", true);
+      return;
+    }
+    try {
+      const res = await fetch(WORKER_URL + "/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ u: u, p: p }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ("登录失败（" + res.status + "）"));
+      setWorkerToken(data.token);
+      closeWorkerModal();
+      refreshAdminUI();
+      render();
+      toast("已登录（授权用户）");
+    } catch (e) {
+      toast("登录失败：" + e.message, true);
+    }
+  }
+  function workerLogout() {
+    if (!window.confirm("确定要退出授权登录吗？")) return;
+    clearWorkerToken();
+    refreshAdminUI();
+    render();
+    toast("已退出授权登录");
+  }
+
+  const FILE_RE = /\.(html?|htm|pdf|docx?|pptx?|xlsx?|txt|md|png|jpe?g|webp|gif|mp4|zip)$/i;
+
+  function setPendingFile(file) {
+    if (!file) return clearPendingFile();
+    if (!FILE_RE.test(file.name)) {
+      toast("不支持的文件类型（支持 HTML/PDF/Word/PPT/Excel/图片/视频/压缩包等）", true);
+      return;
+    }
+    pendingFile = file;
+    $("#fileName").textContent = file.name + "（" + (file.size / 1024).toFixed(1) + " KB）";
+    $("#filePill").style.display = "flex";
+    if (!$("#fTitle").value) {
+      $("#fTitle").value = file.name.replace(/\.[^.]+$/, "");
+    }
+    // 选文件后自动温和预填章节/类型/标签（只填空，不覆盖已选）
+    smartFill(false);
+  }
+
+  function clearPendingFile() {
+    pendingFile = null;
+    $("#fileInput").value = "";
+    $("#filePill").style.display = "none";
+    $("#fileName").textContent = "";
+  }
+
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      // 用 readAsDataURL：浏览器原生 base64，比手动分块拼接快且省内存
+      fr.onload = () => {
+        const dataUrl = String(fr.result || "");
+        const comma = dataUrl.indexOf(",");
+        resolve(comma > -1 ? dataUrl.slice(comma + 1) : dataUrl);
+      };
+      fr.onerror = () => reject(fr.error);
+      fr.readAsDataURL(file);
+    });
+  }
+
+  let saving = false;                 // 防止重复点击“保存”
+  async function saveResource() {
+    const saveBtn = $("#saveResource");
+    if (saving) return;               // 防双击重复发布
+    const title = $("#fTitle").value.trim();
+    if (!title) {
+      toast("请填写资源名称", true);
+      return;
+    }
+    const editing = !!editingId;
+    const isPaper = isPaperType();
+    const extMatch = pendingFile && /\.[^.]*$/.exec(pendingFile.name);
+    const fileExt = pendingFile ? (extMatch ? extMatch[0].toLowerCase() : ".html") : undefined;
+
+    const rec = {
+      id: editingId || ("r" + Date.now() + Math.random().toString(36).slice(2, 7)),
+      title,
+      book: $("#fBook").value,
+      chapter: $("#fChapter").value,
+      // 试卷不挂小节
+      section: isPaper ? "" : $("#fSection").value,
+      desc: $("#fDesc").value.trim(),
+      tags: $("#fTags")
+        .value.split(/[,，\s]+/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+      type: isPaper ? "试卷" : $("#fType").value,
+      fileExt,
+      contentB64: null,
+      createdAt: Date.now(),
+      _blob: pendingFile,             // 记录原文件，用于本会话立即预览
+    };
+
+    // 站长有 GitHub 令牌则直连（可靠）；仅授权老师(只有 Worker 令牌)才走 Worker
+    const isWorker = !!getWorkerToken() && !getPublishToken();
+    if (!isWorker && !getPublishToken()) {
+      toast("请先登录（管理员或授权登录）", true);
+      openAdminModal();
+      return;
+    }
+
+    saving = true;
+    saveBtn.disabled = true;
+    const origLabel = editing ? "保存修改" : "保存资源";
+    saveBtn.textContent = "上传中…";
+    toast("正在保存，请稍候…");
+
+    try {
+      // 读取并转 base64（用 readAsDataURL，快；较大文件给出提示）
+      if (pendingFile) {
+        if (pendingFile.size > 50 * 1024 * 1024) throw new Error("文件过大（超过50MB），请压缩后再上传");
+        if (pendingFile.size > 20 * 1024 * 1024) toast("文件较大，上传会稍慢…");
+        const contentB64 = await readFileAsBase64(pendingFile).catch(() => null);
+        if (!contentB64) { toast("读取文件失败，请重试", true); return; }
+        rec.contentB64 = contentB64;
+      }
+
+      if (editing) {
+        if (isWorker) {
+          await workerUpdate(rec);
+          await loadAll();
+        } else {
+          await updateResource(rec);   // 内部已更新 resources 并渲染
+        }
+        closeModal();
+        toast("已保存修改");
+        return;
+      }
+
+      // 新增
+      if (!pendingFile) {
+        toast("请先选择一个文件", true);
+        return;
+      }
+      if (isWorker) {
+        await workerPost("upload", rec);
+        await loadAll();
+        closeModal();
+        toast("已发布到线上（授权用户）");
+      } else {
+        await publishResource(rec);
+        // 直接用内存里的 resources 更新视图：避免再次 fetch 被缓存覆盖而“刚保存就消失”
+        baseList = [...resources, ...uploadedList];
+        render();
+        closeModal();
+        toast("已发布：卡片已出现，约1分钟后其它访客也能看到");
+      }
+    } catch (e) {
+      toast((editing ? "保存失败：" : "发布失败：") + (e && e.message), true);
+    } finally {
+      saving = false;
+      saveBtn.disabled = false;
+      saveBtn.textContent = origLabel;
+    }
+  }
+
+  // ---------- 资源助手 ----------
+  const CN = {
+    "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8,
+    "九": 9, "十": 10, "十一": 11, "十二": 12, "十三": 13,
+  };
+  function cnNum(w) {
+    if (CN[w] != null) return CN[w];
+    if (w.charAt(0) === "十") return 10 + (CN[w.slice(1)] || 0);
+    return null;
+  }
+  function parseChapterNum(s) {
+    const m = s.match(/第([一二三四五六七八九十]+|\d{1,2})章/);
+    if (!m) return null;
+    const w = m[1];
+    return /^\d+$/.test(w) ? parseInt(w, 10) : cnNum(w);
   }
 
   const BOOK_ALIASES = [
@@ -401,17 +1204,30 @@
     { id: "b5", names: ["选择性必修第二册", "选择性必修二", "选必二", "选必2", "选修二"] },
     { id: "b6", names: ["选择性必修第三册", "选择性必修三", "选必三", "选必3", "选修三"] },
   ];
-  function detectBook(s) { let best = null, bl = 0; for (const b of BOOK_ALIASES) for (const n of b.names) if (s.indexOf(n) > -1 && n.length > bl) { best = b.id; bl = n.length; } return best; }
+  function detectBook(s) {
+    // 选“最长匹配”的别名，避免“必修一”命中“选择性必修一”这类子串误判
+    let best = null, bestLen = 0;
+    for (const b of BOOK_ALIASES)
+      for (const n of b.names)
+        if (s.indexOf(n) > -1 && n.length > bestLen) { best = b.id; bestLen = n.length; }
+    return best;
+  }
+
   function detectType(s, ext, content) {
-    const t = String(s || "").trim(), c = String(content || "").slice(0, 3000);
-    const hasT = (re) => re.test(t), hasC = (re) => re.test(c);
+    const t = String(s || "").trim();
+    const c = String(content || "").slice(0, 3000);
+    const hasT = (re) => re.test(t);
+    const hasC = (re) => re.test(c);
+    // 1) 标题/文件名里的明确类型词（最可靠）
     if (hasT(/教案|教学设计|导学案/)) return "教案";
     if (hasT(/试卷|试题|卷子|考试|月考|期中|期末|测验/)) return "试卷";
     if (hasT(/练习|习题|作业|题目|同步|巩固/)) return "练习";
     if (hasT(/课件|幻灯片|演示文稿|\bppt\b/i)) return "课件";
     if (hasT(/仿真|模拟|动画|交互|演示/)) return "仿真资源";
+    // 2) 文件类型兜底（标题没提示时）：HTML 通常是可交互仿真；PPT 通常是课件
     if (/^(html?|htm)$/.test(ext)) return "仿真资源";
     if (/^(pptx?|ppt)$/.test(ext)) return "课件";
+    // 3) 读文件内容兜底（仅文本类文件）
     if (hasC(/教案|教学设计|导学案/)) return "教案";
     if (hasC(/试卷|试题|考试|测验/)) return "试卷";
     if (hasC(/练习|习题|作业|题目/)) return "练习";
@@ -419,103 +1235,186 @@
     if (hasC(/仿真|模拟|动画|交互|演示|canvas/i)) return "仿真资源";
     return null;
   }
+
+  // 去掉“第X章”、教材名、类型词、标点，得到主题词（用于识别章节/关键词）
   const NOISE = /练习|习题|作业|题目|试卷|试题|考试|测验|课件|幻灯片|演示文稿|教案|教学设计|导学案|仿真|模拟|动画|交互|演示|\bppt\b/gi;
-  function removeNoise(s) { let t = String(s).replace(/第[一二三四五六七八九十]+\d*章/g, " "); for (const b of BOOK_ALIASES) for (const n of b.names) t = t.replace(new RegExp(n, "g"), " "); t = t.replace(NOISE, " "); t = t.replace(/[，。、,.\s]+/g, " ").trim(); return t; }
-  function cleanChapter(c) { return c.replace(/^第[一二三四五六七八九十]+章\s*/, ""); }
-  function cleanSection(s) { return s.replace(/^\s*\d+(\.\d+)*\s*/, ""); }
-  const CN = { "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10, "十一": 11, "十二": 12, "十三": 13 };
-  function cnNum(w) { if (CN[w] != null) return CN[w]; if (w.charAt(0) === "十") return 10 + (CN[w.slice(1)] || 0); return null; }
-  function parseChapterNum(s) { const m = s.match(/第([一二三四五六七八九十]+|\d{1,2})章/); if (!m) return null; const w = m[1]; return /^\d+$/.test(w) ? parseInt(w, 10) : cnNum(w); }
+  function removeNoise(s) {
+    let t = String(s).replace(/第[一二三四五六七八九十]+\d*章/g, " ");
+    for (const b of BOOK_ALIASES) for (const n of b.names) t = t.replace(new RegExp(n, "g"), " ");
+    t = t.replace(NOISE, " ");
+    t = t.replace(/[，。、,.\s]+/g, " ").trim();
+    return t;
+  }
+  function cleanChapter(c) {
+    return c.replace(/^第[一二三四五六七八九十]+章\s*/, "");
+  }
+  function cleanSection(s) {
+    return s.replace(/^\s*\d+(\.\d+)*\s*/, "");
+  }
+
   function detectLoc(s, content, bookId) {
     const books = COURSE.books.filter((b) => !bookId || b.id === bookId);
     const hay = (s || "") + " " + (content || "");
-    const wantNum = parseChapterNum(hay), topic = removeNoise(s || "");
+    const wantNum = parseChapterNum(hay);
+    const topic = removeNoise(s || "");
     let chapter = null, section = null;
-    if (wantNum) { outer: for (const b of books) for (const c of b.chapters) if (parseChapterNum(c.title) === wantNum) { chapter = c.id; break outer; } }
-    if (!chapter && topic.length >= 2) { outer: for (const b of books) for (const c of b.chapters) { const sig = cleanChapter(c.title) + " " + c.sections.map((sec) => cleanSection(sec.title)).join(" "); if (sig.indexOf(topic) > -1) { chapter = c.id; break outer; } } }
-    if (!chapter) { let best = null, bl = 0; for (const b of books) for (const c of b.chapters) { const ct = cleanChapter(c.title); if (ct && ct.length > bl && hay.indexOf(ct) > -1) { best = c.id; bl = ct.length; } } chapter = best; }
-    if (!chapter) { let bestC = null, bestS = null, bl = 0; for (const b of books) for (const c of b.chapters) for (const sec of c.sections) { const st = cleanSection(sec.title); if (st && st.length > bl && hay.indexOf(st) > -1) { bestC = c.id; bestS = sec.id; bl = st.length; } } chapter = bestC; section = bestS; }
-    if (chapter && !section) { const ch = allChapters.find((x) => x.id === chapter); if (ch) { let best = null, bl = 0; for (const sec of ch.sections) { const st = cleanSection(sec.title); if (st && st.length > bl && hay.indexOf(st) > -1) { best = sec.id; bl = st.length; } } section = best; } }
+    // 1) 数字章节“第X章”（标题在前，优先命中标题；按教材顺序首个）
+    if (wantNum) {
+      outer: for (const b of books) for (const c of b.chapters)
+        if (parseChapterNum(c.title) === wantNum) { chapter = c.id; break outer; }
+    }
+    // 2) 标题里的主题词命中某章（章标题 + 各小节标题都算）
+    if (!chapter && topic.length >= 2) {
+      outer: for (const b of books) for (const c of b.chapters) {
+        const sig = cleanChapter(c.title) + " " + c.sections.map((sec) => cleanSection(sec.title)).join(" ");
+        if (sig.indexOf(topic) > -1) { chapter = c.id; break outer; }
+      }
+    }
+    // 3) 在“标题+内容”里找章节标题（取“最具体/最长”匹配，避免短名误中）
+    if (!chapter) {
+      let best = null, bestLen = 0;
+      for (const b of books) for (const c of b.chapters) {
+        const ct = cleanChapter(c.title);
+        if (ct && ct.length > bestLen && hay.indexOf(ct) > -1) { best = c.id; bestLen = ct.length; }
+      }
+      chapter = best;
+    }
+    // 5) 内容含小节标题但没给章节标题：反查该小节所属章节（取最长匹配）
+    if (!chapter) {
+      let bestC = null, bestS = null, bestLen = 0;
+      for (const b of books) for (const c of b.chapters) for (const sec of c.sections) {
+        const st = cleanSection(sec.title);
+        if (st && st.length > bestLen && hay.indexOf(st) > -1) { bestC = c.id; bestS = sec.id; bestLen = st.length; }
+      }
+      chapter = bestC; section = bestS;
+    }
+    // 4) 已知章节时，再定位小节（取最长匹配，避免“动量”误中“动量守恒”）
+    if (chapter && !section) {
+      const ch = allChapters.find((x) => x.id === chapter);
+      if (ch) {
+        let best = null, bestLen = 0;
+        for (const sec of ch.sections) {
+          const st = cleanSection(sec.title);
+          if (st && st.length > bestLen && hay.indexOf(st) > -1) { best = sec.id; bestLen = st.length; }
+        }
+        section = best;
+      }
+    }
     return { chapter: chapter, section: section };
   }
 
-  // ---------- 资源助手 ----------
-  function searchAssistant(s) {
-    const bookId = detectBook(s), type = detectType(s), loc = detectLoc(s, "", bookId), topic = removeNoise(s);
-    let pool = baseList.slice();
-    if (bookId) pool = pool.filter((r) => r.book === bookId);
-    if (type) pool = pool.filter((r) => r.type === type);
-    if (loc && loc.chapter) pool = pool.filter((r) => r.chapter === loc.chapter);
-    if (topic.length >= 2) { const lt = topic.toLowerCase(); pool = pool.filter((r) => [r.title, r.desc, (r.tags || []).join(" "), bookTitle(r.book), chapterTitle(r.chapter), sectionTitle(r.section)].join(" ").toLowerCase().indexOf(lt) > -1); }
-    return { pool: pool, book: bookId, type: type, loc: loc, keywords: topic };
-  }
-  function htmlEscape(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-  function resLabel(r) { const p = []; if (bookTitle(r.book)) p.push(bookTitle(r.book)); if (chapterTitle(r.chapter)) p.push(chapterTitle(r.chapter).replace(/第[一二三四五六七八九十]+章\s*/, "")); if (r.section && sectionTitle(r.section)) p.push(sectionTitle(r.section).replace(/^\s*\d+(\.\d+)*\s*/, "")); return p.join(" · "); }
-  function assistantReply(q) {
-    const res = searchAssistant(q), list = res.pool;
-    const filter = { book: res.book, chapter: res.loc && res.loc.chapter, section: res.loc && res.loc.section, type: res.type };
-    if (list.length === 0) {
-      if (res.loc && res.loc.chapter) return { text: "这个范围（" + (res.loc.section ? sectionTitle(res.loc.section) : chapterTitle(res.loc.chapter)) + "）暂时还没有已上传的资源。换个关键词或去对应章节看看。", resources: [], filter: filter };
-      return { text: "没找到相关资源。试试这样问：\n• 必修一 第二章 自由落体 课件\n• 仿真资源\n• 小船过河 ", resources: [], filter: filter };
-    }
-    let text = "为你找到 " + list.length + " 个相关资源：";
-    if (res.loc && res.loc.chapter) text += "（已定位到 " + (res.loc.section ? sectionTitle(res.loc.section) : chapterTitle(res.loc.chapter)) + "）";
-    return { text: text, resources: list, filter: filter };
-  }
-  function addMsg(html, who) { const body = $("#assistMessages"); const el = document.createElement("div"); el.className = "assist-msg " + who; el.innerHTML = html; body.appendChild(el); body.scrollTop = body.scrollHeight; }
-  function applyFilterFromReply(filter) { state.book = filter.book || null; state.chapter = filter.chapter || null; state.section = filter.section || null; state.type = filter.type || "all"; state.search = ""; render(); closeAssist(); const c = $(".workbench-main"); if (c && typeof c.scrollIntoView === "function") c.scrollIntoView({ behavior: "smooth" }); }
-
-  // ---------- 大模型（AI，可选） ----------
+  // ---------- 可选的大模型（AI）配置：浏览器直连、OpenAI 兼容；失败自动回退规则引擎 ----------
+  // 默认用智谱（BigModel/GLM）：国内可达、支持浏览器 CORS、`glm-4-flash` 免费。站长在“管理员登录”填入自己的 key 即启用 AI。
   const AI_DEFAULT_ENDPOINT = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
   const AI_DEFAULT_MODEL = "glm-4-flash";
   let aiConf = { endpoint: AI_DEFAULT_ENDPOINT, model: AI_DEFAULT_MODEL, key: "" };
-  function getAiConf() { try { const s = localStorage.getItem("ai_conf"); if (s) aiConf = Object.assign({ endpoint: AI_DEFAULT_ENDPOINT, model: AI_DEFAULT_MODEL, key: "" }, JSON.parse(s)); } catch (e) {} return aiConf; }
-  function setAiConf(c) { aiConf = Object.assign({}, getAiConf(), c); try { localStorage.setItem("ai_conf", JSON.stringify(aiConf)); } catch (e) {} }
+  function getAiConf() {
+    try {
+      const s = localStorage.getItem("ai_conf");
+      if (s) aiConf = Object.assign({ endpoint: AI_DEFAULT_ENDPOINT, model: AI_DEFAULT_MODEL, key: "" }, JSON.parse(s));
+    } catch (e) {}
+    return aiConf;
+  }
+  function setAiConf(c) {
+    aiConf = Object.assign({}, getAiConf(), c);
+    try { localStorage.setItem("ai_conf", JSON.stringify(aiConf)); } catch (e) {}
+  }
+
+  // 调用 OpenAI 兼容 /chat/completions；失败或超时返回 null（由调用方回退）
   async function llmChat(system, user, opts) {
     const conf = getAiConf();
-    if (!conf.endpoint || !conf.key) return null;
-    const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), (opts && opts.timeout) || 9000);
+    if (!conf.endpoint) return null;
+    if (!conf.key) return null;   // 未填写 key 时不开 AI（直接走本地规则，不额外请求）
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), (opts && opts.timeout) || 9000);
     try {
       const headers = { "Content-Type": "application/json", Accept: "application/json" };
       if (conf.key) headers.Authorization = "Bearer " + conf.key;
-      const body = { model: conf.model || AI_DEFAULT_MODEL, messages: [{ role: "system", content: system }, { role: "user", content: user }], temperature: (opts && opts.temperature != null) ? opts.temperature : 0.3, max_tokens: (opts && opts.maxTokens) || 200, stream: false };
-      const res = await fetch(conf.endpoint, { method: "POST", headers: headers, body: JSON.stringify(body), signal: ctrl.signal });
+      const body = {
+        model: conf.model || AI_DEFAULT_MODEL,
+        messages: [{ role: "system", content: system }, { role: "user", content: user }],
+        temperature: (opts && opts.temperature != null) ? opts.temperature : 0.3,
+        max_tokens: (opts && opts.maxTokens) || 200,
+        stream: false,
+      };
+      const res = await fetch(conf.endpoint, {
+        method: "POST", headers: headers, body: JSON.stringify(body), signal: ctrl.signal,
+      });
       if (!res.ok) throw new Error("AI " + res.status);
       const data = await res.json();
       return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
-    } catch (e) { return null; } finally { clearTimeout(timer); }
+    } catch (e) {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
   }
-  function parseJsonLoose(text) { if (!text) return null; const m = String(text).match(/\{[\s\S]*\}/); if (!m) return null; try { return JSON.parse(m[0]); } catch (e) { try { return JSON.parse(m[0].replace(/'/g, '"').replace(/，/g, ",")); } catch (e2) { return null; } } }
+
+  // 从模型返回里尽量抠出对象（模型可能用 ```json 包裹或夹带其它文字）
+  function parseJsonLoose(text) {
+    if (!text) return null;
+    const m = String(text).match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try { return JSON.parse(m[0]); } catch (e) {
+      try { return JSON.parse(m[0].replace(/'/g, '"').replace(/，/g, ",")); } catch (e2) { return null; }
+    }
+  }
+
+  // 用大模型从资源清单里挑最相关的资源标题
   async function aiPickTitles(q) {
     if (!baseList.length) return null;
-    const idx = baseList.map((r) => { const loc = [bookTitle(r.book), chapterTitle(r.chapter), sectionTitle(r.section)].filter(Boolean).join(" · "); return (r.title || "") + "┃" + loc + "┃" + (r.type || "") + "┃" + (r.desc || ""); }).join("\n");
-    const system = "你是高中物理教学资源库的检索助手。下面是仓库里的资源清单，每行格式：标题┃所属教材/章节┃类型┃简介。\n请根据用户的查询选出最相关的资源标题。只返回 JSON：{\"titles\":[\"标题1\",\"标题2\"]}，最多 5 个；都不相关则返回 {\"titles\":[]}。只输出 JSON。\n\n资源清单：\n" + idx;
+    const idx = baseList.map((r) => {
+      const loc = [bookTitle(r.book), chapterTitle(r.chapter), sectionTitle(r.section)].filter(Boolean).join(" · ");
+      return (r.title || "") + "┃" + loc + "┃" + (r.type || "") + "┃" + (r.desc || "");
+    }).join("\n");
+    const system =
+      "你是高中物理教学资源库的检索助手。下面是仓库里的资源清单，每行格式：标题┃所属教材/章节┃类型┃简介。\n" +
+      "请根据用户的查询选出最相关的资源标题。只返回 JSON：{\"titles\":[\"标题1\",\"标题2\"]}，最多 5 个；都不相关则返回 {\"titles\":[]}。只输出 JSON。\n\n资源清单：\n" + idx;
     const resp = await llmChat(system, "查询：" + q, { maxTokens: 300, temperature: 0.2, timeout: 6000 });
     const obj = parseJsonLoose(resp);
     if (obj && Array.isArray(obj.titles)) return obj.titles.map((t) => String(t).trim()).filter(Boolean);
     return null;
   }
+
+  // 大模型助手：优先 AI 挑资源，失败回退规则；仅命中同一章时提供“筛选到右侧”
   async function aiAssistantReply(q) {
     const picked = await aiPickTitles(q);
     let list = [];
     if (picked && picked.length) {
-      for (const t of picked) { if (!t) continue; const r = baseList.find((x) => x.title === t) || baseList.find((x) => x.title.indexOf(t) > -1 || (t.length > 1 && t.indexOf(x.title) > -1)); if (r && !list.some((x) => x.id === r.id)) list.push(r); }
+      for (const t of picked) {
+        if (!t) continue;
+        const r = baseList.find((x) => x.title === t)
+          || baseList.find((x) => x.title.indexOf(t) > -1 || (t.length > 1 && t.indexOf(x.title) > -1));
+        if (r && !list.some((x) => x.id === r.id)) list.push(r);
+      }
     }
-    if (!list.length) return assistantReply(q);
+    if (!list.length) return assistantReply(q);   // 回退到规则
     let filter = null;
     const chs = [...new Set(list.map((r) => r.chapter).filter(Boolean))];
-    if (chs.length === 1) { const first = list.find((r) => r.chapter === chs[0]); filter = { book: (first && first.book) || null, chapter: chs[0], section: null, type: "all" }; }
+    if (chs.length === 1) {
+      const first = list.find((r) => r.chapter === chs[0]);
+      filter = { book: (first && first.book) || null, chapter: chs[0], section: null, type: "all" };
+    }
     return { text: "为你找到 " + list.length + " 个相关资源：", resources: list, filter: filter };
   }
+
+  // 生成资源简介（用于上传/编辑表单“✨ 智能简介”）
+  // 基于元数据生成一句兜底简介（AI 不可用时也能给出合理描述）
   function fallbackDesc(title, chapterId, sectionId, type) {
     const cleanTitle = String(title || "").replace(/\.[a-z0-9]+$/i, "");
-    const seg = []; const bid = bookOfChapter(chapterId);
+    const seg = [];
+    const bid = bookOfChapter(chapterId);
     if (bid) seg.push(bookTitle(bid));
     if (chapterId) seg.push(chapterTitle(chapterId));
     if (sectionId) seg.push(sectionTitle(sectionId));
-    const loc = seg.filter(Boolean).map((s) => s.replace(/^第[一二三四五六七八九十]+章\s*/, "").replace(/^\s*\d+(\.\d+)*\s*/, "")).join(" · ");
-    return cleanTitle + (loc ? "（" + loc + "）" : "") + " · " + (type || "教学资源");
+    const loc = seg
+      .filter(Boolean)
+      .map((s) => s.replace(/^第[一二三四五六七八九十]+章\s*/, "").replace(/^\s*\d+(\.\d+)*\s*/, ""))
+      .join(" · ");
+    const t = type || "教学资源";
+    return cleanTitle + (loc ? "（" + loc + "）" : "") + " · " + t;
   }
+
   async function aiDescribe(title, chapterId, sectionId, type, contentSample) {
     const sys = "你是高中物理教学资源库的编辑。请为下面的资源写一句简介，35字以内，只输出简介正文，不要引号、不要“简介：”前缀、不要列表或编号。";
     let info = "资源名称：" + title;
@@ -523,269 +1422,215 @@
     if (type) info += "\n类型：" + type;
     if (contentSample) info += "\n文件内容（片段）：" + String(contentSample).slice(0, 300);
     const resp = await llmChat(sys, info, { maxTokens: 80, temperature: 0.6, timeout: 9000 });
-    if (resp) { let d = String(resp).trim().replace(/^("*|“|「|『|\s*简介[:：]?\s*)/, "").replace(/("*|”|」|』)$/, "").trim(); d = d.slice(0, 60); if (d) return { text: d, ai: true }; }
+    if (resp) {
+      let d = String(resp).trim().replace(/^("*|“|「|『|\s*简介[:：]?\s*)/, "").replace(/("*|”|」|』)$/, "").trim();
+      d = d.slice(0, 60);
+      if (d) return { text: d, ai: true };
+    }
     return { text: fallbackDesc(title, chapterId, sectionId, type), ai: false };
   }
+
+  // “✨ 智能简介”按钮：自动生成并填入描述（AI 优先，失败则用本地规则，绝不空着）
   async function aiGenerateDesc() {
     const title = $("#fTitle").value.trim();
     if (!title) { toast("请先填写资源名称", true); return; }
-    const btn = $("#aiDescBtn"); btn.disabled = true; btn.textContent = "生成中…";
+    const btn = $("#aiDescBtn");
+    btn.disabled = true;
+    btn.textContent = "生成中…";
     try {
       let sample = "";
       if (pendingFile && TEXT_EXT_RE.test(extOf(pendingFile.name))) sample = await readTextSample(pendingFile);
       const res = await aiDescribe(title, $("#fChapter").value, $("#fSection").value, $("#fType").value, sample);
       $("#fDesc").value = res.text;
       toast(res.ai ? "已生成智能简介（可再修改）" : "已生成简介（本地规则；AI 接口暂不可用，可在“管理员登录”里配置）");
-    } catch (e) { $("#fDesc").value = fallbackDesc(title, $("#fChapter").value, $("#fSection").value, $("#fType").value); toast("已生成简介（AI 异常已用本地规则）"); }
-    finally { btn.disabled = false; btn.textContent = "✨ 智能简介"; }
+    } catch (e) {
+      $("#fDesc").value = fallbackDesc(title, $("#fChapter").value, $("#fSection").value, $("#fType").value);
+      toast("已生成简介（AI 异常已用本地规则）");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "✨ 智能简介";
+    }
   }
+
+  function searchAssistant(s) {
+    const bookId = detectBook(s);
+    const type = detectType(s);
+    const loc = detectLoc(s, "", bookId);
+    const topic = removeNoise(s);
+
+    let pool = baseList.slice();
+    if (bookId) pool = pool.filter((r) => r.book === bookId);
+    if (type) pool = pool.filter((r) => r.type === type);
+    if (loc && loc.chapter) pool = pool.filter((r) => r.chapter === loc.chapter);
+
+    if (topic.length >= 2) {
+      const lt = topic.toLowerCase();
+      pool = pool.filter((r) => {
+        const hay = [
+          r.title, r.desc, (r.tags || []).join(" "),
+          bookTitle(r.book), chapterTitle(r.chapter), sectionTitle(r.section),
+        ].join(" ").toLowerCase();
+        return hay.indexOf(lt) > -1;
+      });
+    }
+    return { pool: pool, book: bookId, type: type, loc: loc, keywords: topic };
+  }
+
+  function htmlEscape(s) {
+    return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function resLabel(r) {
+    const parts = [];
+    if (bookTitle(r.book)) parts.push(bookTitle(r.book));
+    if (chapterTitle(r.chapter)) parts.push(chapterTitle(r.chapter).replace(/第[一二三四五六七八九十]+章\s*/, ""));
+    if (r.section && sectionTitle(r.section)) parts.push(sectionTitle(r.section).replace(/^\s*\d+(\.\d+)*\s*/, ""));
+    return parts.join(" · ");
+  }
+
+  function assistantReply(q) {
+    const res = searchAssistant(q);
+    const list = res.pool;
+    const filter = { book: res.book, chapter: res.loc && res.loc.chapter, section: res.loc && res.loc.section, type: res.type };
+    if (list.length === 0) {
+      if (res.loc && res.loc.chapter)
+        return { text: "这个范围（" + (res.loc.section ? sectionTitle(res.loc.section) : chapterTitle(res.loc.chapter)) + "）暂时还没有已上传的资源。换个关键词或去对应章节看看。", resources: [], filter: filter };
+      return {
+        text: "没找到相关资源。试试这样问：\n• 必修一 第二章 自由落体 课件\n• 仿真资源\n• 小船过河 ",
+        resources: [], filter: filter,
+      };
+    }
+    let text = "为你找到 " + list.length + " 个相关资源：";
+    if (res.loc && res.loc.chapter)
+      text += "（已定位到 " + (res.loc.section ? sectionTitle(res.loc.section) : chapterTitle(res.loc.chapter)) + "）";
+    return { text: text, resources: list, filter: filter };
+  }
+
+  function addMsg(html, who) {
+    const body = $("#assistMessages");
+    const el = document.createElement("div");
+    el.className = "assist-msg " + who;
+    el.innerHTML = html;
+    body.appendChild(el);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function applyFilterFromReply(filter) {
+    state.book = filter.book || null;
+    state.chapter = filter.chapter || null;
+    state.section = filter.section || null;
+    state.type = filter.type || "all";
+    state.search = "";
+    render();
+    closeAssist();
+    const c = document.querySelector(".content");
+    if (c && typeof c.scrollIntoView === "function") c.scrollIntoView({ behavior: "smooth" });
+  }
+
   async function assistantSend() {
-    const input = $("#assistInput"), q = input.value.trim();
+    const input = $("#assistInput");
+    const q = input.value.trim();
     if (!q) return;
     input.value = "";
     addMsg(htmlEscape(q), "user");
-    const sendBtn = $("#assistSend"); sendBtn.disabled = true; sendBtn.textContent = "思考中…";
-    const think = document.createElement("div"); think.className = "assist-msg bot"; think.textContent = "🤖 正在思考…";
-    $("#assistMessages").appendChild(think); $("#assistMessages").scrollTop = $("#assistMessages").scrollHeight;
+
+    const sendBtn = $("#assistSend");
+    sendBtn.disabled = true;
+    const origTxt = sendBtn.textContent;
+    sendBtn.textContent = "思考中…";
+    const think = document.createElement("div");
+    think.className = "assist-msg bot";
+    think.textContent = "🤖 正在思考…";
+    $("#assistMessages").appendChild(think);
+    $("#assistMessages").scrollTop = $("#assistMessages").scrollHeight;
+
     let reply;
-    try { reply = await aiAssistantReply(q); } catch (e) { reply = assistantReply(q); }
+    try {
+      reply = await aiAssistantReply(q);
+    } catch (e) {
+      reply = assistantReply(q);
+    }
     if (think.parentNode) think.parentNode.removeChild(think);
-    sendBtn.disabled = false; sendBtn.textContent = "发送";
-    const hitList = reply.resources.length ? "<ul>" + reply.resources.map((r) => "<li><span class='assist-hit' data-id='" + r.id + "'>" + htmlEscape(r.title) + "</span> <small>" + htmlEscape(resLabel(r)) + "</small></li>").join("") + "</ul>" : "";
-    const btn = reply.filter && reply.resources.length ? "<div class='assist-btnrow'><button class='btn btn-secondary btn-sm' type='button' data-applyfilter='1'>筛选到右侧</button></div>" : "";
+    sendBtn.disabled = false;
+    sendBtn.textContent = origTxt;
+
+    const hitList = reply.resources.length
+      ? "<ul>" +
+        reply.resources
+          .map(
+            (r) =>
+              "<li><span class='assist-hit' data-id='" + r.id + "'>" + htmlEscape(r.title) + "</span> <small>" + htmlEscape(resLabel(r)) + "</small></li>"
+          )
+          .join("") +
+        "</ul>"
+      : "";
+    const btn = reply.filter && reply.resources.length
+      ? "<div class='assist-btnrow'><button class='btn ghost' type='button' data-applyfilter='1'>筛选到右侧</button></div>"
+      : "";
     addMsg(reply.text.replace(/\n/g, "<br/>") + hitList + btn, "bot");
-    $$("#assistMessages .assist-hit").forEach((el) => { el.onclick = () => { const r = baseList.find((x) => x.id === el.getAttribute("data-id")); if (r) openResource(r); }; });
-    $$("#assistMessages [data-applyfilter]").forEach((b) => { b.onclick = () => applyFilterFromReply(reply.filter); });
-  }
-  function openAssist() { $("#assistPanel").hidden = false; if ($("#assistMessages").childElementCount === 0) addMsg("你好！我是资源助手。告诉我你想找的教材/章节/类型或关键词，例如“必修一 自由落体 课件”。", "bot"); setTimeout(() => $("#assistInput").focus(), 50); }
-  function closeAssist() { $("#assistPanel").hidden = true; }
 
-  // ---------- 管理员 / AI 登录 ----------
-  function openAdminModal() {
-    $("#adminToken").value = getPublishToken();
-    const ai = getAiConf(); if ($("#aiEndpoint")) $("#aiEndpoint").value = ai.endpoint || ""; if ($("#aiModel")) $("#aiModel").value = ai.model || ""; if ($("#aiKey")) $("#aiKey").value = ai.key || "";
-    refreshAdminUI(); $("#adminMask").classList.remove("hidden"); setTimeout(() => $("#adminToken").focus(), 50);
-  }
-  function closeAdminModal() { $("#adminMask").classList.add("hidden"); }
-  function saveAdmin() {
-    const t = $("#adminToken").value.trim();
-    if (!t) { toast("请输入 GitHub 访问令牌", true); return; }
-    setPublishToken(t);
-    setAiConf({ endpoint: $("#aiEndpoint") ? $("#aiEndpoint").value.trim() : aiConf.endpoint, model: $("#aiModel") ? $("#aiModel").value.trim() : aiConf.model, key: $("#aiKey") ? $("#aiKey").value.trim() : aiConf.key });
-    closeAdminModal(); refreshAdminUI(); hydrateCounts(); render();
-    toast("已登录，上传与编辑入口已开启");
-  }
-  function clearToken() {
-    if (!window.confirm("确定要清除本机保存的管理员令牌吗？清除后上传入口会隐藏。")) return;
-    try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
-    closeAdminModal(); refreshAdminUI(); hydrateCounts(); render(); toast("已退出，上传入口已隐藏");
+    Array.prototype.forEach.call(document.querySelectorAll("#assistMessages .assist-hit"), (el) => {
+      el.onclick = () => {
+        const r = baseList.find((x) => x.id === el.getAttribute("data-id"));
+        if (r) openResource(r);
+      };
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("#assistMessages [data-applyfilter]"), (b) => {
+      b.onclick = () => applyFilterFromReply(reply.filter);
+    });
   }
 
-  // ---------- 渲染：模块切换 ----------
-  const MODULE_INFO = {
-    materials: { name: "1. 教学材料上传", sub: "人教版各章节 · 小节文件浏览目录" },
-    plans: { name: "2. 教学计划安排", sub: "2025-2026 学年教学进度 / 大单元排课" },
-    goals: { name: "3. 教学目标评估", sub: "核心素养评价量规 / 达标分析" },
-    analytics: { name: "4. 班级成绩分析", sub: "阶段考试统计 / 考点易错谱系" },
-    students: { name: "5. 学生重点跟进", sub: "拔尖培优 / 临界生提分" },
-    innovation: { name: "6. 创新思路记录", sub: "自制教具 / 跨学科 STEAM" },
-    gaokao: { name: "7. 高考题目分析", sub: "真题微专题 / 命题趋势预测" },
-  };
-
-  function render() {
-    const info = MODULE_INFO[currentModule] || MODULE_INFO.materials;
-    $("#header-module-name").textContent = info.name;
-    if (currentModule === "materials") {
-      $("#header-sub-name").textContent = info.sub;
-      $("#subtabs-bar").style.display = "none";
-      renderMaterials();
-    } else {
-      $("#header-sub-name").textContent = info.sub;
-      $("#subtabs-bar").style.display = "flex";
-      $("#subtabs-container").innerHTML = '<button class="subtab-btn active">概览</button>';
-      $("#subtabs-actions").innerHTML = '<button class="btn btn-secondary btn-sm">建设中</button>';
-      renderPlaceholder(currentModule, info);
+  function openAssist() {
+    const p = $("#assistPanel");
+    p.hidden = false;
+    if ($("#assistMessages").childElementCount === 0) {
+      addMsg("你好！我是资源助手。告诉我你想找的教材/章节/类型或关键词，例如“必修一 自由落体 课件”。", "bot");
     }
-    $$("#main-nav-menu .nav-item").forEach((b) => b.classList.toggle("active", b.getAttribute("data-module") === currentModule));
+    setTimeout(() => $("#assistInput").focus(), 50);
   }
-
-  function renderPlaceholder(id, info) {
-    const desc = {
-      plans: "教学计划安排模块正在建设中。规划接入各学期大单元排课、实验周历与课时进度表。",
-      goals: "教学目标评估模块正在建设中。规划接入核心素养四维评价量规与课堂达标数据分析。",
-      analytics: "班级成绩分析模块正在建设中。规划接入联考小分统计、班级对比与考点易错谱系。",
-      students: "学生重点跟进模块正在建设中。规划接入拔尖培优档案与临界生提分方案。",
-      innovation: "创新思路记录模块正在建设中。规划接入自制教具方案与 STEAM 跨学科项目。",
-      gaokao: "高考题目分析模块正在建设中。规划接入真题微专题拆解与命题趋势预测。",
-    }[id] || "该模块正在建设中。";
-    $("#content-viewport").innerHTML = '<div class="module-placeholder"><div class="ph-icon">🚧</div><h3>' + (info.name.replace(/^\d+\.\s*/, "")) + "</h3><p>" + desc + '</p><span class="ph-badge">建设中 · 敬请期待</span></div>';
-  }
-
-  // ---------- 渲染：人教资源库（教材→章→节 + 文件卡片） ----------
-  function bookCount(bookId) { return baseList.filter((r) => r.book === bookId).length; }
-  function chCount(ch) { return baseList.filter((r) => r.chapter === ch.id).length; }
-  function secCount(ch, sec) { return baseList.filter((r) => r.chapter === ch.id && r.section === sec.id).length; }
-
-  // 智能默认选择：优先停靠在“第一个有资源的教材→章”；当前项无资源则在有资源的书/章间切换
-  function smartDefault() {
-    if (!state.book || bookCount(state.book) === 0) {
-      const fw = COURSE.books.find((b) => bookCount(b.id) > 0);
-      state.book = (fw || COURSE.books[0]).id;
-    }
-    const book = bookOf(state.book) || COURSE.books[0];
-    const curCh = chapterOf(state.chapter);
-    if (!state.chapter || chCount(curCh) === 0) {
-      const ch = book.chapters.find((c) => chCount(c) > 0) || book.chapters[0];
-      state.chapter = (ch || book.chapters[0]).id;
-      state.section = null;
-    }
-  }
-
-  function renderMaterials() {
-    smartDefault();
-    const book = bookOf(state.book) || COURSE.books[0];
-    const activeChapter = chapterOf(state.chapter) || book.chapters[0];
-    if (state.section && !(activeChapter.sections || []).some((s) => s.id === state.section)) state.section = null; // 失效小节则回到“全章”
-
-    const typeOptions = ["all"].concat(COURSE.resourceTypes || []);
-    const typeLabels = { all: "全部类型", 练习: "练习", 试卷: "试卷", 课件: "课件", 教案: "教案", 仿真资源: "仿真资源" };
-    const vis = visible();
-
-    const treeHtml = book.chapters.map((ch) => {
-      const open = openChapters.has(ch.id) || ch.id === state.chapter;
-      const selCh = ch.id === state.chapter;
-      let secs = ch.sections;
-      if (treeSearch.trim()) { const t = treeSearch.trim().toLowerCase(); secs = secs.filter((s) => s.title.toLowerCase().includes(t)); }
-      return '<div class="chapter-node ' + (open ? "expanded" : "") + (selCh ? " selected-chapter" : "") + '">' +
-        '<div class="chapter-head" data-chapter-id="' + ch.id + '">' +
-        '<span class="chapter-toggle-icon">▶</span>' +
-        '<div class="chapter-title-wrap"><div class="chapter-code-title"><span>' + ch.title.replace(/^第[一二三四五六七八九十]+章\s*/, "") + "</span></div>" +
-        '<div class="chapter-meta"><span>' + ch.sections.length + "个小节</span><span class=\"chapter-count-tag\">" + chCount(ch) + "份</span></div></div></div>" +
-        '<div class="section-list">' +
-        '<div class="section-node' + (selCh && state.section === null ? " active-section" : "") + '" data-chapter-id="' + ch.id + '" data-section-id="">' +
-        '<span class="section-bullet"></span><span class="section-title">📂 全章资源</span><span class="section-badge">' + chCount(ch) + "</span></div>" +
-        secs.map((s) => {
-          const act = selCh && state.section === s.id;
-          return '<div class="section-node' + (act ? " active-section" : "") + '" data-chapter-id="' + ch.id + '" data-section-id="' + s.id + '">' +
-            '<span class="section-bullet"></span><span class="section-title">' + s.title + "</span><span class=\"section-badge\">" + secCount(ch, s) + "</span></div>";
-        }).join("") +
-        "</div></div>";
-    }).join("");
-
-    const secLabel = activeChapter.title.replace(/^第[一二三四五六七八九十]+章\s*/, "");
-    const overview = '<div class="section-overview-card">' +
-      '<div class="section-path-nav"><div class="section-path-crumbs"><span>人教版高中物理</span><span>&gt;</span><span>' + book.title + '</span><span>&gt;</span><strong>' + activeChapter.title + '</strong></div></div>' +
-      '<div class="section-overview-main"><div class="section-heading-block"><h2><span>' + activeChapter.title + '</span><span class="section-highlight-badge">共' + activeChapter.sections.length + '小节</span></h2>' +
-      '<div class="section-meta-row"><div class="section-meta-item"><span>当前范围资源:</span><strong style="color:var(--primary);">' + vis.length + ' 份</strong></div></div></div></div>' +
-      '<div class="section-teaching-targets"><div class="target-title"><span>🎯</span><span>所属章节 · 小节资源：</span></div><div class="target-desc">' + secLabel + ' —— 请从左侧“教材小节精准目录”选择具体小节查看对应资源。</div></div>' +
-      "</div>";
-
-    const uploadZone = '<div class="chapter-upload-zone" id="chapter-dropzone">' +
-      '<div class="upload-zone-left"><div class="upload-zone-icon"><span>📤</span></div><div class="upload-zone-text"><h4>精准上传教学材料至『' + activeChapter.title + '』</h4><p>支持 HTML/PDF/Word/PPT/Excel/图片/视频/压缩包，保存即发布到线上仓库并登记到资源清单。</p></div></div>' +
-      '<div class="upload-zone-right"><button class="btn btn-primary btn-sm" id="btn-open-upload-modal"><span>+ 上传到本节</span></button></div></div>';
-
-    const catBtns = '<div class="category-filter-group">' + typeOptions.map((t) => '<button class="cat-btn' + (state.type === t ? " active" : "") + '" data-cat="' + t + '">' + typeLabels[t] + "</button>").join("") + '</div><div class="view-mode-group"><button class="view-btn' + (currentView === "grid" ? " active" : "") + '" data-view="grid">▦ 卡片</button><button class="view-btn' + (currentView === "list" ? " active" : "") + '" data-view="list">☰ 列表</button></div>';
-
-    const cardsHtml = currentView === "grid"
-      ? '<div class="pep-files-grid">' + (vis.length ? vis.map(buildCard).join("") : emptyHtml()) + "</div>"
-      : buildTable(vis);
-
-    $("#content-viewport").innerHTML =
-      '<div class="pep-module-wrap">' +
-      '<div class="pep-book-tabs">' + COURSE.books.map((b) => '<button class="pep-book-tab' + (b.id === state.book ? " active" : "") + '" data-book-id="' + b.id + '"><span class="book-tab-badge">' + (b.title.replace(/必修|选择性/g, "").slice(0, 2)) + '</span><div class="book-tab-info"><span class="book-tab-title">' + b.title + '</span><span class="book-tab-sub">' + b.chapters.length + "章 / " + b.chapters.reduce((x, c) => x + c.sections.length, 0) + "小节 (" + bookCount(b.id) + "份)</span></div></button>").join("") + "</div>" +
-      '<div class="pep-main-layout">' +
-      '<div class="pep-tree-panel"><div class="tree-header"><div class="tree-title-row"><span>📂</span><h3>教材小节精准目录</h3></div></div>' +
-      '<div class="tree-search-wrap"><span class="tree-search-icon">🔍</span><input type="text" id="tree-filter-input" placeholder="输入小节名/考点检索..." value="' + treeSearch.replace(/"/g, "&quot;") + '" /></div>' +
-      '<div class="tree-nodes-container">' + treeHtml + "</div></div>" +
-      '<div class="pep-content-panel">' + overview + uploadZone +
-      '<div class="pep-toolbar">' + catBtns + "</div>" +
-      '<div class="pep-files-container">' + cardsHtml + "</div></div>" +
-      "</div></div>";
-  }
-
-  function emptyHtml() {
-    return '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-dim);"><div style="font-size:40px;margin-bottom:10px;">🗂️</div><b>暂无匹配的资源</b><br/>试试调整搜索关键词或分类筛选。</div>';
-  }
-
-  function iconBadge(url) {
-    const ext = (url || "").split(".").pop().toLowerCase();
-    let cls = "icon-doc", label = "DOC";
-    if (/pptx?/.test(ext)) { cls = "icon-ppt"; label = "PPT"; }
-    else if (/pdf/.test(ext)) { cls = "icon-pdf"; label = "PDF"; }
-    else if (/xlsx?/.test(ext)) { cls = "icon-xls"; label = "XLS"; }
-    else if (/mp4|webm|mov/.test(ext)) { cls = "icon-mp4"; label = "MP4"; }
-    else if (/html?/.test(ext)) { cls = "icon-doc"; label = "HTML"; }
-    return '<div class="file-icon-badge ' + cls + '">' + label + "</div>";
-  }
-
-  function buildCard(raw) {
-    const r = openable(raw);
-    const meta = [bookTitle(r.book), chapterTitle(r.chapter), r.section ? sectionTitle(r.section) : ""].filter(Boolean).join(" · ");
-    const tags = (r.tags || []).slice(0, 3).map((t) => '<span class="tag-pill">' + htmlEscape(t) + "</span>").join("");
-    let actions = "";
-    if (getPublishToken()) actions = '<button class="btn btn-secondary btn-xs" data-act="edit" data-id="' + r.id + '">✏️ 编辑</button><button class="btn btn-secondary btn-xs" style="color:var(--accent-rose);" data-act="del" data-id="' + r.id + '">🗑 删除</button>';
-    return '<article class="pep-file-card" data-id="' + r.id + '">' +
-      '<div class="card-top-row">' + iconBadge(r.url) +
-      '<div class="file-title-wrap"><div class="file-item-name">' + htmlEscape(r.title || "未命名资源") + '</div><span class="file-section-badge">' + htmlEscape(r.type || "资源") + "</span>" + (tags ? '<div class="file-tags-row">' + tags + "</div>" : "") + "</div></div>" +
-      (r.desc ? '<p style="font-size:12px;color:var(--text-muted);line-height:1.5;">' + htmlEscape(r.desc) + "</p>" : "<p></p>") +
-      '<div class="file-card-footer"><span style="font-size:11px;color:var(--text-dim);">' + htmlEscape(meta || "未分教材") + '</span><div class="file-actions-row"><button class="btn btn-primary btn-xs" data-act="open" data-id="' + r.id + '">↗ 打开</button>' + actions + "</div></div>" +
-      "</article>";
-  }
-
-  function buildTable(list) {
-    if (!list.length) return emptyHtml();
-    const rows = list.map((raw) => {
-      const r = openable(raw);
-      const meta = [bookTitle(r.book), chapterTitle(r.chapter), r.section ? sectionTitle(r.section) : ""].filter(Boolean).join(" · ");
-      let actions = '<button class="btn btn-primary btn-xs" data-act="open" data-id="' + r.id + '">打开</button>';
-      if (getPublishToken()) actions += '<button class="btn btn-secondary btn-xs" data-act="edit" data-id="' + r.id + '">编辑</button><button class="btn btn-secondary btn-xs" style="color:var(--accent-rose);" data-act="del" data-id="' + r.id + '">删除</button>';
-      return "<tr data-id='" + r.id + "'><td>" + htmlEscape(r.title || "") + "</td><td>" + htmlEscape(r.type || "") + "</td><td>" + htmlEscape(meta) + "</td><td class=\"td-actions\">" + actions + "</td></tr>";
-    }).join("");
-    return '<table class="pep-files-table"><thead><tr><th>资源名称</th><th>类型</th><th>所属</th><th>操作</th></tr></thead><tbody>' + rows + "</tbody></table>";
+  function closeAssist() {
+    $("#assistPanel").hidden = true;
   }
 
   // ---------- 事件绑定 ----------
-  function onTreeOrCardClick(e) {
-    const bookBtn = e.target.closest(".pep-book-tab");
-    if (bookBtn) { state.book = bookBtn.getAttribute("data-book-id"); state.chapter = null; state.section = null; openChapters.clear(); render(); return; }
-    const chHead = e.target.closest(".chapter-head");
-    if (chHead) { const cid = chHead.getAttribute("data-chapter-id"); if (state.chapter !== cid) { state.chapter = cid; state.section = null; const b = bookOfChapter(cid); if (b) state.book = b; openChapters.add(cid); } else if (openChapters.has(cid)) openChapters.delete(cid); else openChapters.add(cid); render(); return; }
-    const node = e.target.closest(".section-node");
-    if (node) { state.chapter = node.getAttribute("data-chapter-id"); state.section = node.getAttribute("data-section-id") || null; const b = bookOfChapter(state.chapter); if (b) state.book = b; render(); return; }
-    const cat = e.target.closest(".cat-btn");
-    if (cat) { state.type = cat.getAttribute("data-cat"); render(); return; }
-    const view = e.target.closest(".view-btn");
-    if (view) { currentView = view.getAttribute("data-view"); render(); return; }
-    const act = e.target.closest("[data-act]");
-    if (act) {
-      const id = act.getAttribute("data-id"); const r = baseList.find((x) => x.id === id);
-      if (!r) return;
-      const a = act.getAttribute("data-act");
-      if (a === "open") openResource(r);
-      else if (a === "edit") openModal(r);
-      else if (a === "del") handleDelete(r);
-      return;
-    }
-    if (e.target.closest("#btn-open-upload-modal")) { openModal(); return; }
-  }
-
   function bindEvents() {
-    $$("#main-nav-menu .nav-item").forEach((b) => { b.onclick = () => { currentModule = b.getAttribute("data-module"); render(); }; });
+    $(".nav-all").onclick = () => {
+      state.book = null;
+      state.chapter = null;
+      state.section = null;
+      render();
+    };
+    let debounce;
+    $("#search").addEventListener("input", (e) => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        state.search = e.target.value;
+        render();
+      }, 150);
+    });
 
-    let deb;
-    $("#global-search").addEventListener("input", (e) => { clearTimeout(deb); deb = setTimeout(() => { state.search = e.target.value.trim(); render(); }, 150); });
-    $("#content-viewport").addEventListener("click", onTreeOrCardClick);
-    $("#content-viewport").addEventListener("input", (e) => { if (e.target && e.target.id === "tree-filter-input") { treeSearch = e.target.value.trim(); render(); } });
+    $("#navToggle").onclick = () => {
+      const layout = document.querySelector(".layout");
+      const hidden = layout.classList.toggle("no-sidebar");
+      try { localStorage.setItem(NAV_KEY, hidden ? "1" : "0"); } catch (e) {}
+      applyNavState();
+    };
+    applyNavState();
 
-    $("#quick-add-btn").onclick = () => openModal();
-    $("#btn-notifications").onclick = openAdminModal;
-
-    // 上传弹窗
+    $("#uploadBtn").onclick = () => openModal();
+    $("#adminBtn").onclick = openAdminModal;
     $("#closeModal").onclick = closeModal;
     $("#cancelModal").onclick = closeModal;
-    let mask = $("#modalMask"); if (mask) mask.addEventListener("click", (e) => { if (e.target === mask) closeModal(); });
-    $("#fType").addEventListener("change", () => { refreshTypeUI(); populateSectionSelect(); });
-    $("#fBook").addEventListener("change", populateChapterSelect);
+    mask.addEventListener("click", (e) => {
+      if (e.target === mask) closeModal();
+    });
+    $("#fType").addEventListener("change", () => {
+      refreshTypeUI();
+      populateSectionSelect();
+    });
+    $("#fBook").addEventListener("change", () => {
+      populateChapterSelect();
+    });
     $("#fChapter").addEventListener("change", populateSectionSelect);
     $("#autoFillBtn").onclick = async () => { await smartFill(true); aiGenerateDesc(); };
     $("#aiDescBtn").onclick = aiGenerateDesc;
@@ -795,32 +1640,64 @@
     $("#assistFab").onclick = openAssist;
     $("#assistClose").onclick = closeAssist;
     $("#assistSend").onclick = assistantSend;
-    $("#assistInput").addEventListener("keydown", (e) => { if (e.key === "Enter") assistantSend(); });
+    $("#assistInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") assistantSend();
+    });
 
-    // 管理员/AI
+    // 管理员弹窗
     $("#closeAdminModal").onclick = closeAdminModal;
     $("#cancelAdminModal").onclick = closeAdminModal;
-    let am = $("#adminMask"); if (am) am.addEventListener("click", (e) => { if (e.target === am) closeAdminModal(); });
+    adminMask.addEventListener("click", (e) => {
+      if (e.target === adminMask) closeAdminModal();
+    });
     $("#adminSave").onclick = saveAdmin;
     $("#clearTokenBtn").onclick = clearToken;
-    $("#adminToken").addEventListener("keydown", (e) => { if (e.key === "Enter") saveAdmin(); });
+    $("#adminToken").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") saveAdmin();
+    });
+    $("#workerBtn").onclick = openWorkerModal;
+    $("#closeWorkerModal").onclick = closeWorkerModal;
+    $("#cancelWorkerModal").onclick = closeWorkerModal;
+    workerMask.addEventListener("click", (e) => {
+      if (e.target === workerMask) closeWorkerModal();
+    });
+    $("#workerSave").onclick = saveWorkerLogin;
+    $("#workerLogoutBtn").onclick = workerLogout;
+    $("#workerPass").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") saveWorkerLogin();
+    });
 
-    // 文件选择
-    const dz = $("#dropzone"), fi = $("#fileInput");
+    const dz = $("#dropzone");
+    const fi = $("#fileInput");
     dz.onclick = () => fi.click();
     fi.addEventListener("change", () => setPendingFile(fi.files[0]));
-    ["dragenter", "dragover"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add("drag"); }));
-    ["dragleave", "drop"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove("drag"); }));
-    dz.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) setPendingFile(f); });
+    ["dragenter", "dragover"].forEach((ev) =>
+      dz.addEventListener(ev, (e) => {
+        e.preventDefault();
+        dz.classList.add("drag");
+      })
+    );
+    ["dragleave", "drop"].forEach((ev) =>
+      dz.addEventListener(ev, (e) => {
+        e.preventDefault();
+        dz.classList.remove("drag");
+      })
+    );
+    dz.addEventListener("drop", (e) => {
+      const f = e.dataTransfer.files[0];
+      if (f) setPendingFile(f);
+    });
     $("#clearFile").onclick = clearPendingFile;
   }
 
   // ---------- 启动 ----------
   document.addEventListener("DOMContentLoaded", () => {
-    try { const yearEl = $("#year"); if (yearEl) yearEl.textContent = new Date().getFullYear(); } catch (e) {}
+    $("#subjectSub").textContent = COURSE.subject || "";
+    const yearEl = $("#year");
+    if (yearEl) yearEl.textContent = new Date().getFullYear();
     bindEvents();
-    refreshAdminUI();
-    render();                       // 先用 COURSE 立即画出目录树（不等网络/IndexedDB）
-    loadAll().catch((e) => toast("初始化失败：" + (e && e.message), true));
+    refreshAdminUI(); // 依据本地令牌决定是否显示“上传资源”按钮
+    loadAll()
+      .catch((e) => toast("初始化失败：" + e.message, true));
   });
 })();

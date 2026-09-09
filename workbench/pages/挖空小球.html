@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gravitation: Extended Body & Cavity Model</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;500;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* slate-900 */
+            color: #f8fafc; /* slate-50 */
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Number Input Styles */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            opacity: 1; 
+        }
+
+        .panel-scroll {
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #475569 #1e293b;
+        }
+        .panel-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .panel-scroll::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        .panel-scroll::-webkit-scrollbar-thumb {
+            background-color: #475569;
+            border-radius: 10px;
+        }
+
+        .math-block {
+            background: rgba(30, 41, 59, 0.7);
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border-left: 3px solid #3b82f6;
+            margin-bottom: 0.75rem;
+        }
+
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #68D391;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #68D391;
+        }
+        
+        /* Eye-friendly (Low Blue Light / Soft Green) Theme Overrides */
+        body { background-color: #1e2923 !important; background-image: radial-gradient(circle at center, #233029 0%, #17201b 100%); color: #d1dcd5 !important; }
+        .bg-slate-950 { background-color: #17201b !important; }
+        .bg-slate-900 { background-color: #1e2923 !important; }
+        .bg-slate-900\/80 { background-color: rgba(30, 41, 35, 0.8) !important; }
+        .bg-slate-800 { background-color: #27362d !important; }
+        .border-slate-800 { border-color: #33473b !important; }
+        .border-slate-700 { border-color: #3f5749 !important; }
+        .border-slate-600 { border-color: #4b6656 !important; }
+        .text-slate-400 { color: #8ba396 !important; }
+        .text-slate-300 { color: #a3b8ac !important; }
+        .text-white { color: #dcdedc !important; }
+        .math-block { background: rgba(39, 54, 45, 0.7) !important; }
+
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 40vh;
+        }
+        
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row h-screen">
+
+    <!-- Canvas Area -->
+    <div class="w-full md:w-3/5 h-[40vh] md:h-full relative bg-slate-950 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col">
+        <div class="absolute top-4 left-4 z-10 pointer-events-none">
+            <h1 class="text-xl md:text-2xl font-bold text-blue-400 drop-shadow-md">Gravitation Model</h1>
+            <p class="text-xs text-slate-400">Cavity & Center of Mass (Mass ∝ Area)</p>
+        </div>
+        
+        <!-- Legend -->
+        <div class="absolute bottom-4 left-4 z-10 pointer-events-none flex flex-col gap-1 text-xs mono bg-slate-900/80 p-2 rounded border border-slate-700 backdrop-blur-sm">
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-blue-500/50 border border-blue-400"></span> Base Object (M₁)</div>
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full border border-dashed border-red-400"></span> Cavity (-M_cav)</div>
+            <div class="flex items-center gap-2"><span class="text-green-400 text-lg leading-none">⌖</span> Center of Mass (CoM)</div>
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-amber-400"></span> Test Mass (m)</div>
+        </div>
+
+        <div id="canvas-container" class="flex-grow"></div>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="w-full md:w-2/5 h-[60vh] md:h-full bg-slate-900 panel-scroll flex flex-col">
+        
+        <div class="p-5 flex-grow flex flex-col gap-6">
+            
+            <!-- Controls -->
+            <div class="space-y-3">
+                <div class="flex justify-between items-end border-b border-slate-700 pb-1">
+                    <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider">Parameters (SI Units)</h2>
+                    <span class="text-[10px] text-green-400">Mass ↔ Area Auto-Sync</span>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[11px] text-blue-300 block mb-1">Base Radius R [m]</label>
+                        <input type="number" id="input-R" value="10" min="0.1" step="0.1" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-red-300 block mb-1">Cavity Radius r [m]</label>
+                        <input type="number" id="input-r" value="4" min="0.1" step="0.1" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-purple-300 block mb-1">Cavity Offset x [m]</label>
+                        <input type="number" id="input-x" value="3" step="0.1" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-amber-300 block mb-1">Distance D [m]</label>
+                        <input type="number" id="input-D" value="25" min="0.1" step="0.1" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-slate-300 block mb-1">Test Mass m [kg]</label>
+                        <input type="number" id="input-m" value="1000" min="1" step="10" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-blue-300 block mb-1">Base Mass M₁ [kg]</label>
+                        <input type="number" id="input-Mbase" value="10000" min="1" step="100" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-red-300 block mb-1">Cavity Mass M_cav [kg]</label>
+                        <input type="number" id="input-Mcav" value="1600" min="0" step="10" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calculation Mode Toggle -->
+            <div class="bg-slate-800 p-4 rounded-lg border border-slate-700">
+                <h2 class="text-sm font-bold text-slate-300 mb-3">Calculation Model</h2>
+                <div class="flex items-center justify-center bg-slate-900 rounded-md p-1">
+                    <button id="btn-exact" class="flex-1 py-2 text-xs font-semibold rounded transition-colors bg-blue-600 text-white shadow-md">Exact (Superposition)</button>
+                    <button id="btn-approx" class="flex-1 py-2 text-xs font-semibold rounded transition-colors text-slate-400 hover:text-slate-200">Point Mass Approx</button>
+                </div>
+                <p id="mode-desc" class="text-[11px] text-slate-400 mt-2 text-center">Calculates force by subtracting cavity force from base force.</p>
+            </div>
+
+            <!-- Physics Calculations -->
+            <div class="space-y-3">
+                <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider border-b border-slate-700 pb-1">Calculations</h2>
+                
+                <div class="math-block text-xs mono">
+                    <div class="text-slate-400 mb-1 font-sans font-semibold">1. Net Mass</div>
+                    <div class="flex justify-between"><span>M<sub>base</sub></span> <span id="out-m1" class="text-blue-300">0 kg</span></div>
+                    <div class="flex justify-between"><span>M<sub>cavity</sub></span> <span id="out-mc" class="text-red-300">0 kg</span></div>
+                    <div class="flex justify-between border-t border-slate-600 mt-1 pt-1">
+                        <span>M<sub>net</sub></span> <span id="out-mnet" class="text-white font-bold">0 kg</span>
+                    </div>
+                </div>
+
+                <div class="math-block text-xs mono" style="border-left-color: #10b981;">
+                    <div class="text-slate-400 mb-1 font-sans font-semibold">2. Remaining Mass CoM (X<sub>com</sub>)</div>
+                    <div class="text-[10px] text-slate-500 mb-1">X<sub>com</sub> = (M<sub>base</sub>·0 - M<sub>cavity</sub>·x) / M<sub>net</sub></div>
+                    <div class="flex justify-between items-center">
+                        <span>Result:</span> 
+                        <span id="out-xcom" class="text-green-400 font-bold text-sm">0 m</span>
+                    </div>
+                </div>
+
+                <div class="math-block text-xs mono" style="border-left-color: #f59e0b;">
+                    <div class="text-slate-400 mb-1 font-sans font-semibold flex justify-between">
+                        <span>3. Gravitational Force (F)</span>
+                        <span class="text-[10px]">G ≈ 6.67×10⁻¹¹</span>
+                    </div>
+                    
+                    <!-- Exact Details -->
+                    <div id="calc-exact-details" class="space-y-1 mb-2">
+                        <div class="text-[10px] text-slate-500">F<sub>exact</sub> = F<sub>base</sub> - F<sub>cavity</sub></div>
+                        <div class="flex justify-between text-[11px]">
+                            <span>F<sub>base</sub></span>
+                            <span id="out-fbase" class="text-slate-300">0 N</span>
+                        </div>
+                        <div class="flex justify-between text-[11px]">
+                            <span>F<sub>cavity</sub></span>
+                            <span id="out-fcav" class="text-slate-300">0 N</span>
+                        </div>
+                    </div>
+
+                    <!-- Approx Details -->
+                    <div id="calc-approx-details" class="space-y-1 mb-2 hidden">
+                        <div class="text-[10px] text-slate-500">F<sub>approx</sub> = G·M<sub>net</sub>·m / (D - X<sub>com</sub>)²</div>
+                        <div class="text-[11px] text-amber-500/70">Assuming mass concentrated at CoM.</div>
+                    </div>
+
+                    <div class="flex justify-between items-end border-t border-slate-600 mt-2 pt-2">
+                        <span class="text-lg">F =</span> 
+                        <div class="text-right">
+                            <span id="out-force" class="text-amber-400 font-bold text-lg">0 N</span>
+                            <div id="out-error" class="text-[10px] text-red-400 hidden">Error: 0%</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // UI Elements
+        const inputs = {
+            R: document.getElementById('input-R'),
+            r: document.getElementById('input-r'),
+            x: document.getElementById('input-x'),
+            D: document.getElementById('input-D'),
+            m: document.getElementById('input-m'),
+            Mbase: document.getElementById('input-Mbase'),
+            Mcav: document.getElementById('input-Mcav')
+        };
+        
+        const btnExact = document.getElementById('btn-exact');
+        const btnApprox = document.getElementById('btn-approx');
+        const modeDesc = document.getElementById('mode-desc');
+        const calcExactDetails = document.getElementById('calc-exact-details');
+        const calcApproxDetails = document.getElementById('calc-approx-details');
+        const outError = document.getElementById('out-error');
+
+        // State
+        let state = {
+            R: 10,
+            r: 4,
+            x: 3,
+            D: 25,
+            m: 1000,
+            Mbase: 10000,
+            Mcav: 1600,
+            mode: 'exact' // 'exact' or 'approx'
+        };
+
+        // Physics Constants (SI Units)
+        const PI = Math.PI;
+        const G = 6.6743e-11; // Universal gravitational constant
+
+        // Setup Event Listeners
+        function syncMassToArea() {
+            state.R = parseFloat(inputs.R.value) || 0.1;
+            state.r = parseFloat(inputs.r.value) || 0;
+            state.Mbase = parseFloat(inputs.Mbase.value) || 1;
+            
+            if(state.R <= 0) state.R = 0.1;
+            if(state.r < 0) state.r = 0;
+            if(state.r > state.R) { 
+                state.r = state.R; 
+                inputs.r.value = state.r; 
+            }
+            
+            // Mass proportional to Area: Mcav = Mbase * (r/R)^2
+            state.Mcav = state.Mbase * Math.pow(state.r / state.R, 2);
+            inputs.Mcav.value = parseFloat(state.Mcav.toFixed(4));
+            
+            finalizeState();
+        }
+
+        function syncAreaToMass() {
+            state.Mbase = parseFloat(inputs.Mbase.value) || 1;
+            state.Mcav = parseFloat(inputs.Mcav.value) || 0;
+            state.R = parseFloat(inputs.R.value) || 0.1;
+            
+            if(state.Mbase <= 0) state.Mbase = 1;
+            if(state.Mcav < 0) state.Mcav = 0;
+            if(state.Mcav > state.Mbase) {
+                state.Mcav = state.Mbase;
+                inputs.Mcav.value = state.Mcav;
+            }
+            
+            // Area proportional to Mass: r = R * sqrt(Mcav/Mbase)
+            state.r = state.R * Math.sqrt(state.Mcav / state.Mbase);
+            inputs.r.value = parseFloat(state.r.toFixed(4));
+            
+            finalizeState();
+        }
+
+        function finalizeState() {
+            state.x = parseFloat(inputs.x.value) || 0;
+            state.D = parseFloat(inputs.D.value) || 0;
+            state.m = parseFloat(inputs.m.value) || 0;
+            
+            // Cavity must stay inside base
+            let maxX = state.R - state.r;
+            if(state.x > maxX) { state.x = parseFloat(maxX.toFixed(4)); inputs.x.value = state.x; }
+            if(state.x < -maxX) { state.x = parseFloat((-maxX).toFixed(4)); inputs.x.value = state.x; }
+            
+            // Test mass must be outside the object
+            if(state.D <= state.R) { 
+                state.D = state.R + 0.1; 
+                inputs.D.value = parseFloat(state.D.toFixed(4)); 
+            }
+        }
+
+        inputs.R.addEventListener('input', syncMassToArea);
+        inputs.r.addEventListener('input', syncMassToArea);
+        
+        inputs.Mbase.addEventListener('input', syncAreaToMass);
+        inputs.Mcav.addEventListener('input', syncAreaToMass);
+        
+        inputs.x.addEventListener('input', finalizeState);
+        inputs.D.addEventListener('input', finalizeState);
+        inputs.m.addEventListener('input', finalizeState);
+        
+        // Expose function for the draw loop
+        function updateStateFromInputs() {
+            state.R = parseFloat(inputs.R.value) || 0.1;
+            state.r = parseFloat(inputs.r.value) || 0;
+            state.Mbase = parseFloat(inputs.Mbase.value) || 1;
+            state.Mcav = parseFloat(inputs.Mcav.value) || 0;
+            finalizeState();
+        }
+
+        btnExact.addEventListener('click', () => setMode('exact'));
+        btnApprox.addEventListener('click', () => setMode('approx'));
+
+        function setMode(mode) {
+            state.mode = mode;
+            if (mode === 'exact') {
+                btnExact.className = "flex-1 py-2 text-xs font-semibold rounded transition-colors bg-blue-600 text-white shadow-md";
+                btnApprox.className = "flex-1 py-2 text-xs font-semibold rounded transition-colors text-slate-400 hover:text-slate-200";
+                modeDesc.innerText = "Calculates force by subtracting cavity force from base force.";
+                calcExactDetails.classList.remove('hidden');
+                calcApproxDetails.classList.add('hidden');
+                outError.classList.add('hidden');
+            } else {
+                btnApprox.className = "flex-1 py-2 text-xs font-semibold rounded transition-colors bg-amber-600 text-white shadow-md";
+                btnExact.className = "flex-1 py-2 text-xs font-semibold rounded transition-colors text-slate-400 hover:text-slate-200";
+                modeDesc.innerText = "Treats entire remaining mass as a point particle located at the Center of Mass.";
+                calcExactDetails.classList.add('hidden');
+                calcApproxDetails.classList.remove('hidden');
+                outError.classList.remove('hidden');
+            }
+        }
+
+        // p5.js Sketch
+        const sketch = (p) => {
+            let container;
+            let M_base, M_cav, M_net, X_com, F_exact, F_approx, F_base, F_cav;
+
+            p.setup = () => {
+                container = document.getElementById('canvas-container');
+                let canvas = p.createCanvas(container.clientWidth, container.clientHeight);
+                canvas.parent('canvas-container');
+                p.textAlign(p.CENTER, p.CENTER);
+            };
+
+            p.windowResized = () => {
+                p.resizeCanvas(container.clientWidth, container.clientHeight);
+            };
+
+            p.draw = () => {
+                p.background(23, 32, 27); // eye-friendly dark green
+
+                // Calculate Physics
+                updateStateFromInputs(); // Ensure synced
+                
+                M_base = state.Mbase;
+                M_cav = state.Mcav;
+                M_net = M_base - M_cav;
+                
+                X_com = M_net === 0 ? 0 : (-M_cav * state.x) / M_net;
+
+                let GMm = G * state.m;
+                F_base = (GMm * M_base) / (state.D * state.D);
+                let distCav = state.D - state.x;
+                F_cav = (GMm * M_cav) / (distCav * distCav);
+                F_exact = F_base - F_cav;
+                
+                let distApprox = state.D - X_com;
+                F_approx = (GMm * M_net) / (distApprox * distApprox);
+
+                updateDOM();
+
+                // Drawing Setup
+                p.push();
+                // Center vertically, place origin somewhat left
+                let originX = p.width * 0.35;
+                if (p.width < 600) originX = p.width * 0.3; // mobile adj
+                let originY = p.height / 2;
+                p.translate(originX, originY);
+
+                // Scale to fit based on physical units
+                let maxDist = state.D + state.R * 1.2; 
+                let scaleFactor = (p.width * 0.6) / maxDist;
+                // prevent extreme zoom in if numbers are tiny
+                if (scaleFactor > p.width) scaleFactor = p.width; 
+                p.scale(scaleFactor);
+
+                // Draw Grid/Axis (using pixel-based offsets to remain visually consistent)
+                p.stroke(51, 65, 85); 
+                p.strokeWeight(1 / scaleFactor);
+                let axisPad = 30 / scaleFactor;
+                p.line(-state.R - axisPad, 0, state.D + axisPad * 2, 0); // X axis
+                p.line(0, -state.R - axisPad, 0, state.R + axisPad); // Y axis
+
+                // Draw Base Object
+                p.noStroke();
+                p.fill(59, 130, 246, 150); 
+                p.circle(0, 0, state.R * 2);
+                p.stroke(96, 165, 250); 
+                p.strokeWeight(2 / scaleFactor);
+                p.noFill();
+                p.circle(0, 0, state.R * 2);
+
+                // Draw Cavity
+                p.fill(23, 32, 27); 
+                p.noStroke();
+                p.circle(state.x, 0, state.r * 2);
+                p.stroke(248, 113, 113); 
+                p.strokeWeight(1.5 / scaleFactor);
+                p.drawingContext.setLineDash([5 / scaleFactor, 5 / scaleFactor]);
+                p.circle(state.x, 0, state.r * 2);
+                p.drawingContext.setLineDash([]); 
+
+                // Draw Center of Mass (CoM)
+                p.stroke(74, 222, 128); 
+                p.strokeWeight(2 / scaleFactor);
+                let crossSize = 8 / scaleFactor;
+                p.line(X_com - crossSize, 0, X_com + crossSize, 0);
+                p.line(X_com, -crossSize, X_com, crossSize);
+                
+                p.noStroke();
+                p.fill(74, 222, 128);
+                p.circle(X_com, 0, 6 / scaleFactor);
+                
+                p.fill(74, 222, 128);
+                p.textSize(12 / scaleFactor);
+                p.text("CoM", X_com, -20 / scaleFactor);
+                
+                if (Math.abs(X_com * scaleFactor) > 5) {
+                    p.stroke(74, 222, 128, 150);
+                    p.strokeWeight(1 / scaleFactor);
+                    p.line(0, 15 / scaleFactor, X_com, 15 / scaleFactor);
+                    p.noStroke();
+                    p.fill(74, 222, 128, 200);
+                    p.textSize(9 / scaleFactor);
+                    p.text("X_com", X_com / 2, 25 / scaleFactor);
+                }
+                
+                // Draw Test Mass
+                p.noStroke();
+                p.fill(251, 191, 36); 
+                p.circle(state.D, 0, 16 / scaleFactor);
+                p.fill(0);
+                p.textSize(10 / scaleFactor);
+                p.text("m", state.D, 0);
+
+                // Visualizing Forces based on Mode
+                // Normalize visual length so the largest force is ~80 pixels long
+                let baseForceLen = 80 / scaleFactor;
+                let forceVisScale = F_base > 0 ? baseForceLen / F_base : 0;
+
+                if (state.mode === 'exact') {
+                    // Draw superposition vectors
+                    drawVector(state.D, -20/scaleFactor, -F_base * forceVisScale, "F_base", [96, 165, 250], scaleFactor);
+                    drawVector(state.D, 20/scaleFactor, F_cav * forceVisScale, "-F_cav", [248, 113, 113], scaleFactor);
+                    drawVector(state.D, 0, -F_exact * forceVisScale, "F", [251, 191, 36], scaleFactor, true);
+                } else {
+                    // Point Mass Approx
+                    p.stroke(74, 222, 128, 100);
+                    p.strokeWeight(1 / scaleFactor);
+                    p.drawingContext.setLineDash([4/scaleFactor, 4/scaleFactor]);
+                    p.line(X_com, 0, state.D, 0);
+                    p.drawingContext.setLineDash([]);
+
+                    drawVector(state.D, 0, -F_approx * forceVisScale, "F_approx", [251, 191, 36], scaleFactor, true);
+                }
+
+                // Annotations
+                p.fill(255, 150);
+                p.noStroke();
+                p.textSize(12 / scaleFactor);
+                p.text("O", -10/scaleFactor, 15/scaleFactor);
+                
+                // Distance D marker
+                p.stroke(255, 50);
+                p.strokeWeight(1 / scaleFactor);
+                let dMarkY1 = state.R + 15 / scaleFactor;
+                let dMarkY2 = state.R + 35 / scaleFactor;
+                let dLineY = state.R + 25 / scaleFactor;
+                p.line(0, dMarkY1, 0, dMarkY2);
+                p.line(state.D, dMarkY1, state.D, dMarkY2);
+                p.line(0, dLineY, state.D, dLineY);
+                p.noStroke();
+                p.fill(255, 200);
+                p.text("D", state.D / 2, dLineY + 15 / scaleFactor);
+
+                p.pop();
+            };
+
+            function drawVector(x, y, vLen, label, color, scaleFactor, bold = false) {
+                if (Math.abs(vLen * scaleFactor) < 2) return; // Ignore if visually smaller than 2 pixels
+
+                p.stroke(color[0], color[1], color[2]);
+                p.strokeWeight((bold ? 3 : 1.5) / scaleFactor);
+                p.fill(color[0], color[1], color[2]);
+                
+                p.line(x, y, x + vLen, y);
+                
+                // Arrow head
+                p.push();
+                p.translate(x + vLen, y);
+                if (vLen < 0) p.rotate(PI);
+                let arrowSize = 6 / scaleFactor;
+                p.triangle(0, 0, -arrowSize, arrowSize/2, -arrowSize, -arrowSize/2);
+                p.pop();
+
+                p.noStroke();
+                p.textSize((bold ? 12 : 10) / scaleFactor);
+                p.text(label, x + vLen / 2, y - 10 / scaleFactor);
+            }
+
+            function formatSci(num) {
+                if (num === 0) return "0";
+                let absNum = Math.abs(num);
+                if (absNum >= 1e4 || absNum < 1e-3) {
+                    return num.toExponential(3);
+                }
+                return num.toFixed(3);
+            }
+
+            function updateDOM() {
+                document.getElementById('out-m1').innerText = formatSci(M_base) + " kg";
+                document.getElementById('out-mc').innerText = formatSci(M_cav) + " kg";
+                document.getElementById('out-mnet').innerText = formatSci(M_net) + " kg";
+                
+                document.getElementById('out-xcom').innerText = formatSci(X_com) + " m";
+                
+                document.getElementById('out-fbase').innerText = formatSci(F_base) + " N";
+                document.getElementById('out-fcav').innerText = formatSci(F_cav) + " N";
+
+                if (state.mode === 'exact') {
+                    document.getElementById('out-force').innerText = formatSci(F_exact) + " N";
+                } else {
+                    document.getElementById('out-force').innerText = formatSci(F_approx) + " N";
+                    
+                    let error = F_exact !== 0 ? Math.abs(F_exact - F_approx) / F_exact * 100 : 0;
+                    outError.innerText = `Error vs Exact: ${error.toFixed(2)}%`;
+                    
+                    if (error > 5) outError.className = "text-[10px] text-red-400";
+                    else if (error > 1) outError.className = "text-[10px] text-amber-400";
+                    else outError.className = "text-[10px] text-green-400";
+                }
+            }
+        };
+
+        new p5(sketch);
+
+        // Initial setup calls
+        syncAreaToMass();
+    </script>
+</body>
+</html>

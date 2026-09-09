@@ -8,7 +8,7 @@
 (function () {
   "use strict";
 
-  const ASSET_V = 21;
+  const ASSET_V = 22;
   const PEP = window.PEP_TEXTBOOKS || [];
   const COURSE = window.COURSE || { books: [], resourceTypes: [] };
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev";
@@ -431,3 +431,4 @@
 
   document.addEventListener("DOMContentLoaded", () => { const hm = /\bm=([a-z]+)/.exec((location.hash || "").replace(/^#/, "")); if (hm && MODULE_INFO[hm[1]]) currentModule = hm[1]; bindEvents(); refreshAdminUI(); render(); loadAll().catch((e) => toast("初始化失败：" + (e && e.message), true)); });
 })();
+

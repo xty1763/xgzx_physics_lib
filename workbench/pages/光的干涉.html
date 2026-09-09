@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>光的干涉模拟仿真 - 高中物理（含单缝·无拖动）</title>
+    <style>
+        :root {
+            --bg-dark: #1a1a2e;
+            --bg-panel: #16213e;
+            --bg-card: #0f3460;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0b0;
+            --accent: #4fc3f7;
+            --accent-warm: #ffb74d;
+            --border: #2a3a5a;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', 'Segoe UI', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            user-select: none;
+            -webkit-user-select: none;
+            display: flex;
+            flex-direction: column;
+        }
+        #header {
+            background: linear-gradient(135deg, #0f3460, #1a1a2e);
+            padding: 10px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--border);
+            flex-shrink: 0;
+            z-index: 10;
+        }
+        #header h1 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            background: linear-gradient(90deg, #4fc3f7, #ffb74d, #4fc3f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        #header .subtitle {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+        }
+        #main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            gap: 0;
+            position: relative;
+        }
+        #scene-panel {
+            flex: 1.4;
+            position: relative;
+            background: #0a0a1a;
+            min-width: 0;
+            cursor: grab;
+        }
+        #scene-panel:active {
+            cursor: grabbing;
+        }
+        #scene-panel canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #scene-label {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            padding: 6px 18px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: var(--accent);
+            pointer-events: none;
+            letter-spacing: 1px;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(4px);
+            z-index: 5;
+        }
+        #scene-hint {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.5);
+            padding: 4px 14px;
+            border-radius: 14px;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            pointer-events: none;
+            letter-spacing: 0.5px;
+            z-index: 5;
+        }
+        #right-panel {
+            flex: 0.9;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-panel);
+            border-left: 2px solid var(--border);
+            min-width: 300px;
+            max-width: 420px;
+            overflow-y: auto;
+        }
+        #pattern-panel {
+            background: var(--bg-card);
+            margin: 10px;
+            border-radius: 12px;
+            padding: 12px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            flex-shrink: 0;
+        }
+        #pattern-panel h3 {
+            font-size: 0.85rem;
+            color: var(--accent);
+            margin-bottom: 8px;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+        #pattern-canvas {
+            width: 100%;
+            height: 180px;
+            border-radius: 6px;
+            background: #000;
+            display: block;
+            cursor: crosshair;
+        }
+        #pattern-info {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 8px;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+        #pattern-info span {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px 10px;
+            border-radius: 10px;
+        }
+        #pattern-measure {
+            margin-top: 6px;
+            font-size: 0.7rem;
+            color: var(--accent);
+            background: rgba(0, 0, 0, 0.3);
+            padding: 3px 6px;
+            border-radius: 6px;
+            text-align: center;
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+        #info-panel {
+            flex: 1;
+            background: var(--bg-card);
+            margin: 0 10px 10px 10px;
+            border-radius: 12px;
+            padding: 14px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            min-height: 120px;
+            overflow-y: auto;
+        }
+        #info-panel h3 {
+            font-size: 0.85rem;
+            color: var(--accent-warm);
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+        #info-text {
+            font-size: 0.78rem;
+            line-height: 1.7;
+            color: var(--text-secondary);
+            text-align: justify;
+        }
+        #info-text .highlight {
+            color: var(--accent);
+            font-weight: 600;
+        }
+        #info-text .highlight-warm {
+            color: var(--accent-warm);
+            font-weight: 600;
+        }
+        #controls-panel {
+            background: var(--bg-card);
+            margin: 0 10px 10px 10px;
+            border-radius: 12px;
+            padding: 14px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            flex-shrink: 0;
+        }
+        #controls-panel h3 {
+            font-size: 0.85rem;
+            color: var(--accent);
+            margin-bottom: 10px;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+        .control-group {
+            margin-bottom: 10px;
+        }
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        .control-group label .value-display {
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 0.8rem;
+            min-width: 60px;
+            text-align: right;
+        }
+        .control-group input[type="range"] {
+            width: 100%;
+            -webkit-appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--border);
+            outline: none;
+            cursor: pointer;
+        }
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 0 8px rgba(79, 195, 247, 0.5);
+            transition: all 0.2s;
+        }
+        .control-group input[type="range"]::-webkit-slider-thumb:hover {
+            background: #81d4fa;
+            box-shadow: 0 0 14px rgba(79, 195, 247, 0.8);
+            transform: scale(1.1);
+        }
+        #wavelength-slider::-webkit-slider-thumb {
+            background: #ff6b6b !important;
+            box-shadow: 0 0 8px rgba(255, 107, 107, 0.5) !important;
+        }
+        #wavelength-slider::-webkit-slider-thumb:hover {
+            background: #ff8a8a !important;
+            box-shadow: 0 0 14px rgba(255, 107, 107, 0.8) !important;
+        }
+        #btn-reset {
+            width: 100%;
+            padding: 8px;
+            background: var(--border);
+            border: none;
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.78rem;
+            cursor: pointer;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+            margin-top: 4px;
+        }
+        #btn-reset:hover {
+            background: #3a4a6a;
+            box-shadow: 0 0 12px rgba(79, 195, 247, 0.3);
+        }
+        @media (max-width: 768px) {
+            #main-container {
+                flex-direction: column;
+            }
+            #scene-panel {
+                flex: 1;
+                min-height: 300px;
+            }
+            #right-panel {
+                flex: 1;
+                max-width: none;
+                min-width: 0;
+                flex-direction: row;
+                flex-wrap: wrap;
+                overflow-y: auto;
+            }
+            #pattern-panel {
+                flex: 1;
+                min-width: 200px;
+            }
+            #info-panel {
+                flex: 1;
+                min-width: 200px;
+                margin: 10px;
+            }
+            #controls-panel {
+                flex: 1;
+                min-width: 200px;
+                margin: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <div>
+            <h1>🔬 光的双缝干涉实验</h1>
+            <div class="subtitle">Young's Double-Slit Interference Simulation (with Single Slit)</div>
+        </div>
+        <div style="text-align:right;">
+            <div style="font-size:0.7rem;color:var(--text-secondary);">高中物理 · 波动光学</div>
+            <div style="font-size:0.65rem;color:var(--accent);" id="status-indicator">🟢 就绪</div>
+        </div>
+    </div>
+
+    <div id="main-container">
+        <div id="scene-panel">
+            <div id="scene-label">🏗️ 实验仪器区（3D视图 · 可旋转/缩放）</div>
+            <div id="scene-hint">🖱️ 左键旋转视角 | 滚轮缩放 | 点击仪器查看说明 | 使用滑块调节参数</div>
+        </div>
+        <div id="right-panel">
+            <div id="pattern-panel">
+                <h3>📊 干涉图像区</h3>
+                <canvas id="pattern-canvas"></canvas>
+                <div id="pattern-info">
+                    <span id="info-wavelength">λ = 550 nm</span>
+                    <span id="info-spacing">Δx = 1.10 mm</span>
+                    <span id="info-distance">L = 1.00 m</span>
+                    <span id="info-fringes">亮纹数 ≈ 9（2d/a−1）</span>
+                </div>
+                <div id="pattern-measure">x = 0.00 mm ｜ I/I₀ = 1.00（在图上移动鼠标测量）</div>
+            </div>
+            <div id="info-panel">
+                <h3>📖 文字说明区</h3>
+                <div id="info-text">
+                    欢迎使用光的双缝干涉模拟仿真实验！<br><br>
+                    在左侧<span class="highlight">3D实验仪器区</span>中，您可以：<br>
+                    • <span class="highlight">旋转视角</span>观察实验装置<br>
+                    • <span class="highlight">点击任意仪器</span>查看其功能说明<br><br>
+                    在下方<span class="highlight-warm">参数面板</span>中调节波长、双缝间距、缝宽、屏距。<br>
+                    干涉条纹显示范围固定为 ±5mm，方便观察条纹间距变化。
+                </div>
+            </div>
+            <div id="controls-panel">
+                <h3>⚙️ 参数调节区</h3>
+                <div class="control-group">
+                    <label>光波波长 λ <span class="value-display" id="wavelength-val">550 nm</span></label>
+                    <input type="range" id="wavelength-slider" min="380" max="780" value="550" step="1">
+                    <div style="display:flex;justify-content:space-between;font-size:0.6rem;color:var(--text-secondary);margin-top:2px;">
+                        <span>380nm 紫</span><span>550nm 绿</span><span>780nm 红</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>双缝间距 d <span class="value-display" id="slit-spacing-val">0.50 mm</span></label>
+                    <input type="range" id="slit-spacing-slider" min="0.10" max="1.00" value="0.50" step="0.01">
+                </div>
+                <div class="control-group">
+                    <label>缝宽 a <span class="value-display" id="slit-width-val">0.10 mm</span></label>
+                    <input type="range" id="slit-width-slider" min="0.02" max="0.50" value="0.10" step="0.01">
+                </div>
+                <div class="control-group">
+                    <label>双缝到光屏距离 L <span class="value-display" id="screen-distance-val">1.00 m</span></label>
+                    <input type="range" id="screen-distance-slider" min="0.30" max="2.50" value="1.00" step="0.01">
+                </div>
+                <button id="btn-reset">🔄 重置默认设置</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // ==================== 全局状态 ====================
+        const state = {
+            wavelength: 550, // nm
+            slitSpacing: 0.50, // mm
+            slitWidth: 0.10, // mm
+            screenDistance: 1.00, // m
+            // 固定位置（无拖动）
+            sourceZ: -4,
+            singleSlitZ: -2,
+            doubleSlitZ: 0,
+            screenZ: 4, // 由 L 计算，初始 L=1.00，映射系数0.5
+        };
+
+        // ==================== 波长转RGB ====================
+        function wavelengthToRGB(wavelength) {
+            let r, g, b;
+            const w = wavelength;
+            if (w >= 380 && w < 440) { r = -(w - 440) / (440 - 380); g = 0; b = 1; }
+            else if (w >= 440 && w < 490) { r = 0; g = (w - 440) / (490 - 440); b = 1; }
+            else if (w >= 490 && w < 510) { r = 0; g = 1; b = -(w - 510) / (510 - 490); }
+            else if (w >= 510 && w < 580) { r = (w - 510) / (580 - 510); g = 1; b = 0; }
+            else if (w >= 580 && w < 645) { r = 1; g = -(w - 645) / (645 - 580); b = 0; }
+            else if (w >= 645 && w <= 780) { r = 1; g = 0; b = 0; }
+            else { r = 0; g = 0; b = 0; }
+            let factor;
+            if (w >= 380 && w < 420) factor = 0.3 + 0.7 * (w - 380) / (420 - 380);
+            else if (w >= 420 && w <= 700) factor = 1.0;
+            else if (w > 700 && w <= 780) factor = 0.3 + 0.7 * (780 - w) / (780 - 700);
+            else factor = 0;
+            return {
+                r: Math.round(255 * Math.pow(r * factor, 0.8)),
+                g: Math.round(255 * Math.pow(g * factor, 0.8)),
+                b: Math.round(255 * Math.pow(b * factor, 0.8))
+            };
+        }
+        function getWavelengthColor(wavelength) {
+            const { r, g, b } = wavelengthToRGB(wavelength);
+            return { r: r / 255, g: g / 255, b: b / 255 };
+        }
+
+        // ==================== Three.js 场景初始化 ====================
+        const scenePanel = document.getElementById('scene-panel');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a1a);
+        scene.fog = new THREE.Fog(0x0a0a1a, 10, 25);
+
+        const camera = new THREE.PerspectiveCamera(50, scenePanel.clientWidth / scenePanel.clientHeight, 0.1, 50);
+        camera.position.set(7, 5, 9);
+        camera.lookAt(0, 0.5, 0.5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(scenePanel.clientWidth, scenePanel.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        scenePanel.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0.5, 0.5);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.minDistance = 3;
+        controls.maxDistance = 20;
+        controls.maxPolarAngle = Math.PI * 0.7;
+        controls.minPolarAngle = Math.PI * 0.15;
+        controls.update();
+
+        // ==================== 灯光 ====================
+        const ambientLight = new THREE.AmbientLight(0x303050, 0.8);
+        scene.add(ambientLight);
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        mainLight.position.set(5, 8, 3);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 1024;
+        mainLight.shadow.mapSize.height = 1024;
+        mainLight.shadow.camera.near = 0.5;
+        mainLight.shadow.camera.far = 30;
+        mainLight.shadow.camera.left = -8;
+        mainLight.shadow.camera.right = 8;
+        mainLight.shadow.camera.top = 8;
+        mainLight.shadow.camera.bottom = -8;
+        mainLight.shadow.bias = -0.0001;
+        scene.add(mainLight);
+        const fillLight = new THREE.DirectionalLight(0x8899cc, 0.5);
+        fillLight.position.set(-3, 2, -2);
+        scene.add(fillLight);
+
+        // ==================== 地面 ====================
+        const groundGeo = new THREE.PlaneGeometry(16, 20);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.7, metalness: 0.1 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.25;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // ==================== 光具座 ====================
+        const railGroup = new THREE.Group();
+        const railLength = 10;
+        const railWidth = 0.5;
+        const railHeight = 0.25;
+        const railGeo = new THREE.BoxGeometry(railWidth, railHeight, railLength);
+        const railMat = new THREE.MeshStandardMaterial({ color: 0x4a4a6a, roughness: 0.3, metalness: 0.8 });
+        const railMesh = new THREE.Mesh(railGeo, railMat);
+        railMesh.castShadow = true;
+        railMesh.receiveShadow = true;
+        railMesh.position.y = 0;
+        railGroup.add(railMesh);
+        for (let z = -4.5; z <= 4.5; z += 0.5) {
+            const tickGeo = new THREE.BoxGeometry(railWidth + 0.08, 0.02, 0.02);
+            const tickMat = new THREE.MeshStandardMaterial({ color: 0x8888aa, roughness: 0.2, metalness: 0.6 });
+            const tick = new THREE.Mesh(tickGeo, tickMat);
+            tick.position.set(0, railHeight / 2 + 0.01, z);
+            railGroup.add(tick);
+            if (Math.abs(z) % 1 < 0.01) {
+                const tickBigGeo = new THREE.BoxGeometry(railWidth + 0.16, 0.04, 0.03);
+                const tickBig = new THREE.Mesh(tickBigGeo, tickMat);
+                tickBig.position.set(0, railHeight / 2 + 0.015, z);
+                railGroup.add(tickBig);
+            }
+        }
+        for (let z = -4; z <= 4; z += 2) {
+            const legGeo = new THREE.BoxGeometry(0.4, 0.2, 0.35);
+            const legMat = new THREE.MeshStandardMaterial({ color: 0x3a3a5a, roughness: 0.5, metalness: 0.5 });
+            const leg = new THREE.Mesh(legGeo, legMat);
+            leg.position.set(0, -railHeight / 2 - 0.1, z);
+            leg.castShadow = true;
+            leg.receiveShadow = true;
+            railGroup.add(leg);
+        }
+        scene.add(railGroup);
+        railGroup.position.y = -0.15;
+
+        // ==================== 光源模型 ====================
+        const sourceGroup = new THREE.Group();
+        sourceGroup.position.set(0, 0, state.sourceZ);
+        const sourceStandGeo = new THREE.CylinderGeometry(0.12, 0.18, 1.2, 16);
+        const sourceStandMat = new THREE.MeshStandardMaterial({ color: 0x555577, roughness: 0.3, metalness: 0.7 });
+        const sourceStand = new THREE.Mesh(sourceStandGeo, sourceStandMat);
+        sourceStand.position.y = 0.6;
+        sourceStand.castShadow = true;
+        sourceStand.receiveShadow = true;
+        sourceGroup.add(sourceStand);
+        const sourceBaseGeo = new THREE.CylinderGeometry(0.3, 0.35, 0.2, 20);
+        const sourceBase = new THREE.Mesh(sourceBaseGeo, sourceStandMat);
+        sourceBase.position.y = 0.1;
+        sourceBase.castShadow = true;
+        sourceBase.receiveShadow = true;
+        sourceGroup.add(sourceBase);
+        const bulbGeo = new THREE.SphereGeometry(0.22, 24, 24);
+        const bulbMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1, metalness: 0.2, emissive: 0xffdd88, emissiveIntensity: 0.8 });
+        const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+        bulb.position.y = 1.35;
+        bulb.castShadow = true;
+        sourceGroup.add(bulb);
+        const glowGeo = new THREE.SphereGeometry(0.4, 20, 20);
+        const glowMat = new THREE.MeshBasicMaterial({ color: 0xffdd88, transparent: true, opacity: 0.25, depthWrite: false });
+        const glow = new THREE.Mesh(glowGeo, glowMat);
+        glow.position.y = 1.35;
+        sourceGroup.add(glow);
+        const sourceLabel = createLabel('光源');
+        sourceLabel.position.set(0, 1.9, 0);
+        sourceGroup.add(sourceLabel);
+        sourceGroup.userData = { type: 'source', name: '光源', description: '💡 <span class="highlight">光源</span><br>提供<span class="highlight">单色光</span>。经过单缝后成为相干光。' };
+        scene.add(sourceGroup);
+        const sourceLight = new THREE.PointLight(0xffdd88, 1.5, 4);
+        sourceLight.position.set(0, 1.35, state.sourceZ);
+        scene.add(sourceLight);
+
+        // ==================== 单缝模型（类似双缝平板，单条窄缝） ====================
+        const singleSlitGroup = new THREE.Group();
+        singleSlitGroup.position.set(0, 0, state.singleSlitZ);
+
+        // 支架和底座
+        const singleStandGeo = new THREE.CylinderGeometry(0.1, 0.15, 1.6, 12);
+        const singleStandMat = new THREE.MeshStandardMaterial({ color: 0x555577, roughness: 0.3, metalness: 0.7 });
+        const singleStand = new THREE.Mesh(singleStandGeo, singleStandMat);
+        singleStand.position.y = 0.8;
+        singleStand.castShadow = true;
+        singleStand.receiveShadow = true;
+        singleSlitGroup.add(singleStand);
+        const singleBaseGeo = new THREE.CylinderGeometry(0.28, 0.32, 0.18, 20);
+        const singleBase = new THREE.Mesh(singleBaseGeo, singleStandMat);
+        singleBase.position.y = 0.09;
+        singleBase.castShadow = true;
+        singleBase.receiveShadow = true;
+        singleSlitGroup.add(singleBase);
+
+        // 单缝板（与双缝板尺寸一致）
+        const singlePlateWidth = 1.6;
+        const singlePlateHeight = 1.4;
+        const singlePlateThick = 0.08;
+        const singlePlateGeo = new THREE.BoxGeometry(singlePlateWidth, singlePlateHeight, singlePlateThick);
+        const singlePlateMat = new THREE.MeshStandardMaterial({
+            color: 0x3a3a5a,
+            roughness: 0.4,
+            metalness: 0.6,
+            side: THREE.DoubleSide,
+        });
+        const singlePlate = new THREE.Mesh(singlePlateGeo, singlePlateMat);
+        singlePlate.position.y = 0.9;
+        singlePlate.castShadow = true;
+        singlePlate.receiveShadow = true;
+        singleSlitGroup.add(singlePlate);
+
+        // 单缝开口（窄缝，类似双缝开口但只有一条，宽度较窄）
+        const singleOpeningHeight = 0.5;
+        const singleOpeningWidth = 0.06;  // 窄缝
+        const singleOpeningGeo = new THREE.BoxGeometry(singleOpeningWidth, singleOpeningHeight, singlePlateThick + 0.01);
+        const singleOpeningMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.9,
+            depthWrite: false,
+        });
+        const singleOpening = new THREE.Mesh(singleOpeningGeo, singleOpeningMat);
+        singleOpening.position.set(0, 0.9, 0);
+        singleSlitGroup.add(singleOpening);
+
+        const singleLabel = createLabel('单缝');
+        singleLabel.position.set(0, 1.8, 0);
+        singleSlitGroup.add(singleLabel);
+
+        singleSlitGroup.userData = {
+            type: 'single-slit',
+            name: '单缝',
+            description: '📌 <span class="highlight">单缝</span><br>将光源发出的光变成<span class="highlight">线光源</span>，提高光的空间相干性。单缝宽度较窄，确保从单缝出来的光波具有足够的相干性。'
+        };
+        scene.add(singleSlitGroup);
+
+        // ==================== 双缝模型 ====================
+        const doubleSlitGroup = new THREE.Group();
+        doubleSlitGroup.position.set(0, 0, state.doubleSlitZ);
+        const slitStandGeo = new THREE.CylinderGeometry(0.1, 0.15, 1.6, 12);
+        const slitStandMat = new THREE.MeshStandardMaterial({ color: 0x555577, roughness: 0.3, metalness: 0.7 });
+        const slitStand = new THREE.Mesh(slitStandGeo, slitStandMat);
+        slitStand.position.y = 0.8;
+        slitStand.castShadow = true;
+        slitStand.receiveShadow = true;
+        doubleSlitGroup.add(slitStand);
+        const slitBaseGeo = new THREE.CylinderGeometry(0.28, 0.32, 0.18, 20);
+        const slitBase = new THREE.Mesh(slitBaseGeo, slitStandMat);
+        slitBase.position.y = 0.09;
+        slitBase.castShadow = true;
+        slitBase.receiveShadow = true;
+        doubleSlitGroup.add(slitBase);
+        const slitPlateWidth = 1.6;
+        const slitPlateHeight = 1.4;
+        const slitPlateThick = 0.08;
+        const slitPlateGeo = new THREE.BoxGeometry(slitPlateWidth, slitPlateHeight, slitPlateThick);
+        const slitPlateMat = new THREE.MeshStandardMaterial({
+            color: 0x2a2a3a,
+            roughness: 0.4,
+            metalness: 0.6,
+            side: THREE.DoubleSide,
+        });
+        const slitPlate = new THREE.Mesh(slitPlateGeo, slitPlateMat);
+        slitPlate.position.y = 0.9;
+        slitPlate.castShadow = true;
+        slitPlate.receiveShadow = true;
+        doubleSlitGroup.add(slitPlate);
+        const slitOpeningHeight = 0.5;
+        const slitOpeningWidth = 0.04;
+        const slitOpeningGeo = new THREE.BoxGeometry(slitOpeningWidth, slitOpeningHeight, slitPlateThick + 0.01);
+        const slitOpeningMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.9,
+            depthWrite: false,
+        });
+        const slitOpening1 = new THREE.Mesh(slitOpeningGeo, slitOpeningMat);
+        const slitOpening2 = new THREE.Mesh(slitOpeningGeo, slitOpeningMat);
+        slitOpening1.position.set(-state.slitSpacing * 0.6, 0.9, 0);
+        slitOpening2.position.set(state.slitSpacing * 0.6, 0.9, 0);
+        doubleSlitGroup.add(slitOpening1);
+        doubleSlitGroup.add(slitOpening2);
+        const slitLabel = createLabel('双缝');
+        slitLabel.position.set(0, 1.85, 0);
+        doubleSlitGroup.add(slitLabel);
+        doubleSlitGroup.userData = {
+            type: 'double-slit',
+            name: '双缝',
+            description: '🔲 <span class="highlight">双缝</span><br>将相干光分成两束，产生干涉。缝间距 d 越小，条纹间距越大。'
+        };
+        scene.add(doubleSlitGroup);
+
+        // ==================== 光屏模型 ====================
+        const screenGroup = new THREE.Group();
+        screenGroup.position.set(0, 0, state.screenZ);
+        const screenStandGeo = new THREE.CylinderGeometry(0.12, 0.18, 1.8, 12);
+        const screenStandMat = new THREE.MeshStandardMaterial({ color: 0x555577, roughness: 0.3, metalness: 0.7 });
+        const screenStand = new THREE.Mesh(screenStandGeo, screenStandMat);
+        screenStand.position.y = 0.9;
+        screenStand.castShadow = true;
+        screenStand.receiveShadow = true;
+        screenGroup.add(screenStand);
+        const screenBaseGeo = new THREE.CylinderGeometry(0.3, 0.35, 0.2, 20);
+        const screenBase = new THREE.Mesh(screenBaseGeo, screenStandMat);
+        screenBase.position.y = 0.1;
+        screenBase.castShadow = true;
+        screenBase.receiveShadow = true;
+        screenGroup.add(screenBase);
+        const screenPanelWidth = 2.2;
+        const screenPanelHeight = 2.0;
+        const screenPanelThick = 0.06;
+        const screenPanelGeo = new THREE.BoxGeometry(screenPanelWidth, screenPanelHeight, screenPanelThick);
+        const screenTextureCanvas = document.createElement('canvas');
+        screenTextureCanvas.width = 1024;  // 提高分辨率
+        screenTextureCanvas.height = 1024;
+        const screenTextureCtx = screenTextureCanvas.getContext('2d');
+        const screenTexture = new THREE.CanvasTexture(screenTextureCanvas);
+        screenTexture.magFilter = THREE.LinearFilter;
+        screenTexture.minFilter = THREE.LinearFilter;
+        const screenPanelMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, metalness: 0.0, map: screenTexture, side: THREE.DoubleSide });
+        const screenPanel = new THREE.Mesh(screenPanelGeo, screenPanelMat);
+        screenPanel.position.y = 1.0;
+        screenPanel.castShadow = true;
+        screenPanel.receiveShadow = true;
+        screenGroup.add(screenPanel);
+        const frameGeo = new THREE.BoxGeometry(screenPanelWidth + 0.15, screenPanelHeight + 0.15, screenPanelThick + 0.02);
+        const frameMat = new THREE.MeshStandardMaterial({ color: 0x3a3a5a, roughness: 0.4, metalness: 0.5 });
+        const frame = new THREE.Mesh(frameGeo, frameMat);
+        frame.position.y = 1.0;
+        frame.position.z = -0.01;
+        frame.castShadow = true;
+        frame.receiveShadow = true;
+        screenGroup.add(frame);
+        const screenLabel = createLabel('光屏');
+        screenLabel.position.set(0, 2.3, 0);
+        screenGroup.add(screenLabel);
+        screenGroup.userData = {
+            type: 'screen',
+            name: '光屏',
+            description: '📺 <span class="highlight">光屏</span><br>接收干涉光，显示明暗条纹。条纹间距 Δx = λL/d。'
+        };
+        scene.add(screenGroup);
+
+        // ==================== 光束可视化 ====================
+        const beamGroup = new THREE.Group();
+        scene.add(beamGroup);
+
+        function createBeamGeometry(fromPoint, toRectCorners) {
+            const vertices = [];
+            const indices = [];
+            const numCorners = toRectCorners.length;
+            vertices.push(fromPoint.x, fromPoint.y, fromPoint.z);
+            for (let i = 0; i < numCorners; i++) {
+                vertices.push(toRectCorners[i].x, toRectCorners[i].y, toRectCorners[i].z);
+            }
+            for (let i = 1; i < numCorners; i++) {
+                indices.push(0, i, i + 1);
+            }
+            indices.push(0, numCorners, 1);
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            geo.setIndex(indices);
+            geo.computeVertexNormals();
+            return geo;
+        }
+
+        function updateBeams() {
+            while (beamGroup.children.length > 0) {
+                const child = beamGroup.children[0];
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+                beamGroup.remove(child);
+            }
+            const color = getWavelengthColor(state.wavelength);
+            const beamMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color.r, color.g, color.b), transparent: true, opacity: 0.15, depthWrite: false, side: THREE.DoubleSide });
+            const beamMatBright = new THREE.MeshBasicMaterial({ color: new THREE.Color(color.r, color.g, color.b), transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
+
+            const sourcePos = new THREE.Vector3(0, 1.35, state.sourceZ);
+            const singleZ = state.singleSlitZ;
+            const doubleZ = state.doubleSlitZ;
+            const screenZVal = state.screenZ;
+            const centerY = 0.9;
+            const singleHalfW = 0.6;
+            const singleHalfH = 0.55;
+            const doubleHalfW = 0.7;
+            const doubleHalfH = 0.6;
+            const screenHalfW = 1.1;
+            const screenHalfH = 0.9;
+
+            const singleRect = [
+                new THREE.Vector3(-singleHalfW, centerY - singleHalfH, singleZ),
+                new THREE.Vector3(singleHalfW, centerY - singleHalfH, singleZ),
+                new THREE.Vector3(singleHalfW, centerY + singleHalfH, singleZ),
+                new THREE.Vector3(-singleHalfW, centerY + singleHalfH, singleZ),
+            ];
+            const beam1Geo = createBeamGeometry(sourcePos, singleRect);
+            const beam1 = new THREE.Mesh(beam1Geo, beamMat);
+            beamGroup.add(beam1);
+
+            const doubleRect = [
+                new THREE.Vector3(-doubleHalfW, centerY - doubleHalfH, doubleZ),
+                new THREE.Vector3(doubleHalfW, centerY - doubleHalfH, doubleZ),
+                new THREE.Vector3(doubleHalfW, centerY + doubleHalfH, doubleZ),
+                new THREE.Vector3(-doubleHalfW, centerY + doubleHalfH, doubleZ),
+            ];
+            const singleOpeningPos = new THREE.Vector3(0, centerY, singleZ);
+            const beam2Geo = createBeamGeometry(singleOpeningPos, doubleRect);
+            const beam2 = new THREE.Mesh(beam2Geo, beamMat);
+            beamGroup.add(beam2);
+
+            const slitSpacingWorld = state.slitSpacing * 1.2;
+            const slit1Pos = new THREE.Vector3(-slitSpacingWorld * 0.5, centerY, doubleZ);
+            const slit2Pos = new THREE.Vector3(slitSpacingWorld * 0.5, centerY, doubleZ);
+            const screenRect = [
+                new THREE.Vector3(-screenHalfW, 1.0 - screenHalfH, screenZVal),
+                new THREE.Vector3(screenHalfW, 1.0 - screenHalfH, screenZVal),
+                new THREE.Vector3(screenHalfW, 1.0 + screenHalfH, screenZVal),
+                new THREE.Vector3(-screenHalfW, 1.0 + screenHalfH, screenZVal),
+            ];
+            const beam3Geo = createBeamGeometry(slit1Pos, screenRect);
+            const beam3 = new THREE.Mesh(beam3Geo, beamMat);
+            beamGroup.add(beam3);
+            const beam4Geo = createBeamGeometry(slit2Pos, screenRect);
+            const beam4 = new THREE.Mesh(beam4Geo, beamMat);
+            beamGroup.add(beam4);
+
+            const coreHalfW = 0.12;
+            const coreHalfH = 0.3;
+            const coreRect = [
+                new THREE.Vector3(-coreHalfW, centerY - coreHalfH, doubleZ),
+                new THREE.Vector3(coreHalfW, centerY - coreHalfH, doubleZ),
+                new THREE.Vector3(coreHalfW, centerY + coreHalfH, doubleZ),
+                new THREE.Vector3(-coreHalfW, centerY + coreHalfH, doubleZ),
+            ];
+            const coreBeamGeo = createBeamGeometry(singleOpeningPos, coreRect);
+            const coreBeam = new THREE.Mesh(coreBeamGeo, beamMatBright);
+            beamGroup.add(coreBeam);
+        }
+
+        // ==================== 标签创建 ====================
+        // Canvas roundRect polyfill（必须在 createLabel 首次调用前定义，避免老浏览器崩溃）
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+                if (typeof r === 'number') r = [r, r, r, r];
+                this.beginPath();
+                this.moveTo(x + r[0], y);
+                this.lineTo(x + w - r[1], y);
+                this.quadraticCurveTo(x + w, y, x + w, y + r[1]);
+                this.lineTo(x + w, y + h - r[2]);
+                this.quadraticCurveTo(x + w, y + h, x + w - r[2], y + h);
+                this.lineTo(x + r[3], y + h);
+                this.quadraticCurveTo(x, y + h, x, y + h - r[3]);
+                this.lineTo(x, y + r[0]);
+                this.quadraticCurveTo(x, y, x + r[0], y);
+                this.closePath();
+                return this;
+            };
+        }
+
+        function createLabel(text) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 48;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.roundRect(4, 4, 120, 40, 12);
+            ctx.fill();
+            ctx.strokeStyle = '#4fc3f7';
+            ctx.lineWidth = 1.5;
+            ctx.roundRect(4, 4, 120, 40, 12);
+            ctx.stroke();
+            ctx.fillStyle = '#e0e0e0';
+            ctx.font = 'bold 18px "Microsoft YaHei", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 64, 26);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.magFilter = THREE.LinearFilter;
+            texture.minFilter = THREE.LinearFilter;
+            const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(0.8, 0.3, 1);
+            return sprite;
+        }
+
+        // ==================== 固定显示范围 ====================
+        const DISPLAY_RANGE_MM = 5; // 光屏和右侧图像均显示 ±5mm
+
+        function updateScreenTexture() {
+            const ctx = screenTextureCtx;
+            const w = screenTextureCanvas.width;
+            const h = screenTextureCanvas.height;
+            const color = getWavelengthColor(state.wavelength);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, w, h);
+            const d = state.slitSpacing * 1e-3;
+            const a = state.slitWidth * 1e-3;
+            const L = state.screenDistance;
+            const lambda = state.wavelength * 1e-9;
+            for (let px = 0; px < w; px++) {
+                const xWorld = (px / w - 0.5) * DISPLAY_RANGE_MM * 2; // mm
+                const xMeters = xWorld * 1e-3;
+                const beta = Math.PI * d * xMeters / (lambda * L);
+                const alpha = Math.PI * a * xMeters / (lambda * L);
+                const cosTerm = Math.cos(beta);
+                const sincTerm = alpha !== 0 ? Math.sin(alpha) / alpha : 1;
+                const intensity = cosTerm * cosTerm * sincTerm * sincTerm;
+                const gamma = 0.6;
+                const displayIntensity = Math.pow(intensity, gamma);
+                const r = Math.round(color.r * 255 * displayIntensity);
+                const g = Math.round(color.g * 255 * displayIntensity);
+                const b = Math.round(color.b * 255 * displayIntensity);
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(px, 0, 1, h);
+            }
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(w / 2, 0);
+            ctx.lineTo(w / 2, h);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            screenTexture.needsUpdate = true;
+        }
+
+        const patternCanvas = document.getElementById('pattern-canvas');
+        const patternCtx = patternCanvas.getContext('2d');
+        function resizePatternCanvas() {
+            const rect = patternCanvas.parentElement.getBoundingClientRect();
+            patternCanvas.width = patternCanvas.clientWidth * 2;
+            patternCanvas.height = patternCanvas.clientHeight * 2;
+            patternCanvas.style.width = patternCanvas.clientWidth + 'px';
+            patternCanvas.style.height = patternCanvas.clientHeight + 'px';
+        }
+        // 计算某水平位置（mm）的相对光强，供游标与图案绘制复用
+        function computeIntensity(xWorld) {
+            const d = state.slitSpacing * 1e-3;
+            const a = state.slitWidth * 1e-3;
+            const L = state.screenDistance;
+            const lambda = state.wavelength * 1e-9;
+            const xMeters = xWorld * 1e-3;
+            const beta = Math.PI * d * xMeters / (lambda * L);
+            const alpha = Math.PI * a * xMeters / (lambda * L);
+            const cosTerm = Math.cos(beta);
+            const sincTerm = alpha !== 0 ? Math.sin(alpha) / alpha : 1;
+            return cosTerm * cosTerm * sincTerm * sincTerm;
+        }
+
+        function drawInterferencePattern() {
+            const w = patternCanvas.width;
+            const h = patternCanvas.height;
+            const color = getWavelengthColor(state.wavelength);
+            patternCtx.fillStyle = '#000000';
+            patternCtx.fillRect(0, 0, w, h);
+            const d = state.slitSpacing * 1e-3;
+            const a = state.slitWidth * 1e-3;
+            const L = state.screenDistance;
+            const lambda = state.wavelength * 1e-9;
+            for (let px = 0; px < w; px++) {
+                const xWorld = (px / w - 0.5) * DISPLAY_RANGE_MM * 2;
+                const xMeters = xWorld * 1e-3;
+                const beta = Math.PI * d * xMeters / (lambda * L);
+                const alpha = Math.PI * a * xMeters / (lambda * L);
+                const cosTerm = Math.cos(beta);
+                const sincTerm = alpha !== 0 ? Math.sin(alpha) / alpha : 1;
+                const intensity = cosTerm * cosTerm * sincTerm * sincTerm;
+                const gamma = 0.55;
+                const displayIntensity = Math.pow(intensity, gamma);
+                const r = Math.round(color.r * 255 * displayIntensity);
+                const g = Math.round(color.g * 255 * displayIntensity);
+                const b = Math.round(color.b * 255 * displayIntensity);
+                patternCtx.fillStyle = `rgb(${r},${g},${b})`;
+                patternCtx.fillRect(px, 0, 1, h);
+            }
+            patternCtx.strokeStyle = 'rgba(255,255,255,0.15)';
+            patternCtx.lineWidth = 1;
+            patternCtx.setLineDash([3, 3]);
+            const numLines = 20;
+            for (let i = -numLines; i <= numLines; i++) {
+                const xPos = w / 2 + i * (w / (2 * numLines));
+                patternCtx.beginPath();
+                patternCtx.moveTo(xPos, 0);
+                patternCtx.lineTo(xPos, h);
+                patternCtx.stroke();
+            }
+            patternCtx.setLineDash([]);
+            patternCtx.fillStyle = 'rgba(255,255,255,0.5)';
+            patternCtx.font = '12px "Microsoft YaHei", sans-serif';
+            patternCtx.textAlign = 'center';
+            patternCtx.fillText('中央亮纹', w / 2, h - 15);
+            // mm 坐标轴（中心为 0，范围 ±5mm，便于学生量条纹间距）
+            patternCtx.strokeStyle = 'rgba(255,255,255,0.35)';
+            patternCtx.lineWidth = 1;
+            patternCtx.textBaseline = 'middle';
+            patternCtx.font = '10px "Microsoft YaHei", sans-serif';
+            patternCtx.beginPath();
+            patternCtx.moveTo(0, h - 26);
+            patternCtx.lineTo(w, h - 26);
+            patternCtx.stroke();
+            for (let mm = -DISPLAY_RANGE_MM; mm <= DISPLAY_RANGE_MM; mm++) {
+                const xPx = w / 2 + (mm / DISPLAY_RANGE_MM) * (w / 2);
+                patternCtx.beginPath();
+                patternCtx.moveTo(xPx, h - 31);
+                patternCtx.lineTo(xPx, h - 26);
+                patternCtx.stroke();
+                patternCtx.fillText(`${mm}`, xPx, h - 37);
+            }
+        }
+
+        // 游标测量：随鼠标在干涉图上读出 x（mm）与相对光强
+        const patternMeasureEl = document.getElementById('pattern-measure');
+        patternCanvas.addEventListener('mousemove', (e) => {
+            const rect = patternCanvas.getBoundingClientRect();
+            const xWorld = ((e.clientX - rect.left) / rect.width - 0.5) * DISPLAY_RANGE_MM * 2;
+            const I = computeIntensity(xWorld);
+            patternMeasureEl.textContent = `x = ${xWorld.toFixed(2)} mm ｜ I/I₀ = ${I.toFixed(2)}`;
+        });
+        patternCanvas.addEventListener('mouseleave', () => {
+            patternMeasureEl.textContent = 'x = 0.00 mm ｜ I/I₀ = 1.00（在图上移动鼠标测量）';
+        });
+
+        // ==================== 更新所有 ====================
+        function updateAll() {
+            // 根据 L 更新光屏位置（双缝位置固定）
+            state.screenZ = state.doubleSlitZ + state.screenDistance / 0.5;
+            screenGroup.position.z = state.screenZ;
+            // 更新光束
+            updateBeams();
+            // 更新纹理与图案
+            updateScreenTexture();
+            drawInterferencePattern();
+            // 更新双缝开口位置（模型）
+            const slitSpacingWorld = state.slitSpacing * 1.2;
+            slitOpening1.position.x = -slitSpacingWorld * 0.5;
+            slitOpening2.position.x = slitSpacingWorld * 0.5;
+            const slitW = state.slitWidth * 2;
+            slitOpening1.scale.x = slitW;
+            slitOpening2.scale.x = slitW;
+            // 更新信息显示
+            const d = state.slitSpacing * 1e-3;
+            const lambda = state.wavelength * 1e-9;
+            const L = state.screenDistance;
+            const deltaX = lambda * L / d * 1000;
+            document.getElementById('info-wavelength').textContent = `λ = ${state.wavelength} nm`;
+            document.getElementById('info-spacing').textContent = `Δx = ${deltaX.toFixed(2)} mm`;
+            document.getElementById('info-distance').textContent = `L = ${L.toFixed(2)} m`;
+            // 中央衍射极大内可见亮纹数（由缝间距 d 与缝宽 a 之比决定）
+            const a = state.slitWidth * 1e-3;
+            const ratio = d / a;
+            const nBright = ratio > 1 ? Math.round(2 * ratio - 1) : 1;
+            document.getElementById('info-fringes').textContent = `亮纹数 ≈ ${nBright}（2d/a−1）`;
+            document.getElementById('wavelength-val').textContent = `${state.wavelength} nm`;
+            document.getElementById('slit-spacing-val').textContent = `${state.slitSpacing.toFixed(2)} mm`;
+            document.getElementById('slit-width-val').textContent = `${state.slitWidth.toFixed(2)} mm`;
+            document.getElementById('screen-distance-val').textContent = `${L.toFixed(2)} m`;
+            const color = getWavelengthColor(state.wavelength);
+            bulbMat.emissive = new THREE.Color(color.r, color.g, color.b);
+            bulbMat.emissiveIntensity = 0.8;
+            glowMat.color = new THREE.Color(color.r, color.g, color.b);
+            sourceLight.color = new THREE.Color(color.r, color.g, color.b);
+        }
+
+        // ==================== 射线检测与点击说明（无拖动） ====================
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const interactiveObjects = [sourceGroup, singleSlitGroup, doubleSlitGroup, screenGroup];
+
+        function getIntersections(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            return raycaster.intersectObjects(interactiveObjects, true);
+        }
+
+        function findInteractiveRoot(intersections) {
+            for (const intersect of intersections) {
+                let obj = intersect.object;
+                while (obj) {
+                    if (obj.userData?.type === 'source' || obj.userData?.type === 'single-slit' ||
+                        obj.userData?.type === 'double-slit' || obj.userData?.type === 'screen') {
+                        return obj;
+                    }
+                    obj = obj.parent;
+                }
+            }
+            return null;
+        }
+
+        renderer.domElement.addEventListener('click', (event) => {
+            const intersections = getIntersections(event);
+            const root = findInteractiveRoot(intersections);
+            if (root && root.userData.description) {
+                document.getElementById('info-text').innerHTML = root.userData.description;
+                document.getElementById('status-indicator').textContent = `🔍 查看：${root.userData.name}`;
+            }
+        });
+
+        // ==================== UI控件 ====================
+        // 物理自洽约束：缝宽 a 不能大于缝间距 d（否则两条缝重叠）
+        function validateGeometry() {
+            if (state.slitWidth > state.slitSpacing) {
+                state.slitWidth = state.slitSpacing;
+                document.getElementById('slit-width-slider').value = state.slitSpacing.toFixed(2);
+                document.getElementById('status-indicator').textContent = '⚠️ 缝宽已钳制 ≤ 缝间距（物理需 d ≥ a）';
+                return true;
+            }
+            return false;
+        }
+
+        document.getElementById('wavelength-slider').addEventListener('input', (e) => {
+            state.wavelength = parseInt(e.target.value);
+            updateAll();
+            document.getElementById('status-indicator').textContent = `🎨 波长调节：${state.wavelength}nm`;
+        });
+        document.getElementById('slit-spacing-slider').addEventListener('input', (e) => {
+            state.slitSpacing = parseFloat(e.target.value);
+            const clamped = validateGeometry();
+            updateAll();
+            document.getElementById('status-indicator').textContent = clamped
+                ? '⚠️ 缝宽已钳制 ≤ 缝间距（物理需 d ≥ a）'
+                : `📏 缝间距调节：${state.slitSpacing.toFixed(2)}mm`;
+        });
+        document.getElementById('slit-width-slider').addEventListener('input', (e) => {
+            state.slitWidth = parseFloat(e.target.value);
+            const clamped = validateGeometry();
+            updateAll();
+            document.getElementById('status-indicator').textContent = clamped
+                ? '⚠️ 缝宽已钳制 ≤ 缝间距（物理需 d ≥ a）'
+                : `📐 缝宽调节：${state.slitWidth.toFixed(2)}mm`;
+        });
+        document.getElementById('screen-distance-slider').addEventListener('input', (e) => {
+            state.screenDistance = parseFloat(e.target.value);
+            updateAll();
+            document.getElementById('status-indicator').textContent = `📏 屏距调节：${state.screenDistance.toFixed(2)}m`;
+        });
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            state.wavelength = 550;
+            state.slitSpacing = 0.50;
+            state.slitWidth = 0.10;
+            state.screenDistance = 1.00;
+            document.getElementById('wavelength-slider').value = 550;
+            document.getElementById('slit-spacing-slider').value = 0.50;
+            document.getElementById('slit-width-slider').value = 0.10;
+            document.getElementById('screen-distance-slider').value = 1.00;
+            updateAll();
+            document.getElementById('status-indicator').textContent = '🔄 已重置';
+            document.getElementById('info-text').innerHTML = '已重置所有参数。';
+        });
+
+        // ==================== 窗口大小调整 ====================
+        function onResize() {
+            const w = scenePanel.clientWidth;
+            const h = scenePanel.clientHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+            resizePatternCanvas();
+            drawInterferencePattern();
+        }
+        window.addEventListener('resize', onResize);
+        setTimeout(onResize, 100);
+
+        // ==================== 动画循环 ====================
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            const t = Date.now() * 0.003;
+            glowMat.opacity = 0.2 + Math.sin(t) * 0.08;
+            glow.scale.setScalar(1 + Math.sin(t * 1.5) * 0.08);
+            renderer.render(scene, camera);
+        }
+
+        // ==================== 初始化 ====================
+        updateAll();
+        animate();
+
+        console.log('🔬 光的双缝干涉模拟仿真已启动（含单缝，无拖动，固定显示范围）');
+    </script>
+</body>
+</html>

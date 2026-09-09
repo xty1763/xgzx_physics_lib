@@ -20,6 +20,9 @@
   - `index.js`（云函数代码，Node18，HTTP触发）、`package.json`、`README.md`（部署指南）
 - `publish-local.ps1` — 一键 git pull+commit+push
 - `HANDOFF.md` — 本文件
+- `workbench/` — **深色“教师智能教学工作台”独立子目录网站**（v20，自包含 data/pages，部署在 `https://xty1763.github.io/xgzx_physics_lib/workbench/`，与根站点的资源库互相独立）（由 `物理界面1.html` 设计稿重做而来）
+  - `index.html`、`styles.css`、`app.js`（`BASE_DIR="workbench/"`，数据/页面均读写 `workbench/data/`、`workbench/pages/`）
+  - `data/course-data.js`、`data/resources.json`（线上快照）、`pages/`（所引用的资源文件）
 
 ## 已实现功能
 - 教材→章→节 三层侧栏导航（默认收起，点开选中，再点收起；顶部 ☰ 可整体收起导航栏）

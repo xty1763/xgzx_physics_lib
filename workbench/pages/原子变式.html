@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Radioactive Decay Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            margin: 0;
+            overflow: hidden;
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .btn {
+            transition: all 0.2s ease;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        /* Custom scrollbar for info panel if needed */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row h-screen w-screen">
+
+    <!-- Canvas Area -->
+    <div id="canvas-container" class="flex-1 relative">
+        <canvas id="sim-canvas"></canvas>
+        
+        <!-- Status & Toast -->
+        <div id="toast-msg" class="absolute top-20 left-1/2 transform -translate-x-1/2 bg-red-500/90 text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none z-50"></div>
+        
+        <div class="absolute top-4 right-4 glass-panel p-3 rounded-lg text-sm flex flex-col gap-1 pointer-events-none text-right min-w-[130px]">
+            <div class="text-slate-400 font-mono text-[10px] tracking-wider mb-1">NUCLEUS STATE</div>
+            <div class="text-red-400 font-bold flex justify-between"><span>Protons:</span> <span id="ui-protons">0</span></div>
+            <div class="text-blue-400 font-bold flex justify-between"><span>Neutrons:</span> <span id="ui-neutrons">0</span></div>
+        </div>
+
+        <!-- Legend -->
+        <div class="absolute top-4 left-4 glass-panel p-3 rounded-lg text-sm flex flex-col gap-2 pointer-events-none">
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]"></div>
+                <span>Proton</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]"></div>
+                <span>Neutron</span>
+            </div>
+            <div class="flex items-center gap-2 mt-1">
+                <div class="w-4 h-[1px] bg-white opacity-40"></div>
+                <span class="text-xs text-slate-300">Strong Force Bonds</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- UI Panel -->
+    <div class="w-full md:w-[400px] h-[45vh] md:h-full glass-panel flex flex-col border-t md:border-t-0 md:border-l border-slate-700 z-10">
+        <div class="p-6 flex-1 overflow-y-auto flex flex-col gap-6">
+            
+            <header>
+                <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
+                    Nuclear Decay
+                </h1>
+                <p class="text-slate-400 text-sm mt-1">Interactive Physics Simulation</p>
+            </header>
+
+            <!-- Controls -->
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="triggerDecay('alpha')" class="btn bg-gradient-to-br from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg flex items-center justify-center gap-2">
+                    <span>&alpha;</span> Alpha
+                </button>
+                <button onclick="triggerDecay('beta')" class="btn bg-gradient-to-br from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg flex items-center justify-center gap-2">
+                    <span>&beta;&#8315;</span> Beta
+                </button>
+                <button onclick="triggerDecay('gamma')" class="btn bg-gradient-to-br from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg flex items-center justify-center gap-2">
+                    <span>&gamma;</span> Gamma
+                </button>
+                <button onclick="resetSimulation()" class="btn bg-slate-700 hover:bg-slate-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg">
+                    Reset Nucleus
+                </button>
+            </div>
+
+            <!-- Real World Examples -->
+            <div class="mt-2">
+                <h3 class="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-2">Single Decay Examples</h3>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="triggerDecay('alpha')" class="btn bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-[11px] text-slate-300 py-2 px-1 rounded-lg shadow transition-colors text-center">
+                        <span class="block text-white font-bold mb-0.5 text-xs">Uranium-238</span>
+                        &alpha; Decay
+                    </button>
+                    <button onclick="triggerDecay('beta')" class="btn bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-[11px] text-slate-300 py-2 px-1 rounded-lg shadow transition-colors text-center">
+                        <span class="block text-white font-bold mb-0.5 text-xs">Carbon-14</span>
+                        &beta;&#8315; Decay
+                    </button>
+                    <button onclick="triggerDecay('gamma')" class="btn bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-[11px] text-slate-300 py-2 px-1 rounded-lg shadow transition-colors text-center">
+                        <span class="block text-white font-bold mb-0.5 text-xs">Barium-137m</span>
+                        &gamma; Decay
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mixed Cascades -->
+            <div class="mt-3">
+                <h3 class="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-2">Mixed / Cascade Examples</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="triggerDecay('mixed_bg')" class="btn bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-[11px] text-slate-300 py-2 px-1 rounded-lg shadow transition-colors text-center">
+                        <span class="block text-white font-bold mb-0.5 text-xs">Cobalt-60</span>
+                        &beta;&#8315; + &gamma; Cascade
+                    </button>
+                    <button onclick="triggerDecay('mixed_ag')" class="btn bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-[11px] text-slate-300 py-2 px-1 rounded-lg shadow transition-colors text-center">
+                        <span class="block text-white font-bold mb-0.5 text-xs">Radium-226</span>
+                        &alpha; + &gamma; Cascade
+                    </button>
+                </div>
+            </div>
+
+            <!-- Nuclear Reactions -->
+            <div class="mt-3">
+                <h3 class="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-2">Nuclear Reactions</h3>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="triggerDecay('fission')" class="btn bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-[11px] text-slate-300 py-2 px-1 rounded-lg shadow transition-colors text-center">
+                        <span class="block text-white font-bold mb-0.5 text-xs">U-235</span>
+                        Fission
+                    </button>
+                    <button onclick="triggerDecay('fusion')" class="btn bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-[11px] text-slate-300 py-2 px-1 rounded-lg shadow transition-colors text-center">
+                        <span class="block text-white font-bold mb-0.5 text-xs">D + T</span>
+                        Fusion
+                    </button>
+                    <button onclick="triggerDecay('transmutation')" class="btn bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-[11px] text-slate-300 py-2 px-1 rounded-lg shadow transition-colors text-center">
+                        <span class="block text-white font-bold mb-0.5 text-xs">N-14</span>
+                        Transmutation
+                    </button>
+                </div>
+            </div>
+
+            <!-- Information Display -->
+            <div id="info-panel" class="bg-slate-800/50 rounded-xl p-5 border border-slate-700 flex-1">
+                <div class="text-center text-slate-500 italic mt-10" id="default-msg">
+                    Select a decay mode to view its principles and characteristics.
+                </div>
+                
+                <div id="decay-info" class="hidden flex-col gap-4">
+                    <h2 id="info-title" class="text-xl font-bold text-white border-b border-slate-600 pb-2"></h2>
+                    
+                    <div>
+                        <h3 class="text-sm uppercase tracking-wider text-slate-400 font-semibold mb-1">Principle</h3>
+                        <p id="info-principle" class="text-slate-200 text-sm leading-relaxed"></p>
+                    </div>
+
+                    <div>
+                        <h3 class="text-sm uppercase tracking-wider text-slate-400 font-semibold mb-1">Characteristics</h3>
+                        <ul id="info-characteristics" class="list-disc list-inside text-slate-200 text-sm leading-relaxed space-y-1">
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-900/50 p-4 rounded-lg border border-slate-700 mt-2">
+                        <h3 class="text-sm uppercase tracking-wider text-slate-400 font-semibold mb-2">Real-World Model</h3>
+                        <p id="info-example" class="text-slate-300 text-sm mb-3 leading-relaxed"></p>
+                        <div class="bg-black/60 p-3 rounded font-mono text-center text-green-400 text-lg tracking-widest shadow-inner overflow-x-auto whitespace-nowrap" id="info-equation"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- Data ---
+        const decayData = {
+            alpha: {
+                title: "Alpha (α) Decay",
+                principle: "An unstable nucleus emits an alpha particle (2 protons, 2 neutrons). This occurs when the electromagnetic repulsion between protons overcomes the Strong Nuclear Force (which binds nucleons together), often via quantum tunneling.",
+                characteristics: [
+                    "Governing Force: Strong Interaction & Electromagnetism",
+                    "Particle: Helium nucleus (2P, 2N)",
+                    "Charge: +2e",
+                    "Penetration: Very low. Can be stopped by a sheet of paper.",
+                    "Ionization: Very high."
+                ],
+                example: "Uranium-238, an unstable heavy isotope found in nature, decays into Thorium-234 by emitting an alpha particle (a Helium-4 nucleus).",
+                equation: "²³⁸₉₂U → ²³⁴₉₀Th + ⁴₂He"
+            },
+            beta: {
+                title: "Beta (β⁻) Decay",
+                principle: "Governed by the Weak Interaction, a neutron's down quark changes into an up quark via a W boson, converting the neutron into a proton. It emits an electron (beta particle) and an antineutrino.",
+                characteristics: [
+                    "Governing Force: Weak Interaction",
+                    "Particle: High-speed electron",
+                    "Charge: -1e",
+                    "Penetration: Medium. Stopped by a few millimeters of aluminum.",
+                    "Ionization: Moderate."
+                ],
+                example: "Carbon-14, widely used in radiocarbon dating, undergoes beta decay to become stable Nitrogen-14, emitting an electron and an electron antineutrino.",
+                equation: "¹⁴₆C → ¹⁴₇N + e⁻ + ν̄ₑ"
+            },
+            gamma: {
+                title: "Gamma (γ) Decay",
+                principle: "Driven by the Electromagnetic Force, a nucleus in an excited state transitions to a lower energy state by emitting a high-frequency electromagnetic wave (a gamma-ray photon).",
+                characteristics: [
+                    "Governing Force: Electromagnetic Force",
+                    "Particle: Photon (Electromagnetic radiation)",
+                    "Charge: 0 (Neutral)",
+                    "Penetration: Very high. Requires thick lead or concrete.",
+                    "Ionization: Low."
+                ],
+                example: "Barium-137m (a metastable isomer often produced by the beta decay of Cesium-137) drops to its stable ground state by emitting a highly energetic gamma photon.",
+                equation: "¹³⁷ᵐ₅₆Ba → ¹³⁷₅₆Ba + γ"
+            },
+            mixed_bg: {
+                title: "Beta-Gamma (β⁻ + γ) Cascade",
+                principle: "Many isotopes do not decay directly to the ground state. Instead, they undergo beta decay to an excited state of the daughter nucleus, which rapidly relaxes by emitting one or more gamma photons.",
+                characteristics: [
+                    "Governing Forces: Weak (Beta) then Electromagnetic (Gamma)",
+                    "Particles: Electron, Antineutrino, and Photon(s)",
+                    "Process: Sequential emission cascade",
+                    "Occurrence: Extremely common in nuclear reactors and medicine."
+                ],
+                example: "Cobalt-60 decays via beta emission to an excited state of Nickel-60, which almost instantly emits high-energy gamma rays to reach stability.",
+                equation: "⁶⁰₂₇Co → ⁶⁰₂₈Ni* + e⁻ + ν̄ₑ → ⁶⁰₂₈Ni + γ"
+            },
+            mixed_ag: {
+                title: "Alpha-Gamma (α + γ) Cascade",
+                principle: "Similar to beta-gamma cascades, alpha decay can leave the resulting daughter nucleus in an excited energy state, which subsequently decays to the ground state via gamma emission.",
+                characteristics: [
+                    "Governing Forces: Strong (Alpha) then Electromagnetic (Gamma)",
+                    "Particles: Helium nucleus (Alpha) and Photon (Gamma)",
+                    "Process: Sequential emission cascade"
+                ],
+                example: "Radium-226 decays via alpha emission to Radon-222. A portion of these decays leave Radon in an excited state, which then emits a gamma ray.",
+                equation: "²²⁶₈₈Ra → ²²²₈₆Rn* + ⁴₂He → ²²²₈₆Rn + γ"
+            },
+            fission: {
+                title: "Nuclear Fission",
+                principle: "A heavy, unstable nucleus absorbs a neutron, becomes highly excited, and splits into two lighter nuclei (fission fragments), releasing a large amount of energy and additional neutrons.",
+                characteristics: [
+                    "Governing Force: Interplay of Strong Nuclear & Electromagnetic forces",
+                    "Trigger: Usually a slow-moving thermal neutron",
+                    "Products: Two lighter nuclei, 2-3 neutrons, and gamma rays",
+                    "Energy Release: Very high (~200 MeV per event)"
+                ],
+                example: "Uranium-235 absorbs a neutron, becoming U-236, which rapidly splits into Barium-141 and Krypton-92, releasing 3 neutrons.",
+                equation: "²³⁵₉₂U + ¹₀n → ²³⁶₉₂U* → ¹⁴¹₅₆Ba + ⁹²₃₆Kr + 3 ¹₀n"
+            },
+            fusion: {
+                title: "Nuclear Fusion",
+                principle: "Under extreme temperature and pressure, two light atomic nuclei overcome electrostatic repulsion and collide, fusing together to form a heavier nucleus and releasing immense energy.",
+                characteristics: [
+                    "Governing Force: Strong Nuclear Force overcomes Electromagnetic repulsion",
+                    "Requirement: Extreme temperature/pressure (e.g., stellar cores)",
+                    "Products: Heavier nucleus and often a free nucleon (neutron/proton)",
+                    "Energy Release: Highest per unit mass"
+                ],
+                example: "Deuterium (1P, 1N) and Tritium (1P, 2N) fuse to form Helium-4 (2P, 2N), releasing a high-energy neutron.",
+                equation: "²₁H + ³₁H → ⁴₂He + ¹₀n"
+            },
+            transmutation: {
+                title: "Artificial Transmutation",
+                principle: "The deliberate conversion of one chemical element into another by bombarding its nucleus with subatomic particles or light nuclei.",
+                characteristics: [
+                    "Governing Force: Strong Nuclear Force",
+                    "Trigger: High-energy particle bombardment (e.g., alpha particles)",
+                    "Historical Note: First achieved by Ernest Rutherford in 1919"
+                ],
+                example: "Nitrogen-14 is bombarded with an alpha particle, absorbing it to briefly form Fluorine-18, which instantly decays into Oxygen-17 and a proton.",
+                equation: "¹⁴₇N + ⁴₂He → ¹⁷₈O + ¹₁p"
+            }
+        };
+
+        // --- Canvas Setup ---
+        const canvas = document.getElementById('sim-canvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        let width, height, centerX, centerY;
+
+        function resize() {
+            const container = document.getElementById('canvas-container');
+            width = container.clientWidth;
+            height = container.clientHeight;
+            // Handle high DPI displays
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            ctx.scale(dpr, dpr);
+            centerX = width / 2;
+            centerY = height / 2;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- Physics & Rendering Engine ---
+        
+        let nucleons = [];
+        let emittedParticles = [];
+        let incomingParticles = [];
+        let nucleusState = 'stable'; // stable, excited, awaiting_fission, etc.
+        let excitedTimer = 0;
+        let time = 0;
+
+        const NUCLEUS_RADIUS = 40;
+        const PARTICLE_RADIUS = 5;
+
+        class Nucleon {
+            constructor(type) {
+                this.type = type; // 'proton' or 'neutron'
+                this.color = type === 'proton' ? '#ef4444' : '#3b82f6';
+                this.glow = type === 'proton' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(59, 130, 246, 0.4)';
+                
+                // Random position within a sphere (projected to 2D)
+                const r = Math.cbrt(Math.random()) * NUCLEUS_RADIUS;
+                const theta = Math.random() * 2 * Math.PI;
+                this.targetX = r * Math.cos(theta);
+                this.targetY = r * Math.sin(theta);
+                
+                this.x = this.targetX;
+                this.y = this.targetY;
+                
+                // For idle animation
+                this.phase = Math.random() * Math.PI * 2;
+                this.speed = 0.5 + Math.random() * 1.5;
+            }
+
+            update() {
+                // Wiggle around target
+                let wiggle = 1;
+                if (nucleusState === 'excited') {
+                    wiggle = 4; // Stronger vibration
+                }
+                
+                this.x = this.targetX + Math.sin(time * this.speed + this.phase) * wiggle;
+                this.y = this.targetY + Math.cos(time * this.speed * 0.8 + this.phase) * wiggle;
+            }
+
+            draw(ctx, cx, cy) {
+                ctx.beginPath();
+                ctx.arc(cx + this.x, cy + this.y, PARTICLE_RADIUS, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
+        }
+
+        class EmittedParticle {
+            constructor(type, customData = null, customAngle = null) {
+                this.type = type;
+                this.x = centerX;
+                this.y = centerY;
+                // Random outward direction
+                const angle = customAngle !== null ? customAngle : Math.random() * Math.PI * 2;
+                this.life = 1.0;
+                this.customData = customData;
+                
+                if (type === 'alpha') {
+                    this.vx = Math.cos(angle) * 1.5;
+                    this.vy = Math.sin(angle) * 1.5;
+                    this.components = [
+                        {dx: -PARTICLE_RADIUS, dy: -PARTICLE_RADIUS, c: '#ef4444'}, // p
+                        {dx: PARTICLE_RADIUS, dy: -PARTICLE_RADIUS, c: '#ef4444'},  // p
+                        {dx: -PARTICLE_RADIUS, dy: PARTICLE_RADIUS, c: '#3b82f6'},  // n
+                        {dx: PARTICLE_RADIUS, dy: PARTICLE_RADIUS, c: '#3b82f6'}    // n
+                    ];
+                } else if (type === 'beta') {
+                    this.vx = Math.cos(angle) * 6;
+                    this.vy = Math.sin(angle) * 6;
+                    this.trail = [];
+                } else if (type === 'gamma') {
+                    this.vx = Math.cos(angle) * 4;
+                    this.vy = Math.sin(angle) * 4;
+                    this.angle = angle;
+                    this.distance = 0;
+                } else if (type === 'fragment') {
+                    this.vx = Math.cos(angle) * 2;
+                    this.vy = Math.sin(angle) * 2;
+                    this.components = customData || [];
+                } else if (type === 'single_neutron' || type === 'single_proton') {
+                    this.vx = Math.cos(angle) * 3;
+                    this.vy = Math.sin(angle) * 3;
+                }
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                if (this.type === 'beta') {
+                    this.trail.push({x: this.x, y: this.y});
+                    if (this.trail.length > 10) this.trail.shift();
+                } else if (this.type === 'fragment') {
+                    this.components.forEach(comp => {
+                        ctx.beginPath();
+                        ctx.arc(this.x + comp.x, this.y + comp.y, PARTICLE_RADIUS, 0, Math.PI * 2);
+                        ctx.fillStyle = comp.color;
+                        ctx.fill();
+                    });
+                } else if (this.type === 'single_neutron' || this.type === 'single_proton') {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, PARTICLE_RADIUS, 0, Math.PI * 2);
+                    ctx.fillStyle = this.type === 'single_proton' ? '#ef4444' : '#3b82f6';
+                    ctx.fill();
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = ctx.fillStyle;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                } else if (this.type === 'gamma') {
+                    this.distance += Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+                }
+
+                // Fade out when off screen
+                if (this.x < -100 || this.x > width + 100 || this.y < -100 || this.y > height + 100) {
+                    this.life -= 0.02;
+                }
+            }
+
+            draw(ctx) {
+                ctx.globalAlpha = Math.max(0, this.life);
+                
+                if (this.type === 'alpha') {
+                    // Draw cluster
+                    this.components.forEach(comp => {
+                        ctx.beginPath();
+                        ctx.arc(this.x + comp.dx, this.y + comp.dy, PARTICLE_RADIUS, 0, Math.PI * 2);
+                        ctx.fillStyle = comp.c;
+                        ctx.fill();
+                        
+                        // Glow
+                        ctx.shadowBlur = 10;
+                        ctx.shadowColor = comp.c;
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                    });
+                } else if (this.type === 'beta') {
+                    // Draw trail
+                    if (this.trail.length > 1) {
+                        ctx.beginPath();
+                        ctx.moveTo(this.trail[0].x, this.trail[0].y);
+                        for(let i=1; i<this.trail.length; i++) {
+                            ctx.lineTo(this.trail[i].x, this.trail[i].y);
+                        }
+                        ctx.strokeStyle = 'rgba(165, 243, 252, 0.5)';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                    // Draw electron
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = '#cffafe'; // bright cyan
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#06b6d4';
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                } else if (this.type === 'gamma') {
+                    // Draw wave
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(this.angle);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(NUCLEUS_RADIUS, 0);
+                    
+                    const wavelength = 20;
+                    const amplitude = 15;
+                    
+                    for (let d = NUCLEUS_RADIUS; d < this.distance + NUCLEUS_RADIUS; d += 2) {
+                        const waveY = Math.sin((d - time * 5) / wavelength * Math.PI * 2) * amplitude;
+                        // Taper off amplitude at the ends
+                        let fade = 1;
+                        if (d > this.distance + NUCLEUS_RADIUS - 40) {
+                            fade = (this.distance + NUCLEUS_RADIUS - d) / 40;
+                        }
+                        ctx.lineTo(d, waveY * fade);
+                    }
+                    
+                    ctx.strokeStyle = '#fde047'; // yellow
+                    ctx.lineWidth = 3;
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#eab308';
+                    ctx.stroke();
+                    ctx.restore();
+                }
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        function initSimulation() {
+            nucleons = [];
+            emittedParticles = [];
+            incomingParticles = [];
+            nucleusState = 'stable';
+            
+            // Create a generic heavy nucleus (e.g., ~100 nucleons for visual performance)
+            const numProtons = 40;
+            const numNeutrons = 60;
+            
+            for(let i=0; i<numProtons; i++) nucleons.push(new Nucleon('proton'));
+            for(let i=0; i<numNeutrons; i++) nucleons.push(new Nucleon('neutron'));
+            
+            setTimeout(updateCounts, 50); // Ensure DOM is ready on first load
+        }
+
+        function triggerDecay(type) {
+            let pCount = nucleons.filter(n => n.type === 'proton').length;
+            let nCount = nucleons.filter(n => n.type === 'neutron').length;
+
+            if ((type === 'alpha' || type === 'mixed_ag') && (pCount < 2 || nCount < 2)) {
+                showError("Not enough nucleons for Alpha decay! Please reset nucleus.");
+                return;
+            }
+            if ((type === 'beta' || type === 'mixed_bg') && nCount < 1) {
+                showError("No neutrons left for Beta decay! Please reset nucleus.");
+                return;
+            }
+            if (type === 'fission' && (pCount + nCount < 20)) {
+                showError("Nucleus too small for Fission! Please reset nucleus.");
+                return;
+            }
+
+            updateUI(type);
+
+            if (type === 'alpha' || type === 'mixed_ag') {
+                // Remove 2 protons, 2 neutrons visually
+                let pRemoved = 0, nRemoved = 0;
+                for (let i = nucleons.length - 1; i >= 0; i--) {
+                    if (nucleons[i].type === 'proton' && pRemoved < 2) {
+                        nucleons.splice(i, 1);
+                        pRemoved++;
+                    } else if (nucleons[i].type === 'neutron' && nRemoved < 2) {
+                        nucleons.splice(i, 1);
+                        nRemoved++;
+                    }
+                    if (pRemoved === 2 && nRemoved === 2) break;
+                }
+                // Emit Alpha
+                emittedParticles.push(new EmittedParticle('alpha'));
+                
+                // Shake nucleus
+                nucleusState = 'excited';
+                excitedTimer = 40;
+            } 
+            
+            if (type === 'beta' || type === 'mixed_bg') {
+                // Change 1 neutron to proton
+                for (let i = 0; i < nucleons.length; i++) {
+                    if (nucleons[i].type === 'neutron') {
+                        nucleons[i].type = 'proton';
+                        nucleons[i].color = '#ef4444';
+                        break;
+                    }
+                }
+                // Emit Beta
+                emittedParticles.push(new EmittedParticle('beta'));
+                
+                nucleusState = 'excited';
+                excitedTimer = 20;
+            } 
+            
+            if (type === 'gamma') {
+                // Nucleus gets very excited, then emits wave
+                nucleusState = 'excited';
+                excitedTimer = 60;
+                // Delay emission slightly for effect
+                setTimeout(() => {
+                    emittedParticles.push(new EmittedParticle('gamma'));
+                }, 400);
+            }
+
+            if (type === 'fission') {
+                incomingParticles.push({ type: 'neutron', dist: 300, angle: Math.random() * Math.PI * 2, speed: 2 });
+                nucleusState = 'awaiting_fission';
+            }
+
+            if (type === 'fusion') {
+                nucleons = [];
+                incomingParticles.push({ type: 'deuterium', dist: 300, angle: Math.PI, speed: 2.5 });
+                incomingParticles.push({ type: 'tritium', dist: 300, angle: 0, speed: 2.5 });
+                nucleusState = 'awaiting_fusion';
+            }
+
+            if (type === 'transmutation') {
+                incomingParticles.push({ type: 'alpha', dist: 300, angle: Math.random() * Math.PI * 2, speed: 3 });
+                nucleusState = 'awaiting_transmutation';
+            }
+
+            // Handle cascaded gamma emission for mixed types
+            if (type === 'mixed_bg' || type === 'mixed_ag') {
+                // Schedule the subsequent gamma decay after a short delay
+                setTimeout(() => {
+                    nucleusState = 'excited';
+                    excitedTimer = 40;
+                    setTimeout(() => {
+                        emittedParticles.push(new EmittedParticle('gamma'));
+                    }, 200);
+                }, 800);
+            }
+            
+            updateCounts();
+        }
+
+        function showError(msg) {
+            const toast = document.getElementById('toast-msg');
+            if (toast) {
+                toast.innerText = msg;
+                toast.style.opacity = 1;
+                setTimeout(() => { toast.style.opacity = 0; }, 3000);
+            }
+        }
+
+        function updateCounts() {
+            let p = 0, n = 0;
+            nucleons.forEach(nuc => { if(nuc.type === 'proton') p++; else n++; });
+            const pEl = document.getElementById('ui-protons');
+            const nEl = document.getElementById('ui-neutrons');
+            if(pEl) pEl.innerText = p;
+            if(nEl) nEl.innerText = n;
+        }
+
+        function resetSimulation() {
+            initSimulation();
+            document.getElementById('default-msg').classList.remove('hidden');
+            document.getElementById('decay-info').classList.add('hidden');
+        }
+
+        function updateUI(type) {
+            const data = decayData[type];
+            document.getElementById('default-msg').classList.add('hidden');
+            
+            const infoDiv = document.getElementById('decay-info');
+            infoDiv.classList.remove('hidden');
+            
+            document.getElementById('info-title').innerHTML = data.title;
+            document.getElementById('info-principle').innerHTML = data.principle;
+            
+            const list = document.getElementById('info-characteristics');
+            list.innerHTML = '';
+            data.characteristics.forEach(char => {
+                const li = document.createElement('li');
+                li.innerHTML = char;
+                list.appendChild(li);
+            });
+
+            document.getElementById('info-example').innerHTML = data.example;
+            document.getElementById('info-equation').innerHTML = data.equation;
+        }
+
+        // --- Main Loop ---
+        function animate() {
+            // Draw background
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, width, height);
+            
+            // Draw radial gradient behind nucleus
+            const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 150);
+            gradient.addColorStop(0, nucleusState === 'excited' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)');
+            gradient.addColorStop(1, 'transparent');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+
+            time += 0.025; // Slowed down time progression for gentler wiggling
+
+            // Handle state
+            if (nucleusState === 'excited') {
+                excitedTimer--;
+                if (excitedTimer <= 0) {
+                    nucleusState = 'stable';
+                }
+            }
+
+            // Draw Nucleons
+            // Sort by Y to give slight fake 3D depth
+            nucleons.sort((a, b) => a.y - b.y);
+            
+            // Visualize Strong Nuclear Force (binding connections)
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            for (let i = 0; i < nucleons.length; i++) {
+                nucleons[i].update();
+                for (let j = i + 1; j < nucleons.length; j++) {
+                    let dx = nucleons[i].x - nucleons[j].x;
+                    let dy = nucleons[i].y - nucleons[j].y;
+                    if (dx * dx + dy * dy < 600) { // Connect nearby nucleons
+                        ctx.beginPath();
+                        ctx.moveTo(centerX + nucleons[i].x, centerY + nucleons[i].y);
+                        ctx.lineTo(centerX + nucleons[j].x, centerY + nucleons[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            
+            ctx.shadowBlur = 5; // Slight glow for overall nucleus
+            ctx.shadowColor = 'rgba(255,255,255,0.2)';
+            
+            nucleons.forEach(n => {
+                n.draw(ctx, centerX, centerY);
+            });
+            ctx.shadowBlur = 0;
+
+            // Process and Draw Incoming Particles
+            for (let i = incomingParticles.length - 1; i >= 0; i--) {
+                let p = incomingParticles[i];
+                p.dist -= p.speed;
+                let px = centerX + Math.cos(p.angle) * p.dist;
+                let py = centerY + Math.sin(p.angle) * p.dist;
+                
+                // Draw incoming particles
+                if (p.type === 'neutron') {
+                    ctx.beginPath(); ctx.arc(px, py, PARTICLE_RADIUS, 0, Math.PI*2);
+                    ctx.fillStyle = '#3b82f6'; ctx.fill();
+                } else if (p.type === 'alpha') {
+                    const comps = [
+                        {dx: -PARTICLE_RADIUS, dy: -PARTICLE_RADIUS, c: '#ef4444'},
+                        {dx: PARTICLE_RADIUS, dy: -PARTICLE_RADIUS, c: '#ef4444'},
+                        {dx: -PARTICLE_RADIUS, dy: PARTICLE_RADIUS, c: '#3b82f6'},
+                        {dx: PARTICLE_RADIUS, dy: PARTICLE_RADIUS, c: '#3b82f6'}
+                    ];
+                    comps.forEach(c => {
+                        ctx.beginPath(); ctx.arc(px + c.dx, py + c.dy, PARTICLE_RADIUS, 0, Math.PI*2);
+                        ctx.fillStyle = c.c; ctx.fill();
+                    });
+                } else if (p.type === 'deuterium') {
+                    ctx.beginPath(); ctx.arc(px - PARTICLE_RADIUS, py, PARTICLE_RADIUS, 0, Math.PI*2); ctx.fillStyle = '#ef4444'; ctx.fill();
+                    ctx.beginPath(); ctx.arc(px + PARTICLE_RADIUS, py, PARTICLE_RADIUS, 0, Math.PI*2); ctx.fillStyle = '#3b82f6'; ctx.fill();
+                } else if (p.type === 'tritium') {
+                    ctx.beginPath(); ctx.arc(px - PARTICLE_RADIUS, py - PARTICLE_RADIUS, PARTICLE_RADIUS, 0, Math.PI*2); ctx.fillStyle = '#ef4444'; ctx.fill();
+                    ctx.beginPath(); ctx.arc(px + PARTICLE_RADIUS, py - PARTICLE_RADIUS, PARTICLE_RADIUS, 0, Math.PI*2); ctx.fillStyle = '#3b82f6'; ctx.fill();
+                    ctx.beginPath(); ctx.arc(px, py + PARTICLE_RADIUS, PARTICLE_RADIUS, 0, Math.PI*2); ctx.fillStyle = '#3b82f6'; ctx.fill();
+                }
+
+                // Collision Detection with Nucleus
+                if (p.dist <= 25) {
+                    if (nucleusState === 'awaiting_fission' && p.type === 'neutron') {
+                        nucleons.push(new Nucleon('neutron')); // Absorb neutron
+                        let half = Math.floor(nucleons.length / 2);
+                        let frag1 = nucleons.splice(0, half);
+                        let frag2 = nucleons.splice(0, nucleons.length);
+                        // Split into two large fragments in opposite directions
+                        emittedParticles.push(new EmittedParticle('fragment', frag1, p.angle - 0.4));
+                        emittedParticles.push(new EmittedParticle('fragment', frag2, p.angle + Math.PI + 0.4));
+                        // Emit 3 free neutrons
+                        emittedParticles.push(new EmittedParticle('single_neutron', null, p.angle + Math.PI/2));
+                        emittedParticles.push(new EmittedParticle('single_neutron', null, p.angle - Math.PI/2));
+                        emittedParticles.push(new EmittedParticle('single_neutron', null, p.angle + Math.PI));
+                        nucleons = [];
+                        nucleusState = 'excited';
+                        excitedTimer = 20;
+                        updateCounts();
+                    } else if (nucleusState === 'awaiting_fusion' && p.type === 'tritium') { 
+                        // D and T hit simultaneously, form He-4
+                        nucleons.push(new Nucleon('proton'), new Nucleon('proton'), new Nucleon('neutron'), new Nucleon('neutron'));
+                        emittedParticles.push(new EmittedParticle('single_neutron', null, Math.random() * Math.PI * 2));
+                        nucleusState = 'excited';
+                        excitedTimer = 30;
+                        updateCounts();
+                    } else if (nucleusState === 'awaiting_transmutation' && p.type === 'alpha') {
+                        // Absorb Alpha
+                        nucleons.push(new Nucleon('proton'), new Nucleon('proton'), new Nucleon('neutron'), new Nucleon('neutron'));
+                        // Emit a single proton in opposite direction of incoming alpha
+                        let pIndex = nucleons.findIndex(n => n.type === 'proton');
+                        if (pIndex !== -1) nucleons.splice(pIndex, 1);
+                        emittedParticles.push(new EmittedParticle('single_proton', null, p.angle + Math.PI));
+                        nucleusState = 'excited';
+                        excitedTimer = 20;
+                        updateCounts();
+                    }
+                    incomingParticles.splice(i, 1);
+                }
+            }
+
+            // Update and Draw Particles
+            for (let i = emittedParticles.length - 1; i >= 0; i--) {
+                let p = emittedParticles[i];
+                p.update();
+                p.draw(ctx);
+                if (p.life <= 0) {
+                    emittedParticles.splice(i, 1);
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Initialize and start
+        initSimulation();
+        animate();
+
+    </script>
+</body>
+</html>

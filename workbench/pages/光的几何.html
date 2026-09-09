@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Optics Simulator: Reflection & Refraction</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/polygon-clipping@0.15.3/dist/polygon-clipping.umd.js"></script>
+    <style>
+        * {
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none; /* Prevent scrolling when dragging on canvas */
+        }
+        #ui-panel {
+            background: rgba(30, 41, 59, 0.95);
+            border-top: 1px solid #334155;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            max-height: 50vh;
+            overflow-y: auto;
+            backdrop-filter: blur(10px);
+        }
+        @media (min-width: 768px) {
+            body {
+                flex-direction: row;
+            }
+            #canvas-container {
+                height: 100vh;
+            }
+            #ui-panel {
+                width: 400px;
+                border-top: none;
+                border-left: 1px solid #334155;
+                height: 100vh;
+                max-height: 100vh;
+            }
+        }
+        
+        /* Custom Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 28px;
+            width: 28px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            margin-top: -12px;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #475569;
+            border-radius: 2px;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        
+        .preset-btn {
+            background: #334155;
+            border: 1px solid #475569;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 44px; /* Ensure mobile tap target size */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .preset-btn:hover {
+            background: #475569;
+            border-color: #38bdf8;
+        }
+
+        .math-box {
+            background: #020617;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        
+        .highlight-yellow { color: #fde047; }
+        .highlight-red { color: #f87171; }
+        .highlight-blue { color: #38bdf8; }
+        .highlight-tir { color: #fbbf24; font-weight: bold; animation: pulse 2s infinite; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="simCanvas"></canvas>
+    </div>
+
+    <div id="ui-panel">
+        <div>
+            <h1 class="text-2xl font-bold mb-1 text-white">Advanced Optics</h1>
+            <p class="text-xs text-slate-400">2D Raytracing Engine</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex flex-col gap-4">
+            
+            <!-- Environment -->
+            <div>
+                <div class="flex justify-between mb-1">
+                    <label class="text-sm font-semibold text-slate-300">Environment (n)</label>
+                    <span id="val-env" class="text-sm font-bold">1.00</span>
+                </div>
+                <input type="range" id="slider-env" min="1.0" max="2.0" step="0.01" value="1.00">
+            </div>
+
+            <div class="h-px w-full bg-slate-700 my-1"></div>
+            
+            <!-- Toggles -->
+            <div class="flex flex-wrap gap-4">
+                <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer py-1">
+                    <input type="checkbox" id="toggle-reflection" checked class="rounded border-slate-700 bg-slate-800 w-5 h-5"> Show Reflection
+                </label>
+                <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer py-1">
+                    <input type="checkbox" id="toggle-refraction" checked class="rounded border-slate-700 bg-slate-800 w-5 h-5"> Show Refraction
+                </label>
+                <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer py-1">
+                    <input type="checkbox" id="toggle-angles" checked class="rounded border-slate-700 bg-slate-800 w-5 h-5"> Show Angles
+                </label>
+                <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer py-1">
+                    <input type="checkbox" id="toggle-snap" checked class="rounded border-slate-700 bg-slate-800 w-5 h-5"> Snap to Grid
+                </label>
+            </div>
+            
+            <div class="h-px w-full bg-slate-700 my-1"></div>
+
+            <!-- Add Shapes -->
+            <div>
+                <label class="text-sm font-semibold text-slate-300 block mb-2">Add Glass Shapes</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button class="preset-btn" onclick="addShape('triangle')">Triangle</button>
+                    <button class="preset-btn" onclick="addShape('rectangle')">Rectangle</button>
+                    <button class="preset-btn" onclick="addShape('pentagon')">Pentagon</button>
+                    <button class="preset-btn" onclick="addShape('hexagon')">Hexagon</button>
+                    <button class="preset-btn" onclick="addShape('circle')">Circle</button>
+                    <button class="preset-btn" onclick="addShape('trapezoid')">Trapezoid</button>
+                    <button class="preset-btn col-span-2 !bg-indigo-900/30 !border-indigo-500/50 !text-indigo-300 hover:!bg-indigo-900/50" onclick="startCustomShape()">✏️ Draw Custom Shape</button>
+                    <button class="preset-btn col-span-2" onclick="addShape('triangle-30')">Right Triangle (30°-60°-90°)</button>
+                    <button class="preset-btn col-span-2" onclick="addShape('triangle-45')">Right Triangle (45°-45°-90°)</button>
+                    <button class="preset-btn col-span-2" onclick="addShape('triangle-37')">Right Triangle (37°-53°-90°)</button>
+                </div>
+                <div class="flex gap-2 mt-2">
+                    <button class="preset-btn flex-1 !bg-fuchsia-900/20 !border-fuchsia-900/50 !text-fuchsia-400 hover:!bg-fuchsia-900/40" onclick="mergeOverlappingShapes()">🔗 Merge</button>
+                    <button class="preset-btn flex-1 !bg-orange-900/20 !border-orange-900/50 !text-orange-400 hover:!bg-orange-900/40" onclick="subtractTopShape()">✂️ Subtract Top</button>
+                </div>
+                <button class="preset-btn w-full mt-2 !bg-red-900/20 !border-red-900/50 !text-red-400 hover:!bg-red-900/40" onclick="clearShapes()">Clear All Shapes</button>
+            </div>
+
+            <!-- Selected Shape Properties -->
+            <div id="selected-shape-ui" class="hidden bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                <div class="flex justify-between mb-1">
+                    <label class="text-sm font-semibold text-slate-300">Refractive Index (n)</label>
+                    <span id="val-shape-n" class="text-sm font-bold highlight-blue">1.50</span>
+                </div>
+                <input type="range" id="slider-shape-n" min="1.0" max="3.0" step="0.01" value="1.50">
+                
+                <div class="flex justify-between mb-1 mt-2">
+                    <label class="text-sm font-semibold text-slate-300">Rotation</label>
+                    <span id="val-shape-rot" class="text-sm font-bold text-yellow-400">0°</span>
+                </div>
+                <input type="range" id="slider-shape-rot" min="-180" max="180" step="1" value="0">
+                
+                <div class="flex justify-between mb-1 mt-2">
+                    <label class="text-sm font-semibold text-slate-300">Stretch X</label>
+                    <span id="val-shape-sx" class="text-sm font-bold text-green-400">1.0</span>
+                </div>
+                <input type="range" id="slider-shape-sx" min="0.1" max="5.0" step="0.1" value="1.0">
+                
+                <div class="flex justify-between mb-1 mt-2">
+                    <label class="text-sm font-semibold text-slate-300">Stretch Y</label>
+                    <span id="val-shape-sy" class="text-sm font-bold text-blue-400">1.0</span>
+                </div>
+                <input type="range" id="slider-shape-sy" min="0.1" max="5.0" step="0.1" value="1.0">
+
+                <div class="flex justify-between mb-1 mt-2">
+                    <label class="text-sm font-semibold text-slate-300">Scale (Uniform)</label>
+                    <span id="val-shape-scale" class="text-sm font-bold text-purple-400">1.0</span>
+                </div>
+                <input type="range" id="slider-shape-scale" min="0.1" max="5.0" step="0.1" value="1.0">
+
+                <div class="flex justify-between mt-3 items-center">
+                    <span class="text-xs text-slate-400">Shape Selected (Del to remove)</span>
+                    <button class="text-sm bg-red-500/10 text-red-400 px-4 py-2 rounded hover:bg-red-500/20 transition border border-red-500/20 min-h-[44px]" onclick="deleteSelected()">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Math & Results -->
+        <div class="math-box mt-auto">
+            <div class="text-xs text-slate-400 mb-2 border-b border-slate-800 pb-1">First Intersection Data</div>
+            
+            <div class="flex justify-between mb-1 items-center">
+                <span class="text-slate-300">Incidence (θ₁):</span>
+                <div class="flex items-center">
+                    <input type="number" id="input-incidence" class="w-16 bg-slate-800 text-yellow-400 font-bold text-right border border-slate-600 rounded px-1 outline-none focus:border-yellow-400 disabled:opacity-50 transition-colors" step="0.1" min="0" max="89.9" disabled>
+                    <span class="text-yellow-400 ml-1 font-bold text-sm">°</span>
+                </div>
+            </div>
+            
+            <div class="flex justify-between mb-1 items-center">
+                <span class="text-slate-300">Reflection (θ₁'):</span>
+                <span id="res-reflection" class="highlight-red font-bold">-</span>
+            </div>
+            
+            <div class="flex justify-between mb-3 items-center">
+                <span class="text-slate-300">Refraction (θ₂):</span>
+                <div class="flex items-center">
+                    <input type="number" id="input-refraction" class="w-16 bg-slate-800 text-blue-400 font-bold text-right border border-slate-600 rounded px-1 outline-none focus:border-blue-400 disabled:opacity-50 transition-colors" step="0.1" min="0" max="89.9" disabled>
+                    <span class="text-blue-400 ml-1 font-bold text-sm">°</span>
+                </div>
+            </div>
+
+            <div class="text-xs text-slate-400 mb-1 mt-2 border-t border-slate-800 pt-2">Law of Reflection: <span class="text-slate-300">θ₁ = θ₁'</span></div>
+            
+            <div class="text-xs text-slate-400 mb-1 mt-2 border-t border-slate-800 pt-2">Snell's Law: <span class="text-slate-300">n₁ · sin(θ₁) = n₂ · sin(θ₂)</span></div>
+            <div id="snell-equation" class="text-sm text-slate-200">
+                No intersection
+            </div>
+            <div id="tir-warning" class="hidden mt-2 text-center highlight-tir text-sm bg-amber-900/30 border border-amber-700/50 py-1 rounded">
+                ⚠ Total Internal Reflection
+            </div>
+        </div>
+        
+        <div class="text-xs text-slate-500 text-center mt-1">
+            Drag the laser box to move it.<br>Drag the yellow dot to rotate the beam.<br>Drag shapes to move them.
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Elements
+        const sliderEnv = document.getElementById('slider-env');
+        const valEnv = document.getElementById('val-env');
+        const sliderShapeN = document.getElementById('slider-shape-n');
+        const valShapeN = document.getElementById('val-shape-n');
+        const sliderShapeRot = document.getElementById('slider-shape-rot');
+        const valShapeRot = document.getElementById('val-shape-rot');
+        const sliderShapeSx = document.getElementById('slider-shape-sx');
+        const valShapeSx = document.getElementById('val-shape-sx');
+        const sliderShapeSy = document.getElementById('slider-shape-sy');
+        const valShapeSy = document.getElementById('val-shape-sy');
+        const sliderShapeScale = document.getElementById('slider-shape-scale');
+        const valShapeScale = document.getElementById('val-shape-scale');
+        const selectedShapeUI = document.getElementById('selected-shape-ui');
+        
+        const inputIncidence = document.getElementById('input-incidence');
+        const resReflection = document.getElementById('res-reflection');
+        const inputRefraction = document.getElementById('input-refraction');
+        const snellEquation = document.getElementById('snell-equation');
+        const tirWarning = document.getElementById('tir-warning');
+
+        // State variables
+        let w, h;
+        let envN = 1.00;
+        let laser = { x: 100, y: 100, angle: 30 }; // angle in degrees
+        let shapes = [];
+        let shapeIdCounter = 0;
+        let selectedShape = null;
+        let dragState = null; // 'laser', 'laser-dir', 'shape'
+        let dragOffset = { x: 0, y: 0 };
+        let firstHitData = null;
+        let intersections = [];
+        let showReflection = true;
+        let showRefraction = true;
+        let showAngles = true;
+        let snapToGrid = true;
+        const GRID_SIZE = 20;
+
+        let drawingMode = false;
+        let customVertices = [];
+        let mousePos = { x: 0, y: 0 };
+
+        const MAX_DEPTH = 5;
+        const EPSILON = 0.001;
+
+        const COLORS = {
+            bg1: '#0f172a',
+            incident: '#fde047',
+            reflected: '#f87171',
+            refracted: '#38bdf8',
+            shapeFill: 'rgba(255, 255, 255, 0.08)',
+            shapeStroke: '#475569',
+            shapeSelectedFill: 'rgba(56, 189, 248, 0.15)',
+            shapeSelectedStroke: '#38bdf8'
+        };
+
+        function resizeCanvas() {
+            const container = document.getElementById('canvas-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            w = canvas.width;
+            h = canvas.height;
+            draw();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // Shape Management
+        function addShape(type) {
+            const cx = w / 2;
+            const cy = h / 2;
+            let shape = { id: shapeIdCounter++, type, n: 1.5, x: cx, y: cy, rotation: 0, scaleX: 1, scaleY: 1 };
+            
+            shape.vertices = [];
+            if (type === 'circle') {
+                for (let i = 0; i < 60; i++) {
+                    let a = i * 2 * Math.PI / 60;
+                    shape.vertices.push({ x: 80 * Math.cos(a), y: 80 * Math.sin(a) });
+                }
+            } else if (type === 'trapezoid') {
+                shape.vertices = [{x: -60, y: -50}, {x: 60, y: -50}, {x: 100, y: 50}, {x: -100, y: 50}];
+            } else if (type === 'triangle-30') {
+                // 30-60-90 triangle
+                shape.vertices = [{x: -86.6, y: 50}, {x: 86.6, y: 50}, {x: -86.6, y: -50}];
+            } else if (type === 'triangle-45') {
+                // 45-45-90 triangle
+                shape.vertices = [{x: -60, y: 60}, {x: 60, y: 60}, {x: -60, y: -60}];
+            } else if (type === 'triangle-37') {
+                // 37-53-90 triangle (3:4:5 ratio)
+                shape.vertices = [{x: -80, y: 60}, {x: 80, y: 60}, {x: -80, y: -60}];
+            } else {
+                let sides = 3;
+                let radius = 90;
+                if (type === 'rectangle') { sides = 4; radius = 100; }
+                if (type === 'pentagon') { sides = 5; radius = 90; }
+                if (type === 'hexagon') { sides = 6; radius = 90; }
+
+                let offsetAngle = type === 'rectangle' ? Math.PI/4 : -Math.PI/2;
+                for (let i = 0; i < sides; i++) {
+                    let a = offsetAngle + (i * 2 * Math.PI / sides);
+                    shape.vertices.push({ x: radius * Math.cos(a), y: radius * Math.sin(a) });
+                }
+            }
+            
+            shapes.push(shape);
+            selectShape(shape);
+            draw();
+        }
+
+        function startCustomShape() {
+            drawingMode = !drawingMode;
+            customVertices = [];
+            selectShape(null);
+            draw();
+        }
+
+        function finishCustomShape() {
+            if (customVertices.length < 3) {
+                drawingMode = false;
+                customVertices = [];
+                draw();
+                return;
+            }
+            
+            // Calculate geometric center
+            let cx = 0, cy = 0;
+            customVertices.forEach(v => { cx += v.x; cy += v.y; });
+            cx /= customVertices.length;
+            
+            // Shift vertices to local space relative to center
+            let localVerts = customVertices.map(v => ({ x: v.x - cx, y: v.y - cy }));
+            
+            let shape = { 
+                id: shapeIdCounter++, 
+                type: 'custom', 
+                n: 1.5, 
+                x: cx, 
+                y: cy, 
+                rotation: 0, 
+                scaleX: 1, 
+                scaleY: 1,
+                vertices: localVerts
+            };
+            
+            shapes.push(shape);
+            drawingMode = false;
+            customVertices = [];
+            selectShape(shape);
+            draw();
+        }
+
+        function clearShapes() {
+            shapes = [];
+            selectShape(null);
+            draw();
+        }
+
+        function deleteSelected() {
+            if (selectedShape) {
+                shapes = shapes.filter(s => s.id !== selectedShape.id);
+                selectShape(null);
+                draw();
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (document.activeElement.tagName === 'INPUT') return;
+                deleteSelected();
+            }
+        });
+
+        function mergeOverlappingShapes() {
+            if (shapes.length < 2) return;
+            if (typeof polygonClipping === 'undefined') {
+                alert("Polygon clipping library not loaded.");
+                return;
+            }
+
+            let mergedAny = false;
+            
+            // Loop from top layer downwards
+            restart:
+            for (let i = shapes.length - 1; i >= 0; i--) {
+                for (let j = i - 1; j >= 0; j--) {
+                    let s1 = shapes[i];
+                    let s2 = shapes[j];
+
+                    let poly1 = getWorldRings(s1).map(ring => {
+                        let r = ring.map(v => [v.x, v.y]);
+                        r.push([...r[0]]);
+                        return r;
+                    });
+                    
+                    let poly2 = getWorldRings(s2).map(ring => {
+                        let r = ring.map(v => [v.x, v.y]);
+                        r.push([...r[0]]);
+                        return r;
+                    });
+
+                    try {
+                        let union = polygonClipping.union([poly1], [poly2]);
+                        
+                        // If union results in a single polygon, they overlapped/touched
+                        if (union.length === 1) {
+                            let newRings = union[0].map(ring => ring.slice(0, -1).map(p => ({x: p[0], y: p[1]})));
+                            
+                            // Calculate new center using exterior ring
+                            let cx = 0, cy = 0;
+                            newRings[0].forEach(v => { cx += v.x; cy += v.y; });
+                            cx /= newRings[0].length;
+                            
+                            // Localize rings relative to new center
+                            let localRings = newRings.map(ring => ring.map(v => ({ x: v.x - cx, y: v.y - cy })));
+                            
+                            let newShape = { 
+                                id: shapeIdCounter++, 
+                                type: 'custom', 
+                                n: s1.n, 
+                                x: cx, 
+                                y: cy, 
+                                rotation: 0, 
+                                scaleX: 1, 
+                                scaleY: 1,
+                                vertices: localRings[0],
+                                rings: localRings
+                            };
+                            
+                            // Remove old shapes and add new one
+                            shapes.splice(i, 1);
+                            shapes.splice(j, 1);
+                            shapes.push(newShape);
+                            
+                            mergedAny = true;
+                            selectShape(newShape);
+                            break restart; // Array mutated, restart scan
+                        }
+                    } catch (e) {
+                        console.error("Merge error:", e);
+                    }
+                }
+            }
+            
+            if (mergedAny) draw();
+        }
+
+        function subtractTopShape() {
+            if (shapes.length < 2) return;
+            if (typeof polygonClipping === 'undefined') return;
+
+            // Use the last shape in array as the "cutter"
+            const cutterIdx = shapes.length - 1;
+            const cutter = shapes[cutterIdx];
+            const cutterPoly = getWorldRings(cutter).map(ring => {
+                let r = ring.map(v => [v.x, v.y]);
+                r.push([...r[0]]);
+                return r;
+            });
+
+            let changed = false;
+            let newShapesList = [];
+
+            // Iterate through all shapes except the cutter
+            for (let i = 0; i < shapes.length - 1; i++) {
+                const subject = shapes[i];
+                const subjectPoly = getWorldRings(subject).map(ring => {
+                    let r = ring.map(v => [v.x, v.y]);
+                    r.push([...r[0]]);
+                    return r;
+                });
+
+                try {
+                    const result = polygonClipping.difference([subjectPoly], [cutterPoly]);
+                    
+                    // If result is empty, the shape was completely deleted
+                    if (result.length === 0) {
+                        changed = true;
+                        continue; 
+                    }
+
+                    // Shape was clipped, might result in multiple polygons
+                    // Check if it's identical (heuristic: same number of polygons, rings, and points in exterior ring)
+                    if (result.length === 1 && result[0].length === subjectPoly.length && result[0][0].length === subjectPoly[0].length) {
+                        newShapesList.push(subject);
+                    } else {
+                        changed = true;
+                        result.forEach(polySet => {
+                            let newRings = polySet.map(ring => ring.slice(0, -1).map(p => ({x: p[0], y: p[1]})));
+                            
+                            let cx = 0, cy = 0;
+                            newRings[0].forEach(v => { cx += v.x; cy += v.y; });
+                            cx /= newRings[0].length;
+                            
+                            let localRings = newRings.map(ring => ring.map(v => ({ x: v.x - cx, y: v.y - cy })));
+                            
+                            newShapesList.push({
+                                id: shapeIdCounter++,
+                                type: 'custom',
+                                n: subject.n,
+                                x: cx,
+                                y: cy,
+                                rotation: 0,
+                                scaleX: 1,
+                                scaleY: 1,
+                                vertices: localRings[0],
+                                rings: localRings
+                            });
+                        });
+                    }
+                } catch (e) {
+                    console.error("Clip error:", e);
+                    newShapesList.push(subject);
+                }
+            }
+
+            if (changed) {
+                // Keep the cutter, but remove the clipped parts from others
+                newShapesList.push(cutter);
+                shapes = newShapesList;
+                selectShape(cutter);
+                draw();
+            }
+        }
+
+        function updateShapeSliders() {
+            if (!selectedShape) return;
+            sliderShapeN.value = selectedShape.n;
+            valShapeN.textContent = selectedShape.n.toFixed(2);
+            
+            let deg = Math.round(selectedShape.rotation * 180 / Math.PI) % 360;
+            if (deg > 180) deg -= 360;
+            if (deg < -180) deg += 360;
+            sliderShapeRot.value = deg;
+            valShapeRot.textContent = deg + '°';
+            
+            sliderShapeSx.value = selectedShape.scaleX.toFixed(1);
+            valShapeSx.textContent = selectedShape.scaleX.toFixed(1);
+            
+            sliderShapeSy.value = selectedShape.scaleY.toFixed(1);
+            valShapeSy.textContent = selectedShape.scaleY.toFixed(1);
+            
+            let maxScale = Math.max(selectedShape.scaleX, selectedShape.scaleY);
+            sliderShapeScale.value = maxScale.toFixed(1);
+            valShapeScale.textContent = maxScale.toFixed(1);
+        }
+
+        function selectShape(shape) {
+            selectedShape = shape;
+            if (shape) {
+                selectedShapeUI.classList.remove('hidden');
+                updateShapeSliders();
+            } else {
+                selectedShapeUI.classList.add('hidden');
+            }
+        }
+
+        // UI Listeners
+        const toggleReflection = document.getElementById('toggle-reflection');
+        const toggleRefraction = document.getElementById('toggle-refraction');
+        const toggleAngles = document.getElementById('toggle-angles');
+        const toggleSnap = document.getElementById('toggle-snap');
+        
+        toggleReflection.addEventListener('change', (e) => { showReflection = e.target.checked; draw(); });
+        toggleRefraction.addEventListener('change', (e) => { showRefraction = e.target.checked; draw(); });
+        toggleAngles.addEventListener('change', (e) => { showAngles = e.target.checked; draw(); });
+        toggleSnap.addEventListener('change', (e) => { snapToGrid = e.target.checked; draw(); });
+
+        sliderEnv.addEventListener('input', (e) => {
+            envN = parseFloat(e.target.value);
+            valEnv.textContent = envN.toFixed(2);
+            draw();
+        });
+
+        sliderShapeN.addEventListener('input', (e) => {
+            if (selectedShape) {
+                selectedShape.n = parseFloat(e.target.value);
+                valShapeN.textContent = selectedShape.n.toFixed(2);
+                draw();
+            }
+        });
+
+        sliderShapeRot.addEventListener('input', (e) => {
+            if (selectedShape) {
+                selectedShape.rotation = parseFloat(e.target.value) * Math.PI / 180;
+                valShapeRot.textContent = e.target.value + '°';
+                draw();
+            }
+        });
+
+        sliderShapeSx.addEventListener('input', (e) => {
+            if (selectedShape) {
+                selectedShape.scaleX = parseFloat(e.target.value);
+                valShapeSx.textContent = selectedShape.scaleX.toFixed(1);
+                draw();
+            }
+        });
+
+        sliderShapeSy.addEventListener('input', (e) => {
+            if (selectedShape) {
+                selectedShape.scaleY = parseFloat(e.target.value);
+                valShapeSy.textContent = selectedShape.scaleY.toFixed(1);
+                draw();
+            }
+        });
+
+        sliderShapeScale.addEventListener('input', (e) => {
+            if (selectedShape) {
+                const val = parseFloat(e.target.value);
+                const currentMax = Math.max(selectedShape.scaleX, selectedShape.scaleY);
+                const factor = currentMax > 0 ? val / currentMax : val;
+                selectedShape.scaleX *= factor;
+                selectedShape.scaleY *= factor;
+                updateShapeSliders();
+                draw();
+            }
+        });
+
+        function setLaserIncidenceAngle(i_new) {
+            const N = firstHitData.normal;
+            const negN = { x: -N.x, y: -N.y };
+            
+            const rad = laser.angle * Math.PI / 180;
+            const dir = { x: Math.cos(rad), y: Math.sin(rad) };
+            
+            let delta = Math.atan2(dir.y, dir.x) - Math.atan2(negN.y, negN.x);
+            delta = Math.atan2(Math.sin(delta), Math.cos(delta)); // normalize to [-PI, PI]
+            
+            const sign = Math.sign(delta) || 1;
+            const delta_new = (i_new * Math.PI / 180) * sign;
+            
+            const a_dir_new = Math.atan2(negN.y, negN.x) + delta_new;
+            laser.angle = a_dir_new * 180 / Math.PI;
+            draw();
+        }
+
+        inputIncidence.addEventListener('change', (e) => {
+            if (!firstHitData) return;
+            let i_new = parseFloat(e.target.value);
+            if (isNaN(i_new)) return;
+            i_new = Math.max(0, Math.min(89.9, i_new));
+            setLaserIncidenceAngle(i_new);
+            e.target.blur();
+        });
+
+        inputRefraction.addEventListener('change', (e) => {
+            if (!firstHitData) return;
+            let r_new = parseFloat(e.target.value);
+            if (isNaN(r_new)) return;
+            r_new = Math.max(0, Math.min(89.9, r_new));
+            
+            const n1 = firstHitData.n1;
+            const n2 = firstHitData.n2;
+            const sinI = (n2 / n1) * Math.sin(r_new * Math.PI / 180);
+            
+            if (sinI > 1.0) {
+                // Invalid refraction angle (requires sin(i) > 1)
+                e.target.style.backgroundColor = '#7f1d1d'; // flash red
+                setTimeout(() => e.target.style.backgroundColor = '', 300);
+                e.target.value = firstHitData.theta2.toFixed(1);
+                e.target.blur();
+                return;
+            }
+            
+            const i_new = Math.asin(sinI) * 180 / Math.PI;
+            setLaserIncidenceAngle(i_new);
+            e.target.blur();
+        });
+
+        // Geometry Math
+        function getWorldRings(shape) {
+            const cos = Math.cos(shape.rotation);
+            const sin = Math.sin(shape.rotation);
+            const rings = shape.rings || [shape.vertices];
+            return rings.map(ring => ring.map(v => {
+                const sx = v.x * shape.scaleX;
+                const sy = v.y * shape.scaleY;
+                return {
+                    x: shape.x + sx * cos - sy * sin,
+                    y: shape.y + sx * sin + sy * cos
+                };
+            }));
+        }
+
+        function getWorldVertices(shape) {
+            return getWorldRings(shape)[0];
+        }
+
+        function getShapeHandles(shape) {
+            let minX = Math.min(...shape.vertices.map(v=>v.x));
+            let maxX = Math.max(...shape.vertices.map(v=>v.x));
+            let minY = Math.min(...shape.vertices.map(v=>v.y));
+            let maxY = Math.max(...shape.vertices.map(v=>v.y));
+
+            const cos = Math.cos(shape.rotation);
+            const sin = Math.sin(shape.rotation);
+
+            const toWorld = (lx, ly) => ({
+                x: shape.x + (lx * shape.scaleX * cos - ly * shape.scaleY * sin),
+                y: shape.y + (lx * shape.scaleX * sin + ly * shape.scaleY * cos)
+            });
+
+            return {
+                rot: toWorld(0, minY - 30),
+                stretchX: toWorld(maxX + 20, 0),
+                stretchY: toWorld(0, maxY + 20),
+                scale: toWorld(maxX + 20, maxY + 20)
+            };
+        }
+
+        // Interaction
+        function isPointInShape(px, py, shape) {
+            const rings = getWorldRings(shape);
+            let inside = false;
+            for (let r = 0; r < rings.length; r++) {
+                const verts = rings[r];
+                for (let i = 0, j = verts.length - 1; i < verts.length; j = i++) {
+                    const vi = verts[i];
+                    const vj = verts[j];
+                    const intersect = ((vi.y > py) !== (vj.y > py))
+                        && (px < (vj.x - vi.x) * (py - vi.y) / (vj.y - vi.y) + vi.x);
+                    if (intersect) inside = !inside;
+                }
+            }
+            return inside;
+        }
+
+        function getSnappedPos(valX, valY) {
+            if (!snapToGrid) return { x: valX, y: valY };
+            return {
+                x: Math.round(valX / GRID_SIZE) * GRID_SIZE,
+                y: Math.round(valY / GRID_SIZE) * GRID_SIZE
+            };
+        }
+
+        canvas.addEventListener('pointerdown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            let x = e.clientX - rect.left;
+            let y = e.clientY - rect.top;
+
+            canvas.setPointerCapture(e.pointerId); // Capture pointer for reliable mobile drag
+
+            if (drawingMode) {
+                const snapped = getSnappedPos(x, y);
+                if (customVertices.length >= 3) {
+                    const first = customVertices[0];
+                    if (Math.hypot(snapped.x - first.x, snapped.y - first.y) < 30) { // Increased hit radius
+                        finishCustomShape();
+                        return;
+                    }
+                }
+                customVertices.push({x: snapped.x, y: snapped.y});
+                draw();
+                return;
+            }
+
+            // Check laser direction handle
+            const rad = laser.angle * Math.PI / 180;
+            const hx = laser.x + 60 * Math.cos(rad);
+            const hy = laser.y + 60 * Math.sin(rad);
+            if (Math.hypot(x - hx, y - hy) < 30) { // Increased hit radius for mobile
+                dragState = 'laser-dir';
+                return;
+            }
+
+            // Check laser body
+            if (x >= laser.x - 30 && x <= laser.x + 30 && y >= laser.y - 30 && y <= laser.y + 30) { // Increased hit radius
+                dragState = 'laser';
+                dragOffset = { x: laser.x - x, y: laser.y - y };
+                return;
+            }
+
+            // Check selected shape handles first
+            if (selectedShape) {
+                const handles = getShapeHandles(selectedShape);
+                const handleHitRadius = 25; // Increased for mobile
+                if (Math.hypot(x - handles.rot.x, y - handles.rot.y) < handleHitRadius) { dragState = 'shape-rot'; return; }
+                if (Math.hypot(x - handles.stretchX.x, y - handles.stretchX.y) < handleHitRadius) { dragState = 'shape-stretch-x'; return; }
+                if (Math.hypot(x - handles.stretchY.x, y - handles.stretchY.y) < handleHitRadius) { dragState = 'shape-stretch-y'; return; }
+                if (Math.hypot(x - handles.scale.x, y - handles.scale.y) < handleHitRadius) { 
+                    dragState = 'shape-scale'; 
+                    dragOffset = { initScaleX: selectedShape.scaleX, initScaleY: selectedShape.scaleY };
+                    return; 
+                }
+            }
+
+            // Check shapes (top-most first)
+            for (let i = shapes.length - 1; i >= 0; i--) {
+                if (isPointInShape(x, y, shapes[i])) {
+                    dragState = 'shape';
+                    selectShape(shapes[i]);
+                    dragOffset = { x: shapes[i].x - x, y: shapes[i].y - y };
+                    draw();
+                    return;
+                }
+            }
+
+            selectShape(null);
+            draw();
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            if (drawingMode) {
+                mousePos = getSnappedPos(x, y);
+                draw();
+                return;
+            }
+            mousePos = { x, y };
+
+            if (!dragState) return;
+
+            if (dragState === 'laser') {
+                const target = getSnappedPos(x + dragOffset.x, y + dragOffset.y);
+                laser.x = target.x;
+                laser.y = target.y;
+            } else if (dragState === 'laser-dir') {
+                laser.angle = Math.atan2(y - laser.y, x - laser.x) * 180 / Math.PI;
+            } else if (dragState === 'shape' && selectedShape) {
+                const target = getSnappedPos(x + dragOffset.x, y + dragOffset.y);
+                selectedShape.x = target.x;
+                selectedShape.y = target.y;
+            } else if (dragState === 'shape-rot' && selectedShape) {
+                selectedShape.rotation = Math.atan2(y - selectedShape.y, x - selectedShape.x) + Math.PI/2;
+                updateShapeSliders();
+            } else if (dragState === 'shape-stretch-x' && selectedShape) {
+                const dx = x - selectedShape.x;
+                const dy = y - selectedShape.y;
+                const cos = Math.cos(selectedShape.rotation);
+                const sin = Math.sin(selectedShape.rotation);
+                const proj = dx * cos + dy * sin;
+                const maxX = Math.max(...selectedShape.vertices.map(v=>v.x));
+                selectedShape.scaleX = Math.max(0.1, proj / (maxX + 20));
+                updateShapeSliders();
+            } else if (dragState === 'shape-stretch-y' && selectedShape) {
+                const dx = x - selectedShape.x;
+                const dy = y - selectedShape.y;
+                const cos = Math.cos(selectedShape.rotation);
+                const sin = Math.sin(selectedShape.rotation);
+                const proj = -dx * sin + dy * cos;
+                const maxY = Math.max(...selectedShape.vertices.map(v=>v.y));
+                selectedShape.scaleY = Math.max(0.1, proj / (maxY + 20));
+                updateShapeSliders();
+            } else if (dragState === 'shape-scale' && selectedShape) {
+                const dx = x - selectedShape.x;
+                const dy = y - selectedShape.y;
+                const cos = Math.cos(selectedShape.rotation);
+                const sin = Math.sin(selectedShape.rotation);
+                const localX = dx * cos + dy * sin;
+                const localY = -dx * sin + dy * cos;
+                
+                const maxX = Math.max(...selectedShape.vertices.map(v=>v.x));
+                const maxY = Math.max(...selectedShape.vertices.map(v=>v.y));
+                
+                const handleLocalX = (maxX + 20) * dragOffset.initScaleX;
+                const handleLocalY = (maxY + 20) * dragOffset.initScaleY;
+                
+                const startDist = Math.hypot(handleLocalX, handleLocalY);
+                const newDist = Math.hypot(localX, localY);
+                
+                const factor = Math.max(0.1, newDist / startDist);
+                selectedShape.scaleX = dragOffset.initScaleX * factor;
+                selectedShape.scaleY = dragOffset.initScaleY * factor;
+                updateShapeSliders();
+            }
+            draw();
+        });
+
+        window.addEventListener('pointerup', (e) => { 
+            dragState = null; 
+            if (e.pointerId) {
+                try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
+            }
+        });
+        window.addEventListener('pointercancel', (e) => { 
+            dragState = null; 
+            if (e.pointerId) {
+                try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
+            }
+        });
+
+        // Raytracing Math
+        function rayIntersectSegment(rayOrigin, rayDir, p1, p2, shape) {
+            const v1 = p1.x - rayOrigin.x;
+            const v2 = p1.y - rayOrigin.y;
+            const v3 = p2.x - p1.x;
+            const v4 = p2.y - p1.y;
+            const cross = rayDir.x * v4 - rayDir.y * v3;
+            if (Math.abs(cross) < 1e-6) return null;
+            
+            const t1 = (v1 * v4 - v2 * v3) / cross;
+            const t2 = (v1 * rayDir.y - v2 * rayDir.x) / cross;
+            
+            if (t1 > EPSILON && t2 >= 0 && t2 <= 1) {
+                let nx = -v4; let ny = v3;
+                let len = Math.hypot(nx, ny);
+                nx /= len; ny /= len;
+                
+                // Ensure normal points outward by testing a point slightly along the normal
+                const midX = (p1.x + p2.x) / 2;
+                const midY = (p1.y + p2.y) / 2;
+                if (isPointInShape(midX + nx * 0.1, midY + ny * 0.1, shape)) {
+                    nx = -nx; ny = -ny;
+                }
+                
+                return { 
+                    t: t1, 
+                    p: { x: rayOrigin.x + t1*rayDir.x, y: rayOrigin.y + t1*rayDir.y }, 
+                    n: { x: nx, y: ny } 
+                };
+            }
+            return null;
+        }
+
+        function traceRay(origin, dir, intensity, depth) {
+            if (depth <= 0 || intensity < 0.05) return;
+
+            let closest = null;
+            let minT = Infinity;
+
+            // Find closest intersection
+            shapes.forEach(shape => {
+                const rings = getWorldRings(shape);
+                rings.forEach(verts => {
+                    for (let i = 0; i < verts.length; i++) {
+                        const p1 = verts[i];
+                        const nextI = (i + 1) % verts.length;
+                        const p2 = verts[nextI];
+                        const res = rayIntersectSegment(origin, dir, p1, p2, shape);
+                        if (res && res.t < minT) {
+                            minT = res.t;
+                            closest = { ...res, shape };
+                        }
+                    }
+                });
+            });
+
+            if (!closest) {
+                // Draw to infinity
+                const endX = origin.x + dir.x * 2000;
+                const endY = origin.y + dir.y * 2000;
+                drawRayLine(origin, { x: endX, y: endY }, intensity, depth === MAX_DEPTH);
+                return;
+            }
+
+            drawRayLine(origin, closest.p, intensity, depth === MAX_DEPTH);
+
+            // Physics at boundary
+            let n1 = envN;
+            let n2 = closest.shape.n;
+            let normal = closest.n;
+
+            let cosI = -(dir.x * normal.x + dir.y * normal.y);
+            if (cosI < 0) {
+                // Ray is exiting the shape
+                n1 = closest.shape.n;
+                n2 = envN;
+                normal = { x: -normal.x, y: -normal.y };
+                cosI = -cosI;
+            }
+
+            const sinI2 = 1.0 - cosI * cosI;
+            const sinI = Math.sqrt(Math.max(0, sinI2));
+            const sinT = (n1 / n2) * sinI;
+            const isTIR = sinT >= 1.0;
+
+            const theta1 = Math.acos(cosI) * 180 / Math.PI;
+            const theta2 = isTIR ? 'TIR' : Math.asin(sinT) * 180 / Math.PI;
+
+            // Save math for first hit UI panel
+            if (depth === MAX_DEPTH) {
+                firstHitData = {
+                    n1, n2, theta1, theta2, isTIR, p: closest.p, normal: normal
+                };
+            }
+
+            // Save math for on-canvas display at EVERY interface
+            intersections.push({
+                p: closest.p,
+                normal: normal,
+                theta1: theta1,
+                theta2: theta2,
+                isTIR: isTIR
+            });
+
+            // Reflected ray
+            const refDir = {
+                x: dir.x + 2 * cosI * normal.x,
+                y: dir.y + 2 * cosI * normal.y
+            };
+
+            if (isTIR) {
+                if (showReflection) traceRay(closest.p, refDir, intensity, depth - 1);
+            } else {
+                const cosT = Math.sqrt(1.0 - sinT * sinT);
+                // Fresnel approximation
+                let r0 = (n1 - n2) / (n1 + n2);
+                r0 = r0 * r0;
+                let cosFresnel = cosI;
+                if (n1 > n2) cosFresnel = cosT;
+                const R = r0 + (1 - r0) * Math.pow(1 - cosFresnel, 5);
+                const T = 1 - R;
+
+                // Refracted ray
+                const refrDir = {
+                    x: (n1/n2) * dir.x + ((n1/n2) * cosI - cosT) * normal.x,
+                    y: (n1/n2) * dir.y + ((n1/n2) * cosI - cosT) * normal.y
+                };
+
+                if (showReflection && R > 0.05) traceRay(closest.p, refDir, intensity * R, depth - 1);
+                if (showRefraction && T > 0.05) traceRay(closest.p, refrDir, intensity * T, depth - 1);
+            }
+        }
+
+        // Drawing Functions
+        function drawRayLine(p1, p2, intensity, isPrimary) {
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            
+            // Color based on primary vs secondary
+            const r = isPrimary ? 253 : 56;
+            const g = isPrimary ? 224 : 189;
+            const b = isPrimary ? 71 : 248;
+            
+            ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${intensity})`;
+            ctx.lineWidth = isPrimary ? 3 : 2;
+            if (isPrimary) {
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = `rgba(253, 224, 71, ${intensity})`;
+            }
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Draw directional arrow (True Cartesian Angle fix)
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const len = Math.hypot(dx, dy);
+            if (len > 40 && intensity > 0.1) {
+                const midX = p1.x + dx * 0.5;
+                const midY = p1.y + dy * 0.5;
+                const angle = Math.atan2(dy, dx);
+                drawArrow(midX, midY, angle, `rgba(${r}, ${g}, ${b}, ${intensity})`);
+            }
+        }
+
+        function drawArrow(x, y, angle, color) {
+            const headlen = 12;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            // Arrow fins point backwards from the tip, meaning arrow points towards 'angle'
+            ctx.lineTo(x - headlen * Math.cos(angle - Math.PI / 6), y - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.moveTo(x, y);
+            ctx.lineTo(x - headlen * Math.cos(angle + Math.PI / 6), y - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = COLORS.bg1;
+            ctx.fillRect(0, 0, w, h);
+
+            if (snapToGrid) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                for (let x = 0; x < w; x += GRID_SIZE) {
+                    ctx.moveTo(x, 0); ctx.lineTo(x, h);
+                }
+                for (let y = 0; y < h; y += GRID_SIZE) {
+                    ctx.moveTo(0, y); ctx.lineTo(w, y);
+                }
+                ctx.stroke();
+            }
+
+            firstHitData = null;
+            intersections = [];
+
+            // Draw Shapes
+            shapes.forEach(shape => {
+                const rings = getWorldRings(shape);
+                ctx.beginPath();
+                rings.forEach(verts => {
+                    verts.forEach((v, i) => {
+                        if (i === 0) ctx.moveTo(v.x, v.y);
+                        else ctx.lineTo(v.x, v.y);
+                    });
+                    ctx.closePath();
+                });
+                
+                const isSelected = shape.id === (selectedShape?.id);
+                ctx.fillStyle = isSelected ? COLORS.shapeSelectedFill : COLORS.shapeFill;
+                ctx.fill('evenodd');
+                ctx.strokeStyle = isSelected ? COLORS.shapeSelectedStroke : COLORS.shapeStroke;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`n=${shape.n.toFixed(2)}`, shape.x, shape.y);
+
+                // Draw transform handles if selected
+                if (isSelected) {
+                    const handles = getShapeHandles(shape);
+                    
+                    // Draw connection lines
+                    ctx.beginPath();
+                    ctx.moveTo(shape.x, shape.y);
+                    ctx.lineTo(handles.rot.x, handles.rot.y);
+                    ctx.moveTo(shape.x, shape.y);
+                    ctx.lineTo(handles.stretchX.x, handles.stretchX.y);
+                    ctx.moveTo(shape.x, shape.y);
+                    ctx.lineTo(handles.stretchY.x, handles.stretchY.y);
+                    ctx.moveTo(shape.x, shape.y);
+                    ctx.lineTo(handles.scale.x, handles.scale.y);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    // Rot Handle (Yellow)
+                    ctx.fillStyle = '#eab308';
+                    ctx.beginPath(); ctx.arc(handles.rot.x, handles.rot.y, 10, 0, Math.PI*2); ctx.fill();
+                    
+                    // Stretch X Handle (Green)
+                    ctx.fillStyle = '#22c55e';
+                    ctx.beginPath(); ctx.arc(handles.stretchX.x, handles.stretchX.y, 10, 0, Math.PI*2); ctx.fill();
+
+                    // Stretch Y Handle (Blue)
+                    ctx.fillStyle = '#3b82f6';
+                    ctx.beginPath(); ctx.arc(handles.stretchY.x, handles.stretchY.y, 10, 0, Math.PI*2); ctx.fill();
+
+                    // Scale Handle (Purple)
+                    ctx.fillStyle = '#a855f7';
+                    ctx.beginPath(); ctx.arc(handles.scale.x, handles.scale.y, 10, 0, Math.PI*2); ctx.fill();
+                }
+            });
+
+            // Draw Custom Shape Preview
+            if (drawingMode) {
+                ctx.beginPath();
+                customVertices.forEach((v, i) => {
+                    if (i === 0) ctx.moveTo(v.x, v.y);
+                    else ctx.lineTo(v.x, v.y);
+                });
+                if (customVertices.length > 0) {
+                    ctx.lineTo(mousePos.x, mousePos.y);
+                }
+                ctx.strokeStyle = '#a855f7';
+                ctx.setLineDash([5, 5]);
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                customVertices.forEach((v, i) => {
+                    ctx.beginPath();
+                    ctx.arc(v.x, v.y, i === 0 ? 12 : 6, 0, Math.PI*2);
+                    ctx.fillStyle = i === 0 ? '#22c55e' : '#a855f7';
+                    ctx.fill();
+                });
+                
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+                ctx.fillRect(w/2 - 160, 20, 320, 36);
+                ctx.strokeStyle = '#a855f7';
+                ctx.strokeRect(w/2 - 160, 20, 320, 36);
+                ctx.fillStyle = '#fff';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Click to add points. Click green start point to finish.', w/2, 38);
+            }
+
+            // Draw Laser Source
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(laser.x - 15, laser.y - 15, 30, 30);
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(laser.x - 15, laser.y - 15, 30, 30);
+            
+            // Laser handle
+            const rad = laser.angle * Math.PI / 180;
+            const hx = laser.x + 60 * Math.cos(rad);
+            const hy = laser.y + 60 * Math.sin(rad);
+            ctx.beginPath();
+            ctx.moveTo(laser.x, laser.y);
+            ctx.lineTo(hx, hy);
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.arc(hx, hy, 10, 0, Math.PI*2);
+            ctx.fillStyle = COLORS.incident;
+            ctx.fill();
+
+            // Trace Rays
+            const dir = { x: Math.cos(rad), y: Math.sin(rad) };
+            traceRay(laser, dir, 1.0, MAX_DEPTH);
+
+            // Draw angles and normals at EVERY intersection
+            intersections.forEach(hit => {
+                const p = hit.p;
+                const n = hit.normal;
+                
+                if (showAngles) {
+                    // Draw Normal line
+                    ctx.beginPath();
+                    ctx.moveTo(p.x - n.x * 40, p.y - n.y * 40);
+                    ctx.lineTo(p.x + n.x * 40, p.y + n.y * 40);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+                    ctx.setLineDash([4, 4]);
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Info Box Background
+                    const textX = p.x + 10;
+                    const textY = p.y - 10;
+                    
+                    let lines = [`i: ${hit.theta1.toFixed(1)}°`];
+                    if (showReflection) lines.push(`ref: ${hit.theta1.toFixed(1)}°`);
+                    if (showRefraction) lines.push(hit.isTIR ? `TIR` : `refr: ${hit.theta2.toFixed(1)}°`);
+
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+                    ctx.fillRect(textX - 2, textY - 4, 80, lines.length * 14 + 4);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                    ctx.strokeRect(textX - 2, textY - 4, 80, lines.length * 14 + 4);
+
+                    // Draw Text
+                    ctx.font = '11px monospace';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    
+                    lines.forEach((line, i) => {
+                        if(line.startsWith('i')) ctx.fillStyle = '#fde047';
+                        else if(line.startsWith('ref:')) ctx.fillStyle = '#f87171';
+                        else if(line.startsWith('refr')) ctx.fillStyle = '#38bdf8';
+                        else ctx.fillStyle = '#fbbf24'; // TIR
+                        ctx.fillText(line, textX, textY + i * 14);
+                    });
+                }
+            });
+
+            // Update Math UI Panel
+            if (firstHitData) {
+                inputIncidence.disabled = false;
+                if (document.activeElement !== inputIncidence) {
+                    inputIncidence.value = firstHitData.theta1.toFixed(1);
+                }
+                
+                resReflection.textContent = firstHitData.theta1.toFixed(1) + '°';
+                
+                if (firstHitData.isTIR) {
+                    inputRefraction.disabled = true;
+                    if (document.activeElement !== inputRefraction) {
+                        inputRefraction.value = '';
+                    }
+                    inputRefraction.classList.add('hidden');
+                    if(!document.getElementById('tir-text-span')) {
+                        let span = document.createElement('span');
+                        span.id = 'tir-text-span';
+                        span.className = 'highlight-tir font-bold text-sm';
+                        span.textContent = 'None (TIR)';
+                        inputRefraction.parentNode.appendChild(span);
+                    } else {
+                        document.getElementById('tir-text-span').classList.remove('hidden');
+                    }
+                    
+                    snellEquation.innerHTML = `${firstHitData.n1.toFixed(2)} · sin(${firstHitData.theta1.toFixed(1)}°) > ${firstHitData.n2.toFixed(2)} <br><span class="text-xs text-amber-500">(Critical Angle Exceeded)</span>`;
+                    tirWarning.classList.remove('hidden');
+                } else {
+                    inputRefraction.disabled = false;
+                    inputRefraction.classList.remove('hidden');
+                    if(document.getElementById('tir-text-span')) {
+                        document.getElementById('tir-text-span').classList.add('hidden');
+                    }
+                    if (document.activeElement !== inputRefraction) {
+                        inputRefraction.value = firstHitData.theta2.toFixed(1);
+                    }
+                    
+                    let val1 = (firstHitData.n1 * Math.sin(firstHitData.theta1 * Math.PI/180)).toFixed(3);
+                    let val2 = (firstHitData.n2 * Math.sin(firstHitData.theta2 * Math.PI/180)).toFixed(3);
+                    snellEquation.innerHTML = `${firstHitData.n1.toFixed(2)} · sin(${firstHitData.theta1.toFixed(1)}°) = ${val1}<br>${firstHitData.n2.toFixed(2)} · sin(${firstHitData.theta2.toFixed(1)}°) = ${val2}`;
+                    tirWarning.classList.add('hidden');
+                }
+
+            } else {
+                inputIncidence.disabled = true;
+                inputIncidence.value = '';
+                inputRefraction.disabled = true;
+                inputRefraction.value = '';
+                inputRefraction.classList.remove('hidden');
+                if(document.getElementById('tir-text-span')) {
+                    document.getElementById('tir-text-span').classList.add('hidden');
+                }
+                
+                resReflection.textContent = '-';
+                snellEquation.innerHTML = 'No intersection';
+                tirWarning.classList.add('hidden');
+            }
+        }
+
+        // Initialize with a rectangle
+        resizeCanvas();
+        addShape('rectangle');
+        laser = { x: 100, y: h/2 - 80, angle: 35 };
+        draw();
+
+    </script>
+</body>
+</html>

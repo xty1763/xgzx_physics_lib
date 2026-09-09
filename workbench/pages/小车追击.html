@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Physics: Two-Car Pursuit Problem</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #f8f9fa; /* Off-white theme */
+            color: #1e293b;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+        }
+        #ui-layer {
+            flex: 0 0 auto;
+            width: 100%;
+            padding: 0.75rem;
+            z-index: 10;
+            background-color: rgba(248, 249, 250, 0.95);
+            border-bottom: 1px solid #e2e8f0;
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+        .pointer-events-auto {
+            pointer-events: auto;
+        }
+        #canvas-container {
+            flex: 1 1 auto;
+            position: relative;
+            width: 100%;
+            min-height: 0;
+        }
+        /* Custom radio button styling */
+        input[type="radio"] {
+            accent-color: #3b82f6;
+            width: 1.2rem;
+            height: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- UI Layer -->
+    <div id="ui-layer">
+        <div class="max-w-4xl mx-auto w-full flex flex-col gap-3">
+            <div class="flex flex-col md:flex-row gap-3 justify-between items-center">
+                <h1 class="text-lg md:text-xl font-bold text-blue-600 m-0">Kinematics: Pursuit & Collision</h1>
+                <!-- Controls -->
+                <div class="flex gap-2 w-full md:w-auto justify-center">
+                    <button onclick="playSim()" class="flex-1 md:flex-none bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 px-3 rounded shadow transition-colors flex items-center justify-center gap-1 text-sm">
+                        <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Play
+                    </button>
+                    <button onclick="pauseSim()" class="flex-1 md:flex-none bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-1.5 px-3 rounded shadow transition-colors flex items-center justify-center gap-1 text-sm">
+                        <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg> Pause
+                    </button>
+                    <button onclick="resetSim()" class="flex-1 md:flex-none bg-slate-500 hover:bg-slate-400 text-white font-bold py-1.5 px-3 rounded shadow transition-colors flex items-center justify-center gap-1 text-sm">
+                        <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg> Reset
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-col md:flex-row gap-3">
+                <!-- Mode Selection -->
+                <div class="flex flex-row md:flex-col gap-2 bg-white shadow-sm border border-slate-200 p-2 rounded w-full md:w-1/4 justify-center text-xs text-slate-700">
+                    <label class="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" name="mode" value="accel" checked onchange="changeMode('accel')">
+                        <span>Preset: Accel</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" name="mode" value="decel" onchange="changeMode('decel')">
+                        <span>Preset: Decel</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" name="mode" value="custom" onchange="changeMode('custom')">
+                        <span>Custom Params</span>
+                    </label>
+                </div>
+
+                <!-- Parameters -->
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-2 w-full md:w-3/4 text-xs">
+                    <div class="bg-white shadow-sm border border-slate-200 p-2 rounded border-l-4 border-l-red-500">
+                        <div class="text-red-600 font-bold mb-1">Car A (Red)</div>
+                        <div class="flex justify-between items-center mb-1 text-slate-600"><label>v₀:</label><div class="flex items-center"><input type="number" id="input-a-v0" class="w-12 bg-slate-50 border border-slate-300 rounded px-1 text-slate-800 text-right" value="0" step="0.1" onchange="applyCustomParams()"> <span class="ml-1 text-[10px] text-slate-500">m/s</span></div></div>
+                        <div class="flex justify-between items-center text-slate-600"><label>a:</label><div class="flex items-center"><input type="number" id="input-a-a" class="w-12 bg-slate-50 border border-slate-300 rounded px-1 text-slate-800 text-right" value="4" step="0.1" onchange="applyCustomParams()"> <span class="ml-1 text-[10px] text-slate-500">m/s²</span></div></div>
+                    </div>
+                    <div class="bg-white shadow-sm border border-slate-200 p-2 rounded border-l-4 border-l-blue-500">
+                        <div class="text-blue-600 font-bold mb-1">Car B (Blue)</div>
+                        <div class="flex justify-between items-center mb-1 text-slate-600"><label>v₀:</label><div class="flex items-center"><input type="number" id="input-b-v0" class="w-12 bg-slate-50 border border-slate-300 rounded px-1 text-slate-800 text-right" value="4" step="0.1" onchange="applyCustomParams()"> <span class="ml-1 text-[10px] text-slate-500">m/s</span></div></div>
+                        <div class="flex justify-between items-center text-slate-600"><label>a:</label><div class="flex items-center"><input type="number" id="input-b-a" class="w-12 bg-slate-50 border border-slate-300 rounded px-1 text-slate-800 text-right" value="0" step="0.1" onchange="applyCustomParams()"> <span class="ml-1 text-[10px] text-slate-500">m/s²</span></div></div>
+                    </div>
+                    <div class="bg-white shadow-sm border border-slate-200 p-2 rounded col-span-2 md:col-span-1 flex flex-col justify-center">
+                        <div class="text-amber-600 font-bold mb-1">Initial Distance</div>
+                        <div class="flex justify-between items-center text-slate-600"><label>Δx₀:</label><div class="flex items-center"><input type="number" id="input-dx" class="w-16 bg-slate-50 border border-slate-300 rounded px-1 text-slate-800 text-right" value="16" step="0.5" onchange="applyCustomParams()"> <span class="ml-1 text-[10px] text-slate-500">m</span></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Panel -->
+            <div class="grid grid-cols-3 gap-2 text-center text-sm">
+                <div class="bg-slate-100 border border-slate-200 p-1.5 rounded">
+                    <div class="text-slate-500 text-xs">Time (t)</div>
+                    <div id="stat-t" class="font-mono font-bold text-base text-slate-800">0.00 s</div>
+                </div>
+                <div class="bg-slate-100 border border-slate-200 p-1.5 rounded">
+                    <div class="text-slate-500 text-xs">Distance (Δx)</div>
+                    <div id="stat-dx" class="font-mono font-bold text-base text-amber-600">0.0 m</div>
+                </div>
+                <div class="bg-slate-100 border border-slate-200 p-1.5 rounded">
+                    <div class="text-slate-500 text-xs">Status</div>
+                    <div id="stat-status" class="font-bold text-sm text-green-600 mt-1">Ready</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        // --- Physics & Simulation State ---
+        let mode = 'accel'; // 'accel' or 'decel'
+        let t = 0;
+        let dt = 0.02; // Time step per frame
+        let isPlaying = false;
+        let hasFinished = false;
+
+        // Colors
+        let colorA, colorB, colorBg, colorGrid, colorText;
+
+        // Scenarios Configurations
+        // We use carefully calculated numbers to make the demonstration clear on screen.
+        const scenarios = {
+            accel: {
+                // Car A (Red - Pursuer) accelerates from rest
+                A: { x0: 0, v0: 0, a: 4 },
+                // Car B (Blue - Target) moves at constant speed
+                B: { x0: 16, v0: 4, a: 0 },
+                // Physics facts for these params:
+                // Velocities equal at t = 1s. Max distance = 18m.
+                // Catch up at t = 4s. Position = 32m.
+                graphMaxT: 5,
+                graphMaxV: 20,
+                simMaxX: 40,
+                desc: "Car A accelerates. Max distance when Va = Vb."
+            },
+            decel: {
+                // Car A (Red) brakes (decelerates)
+                A: { x0: 0, v0: 12, a: -2 },
+                // Car B (Blue) constant speed
+                B: { x0: 16, v0: 4, a: 0 },
+                // Physics facts for these params (Critical Boundary Condition):
+                // Velocities equal at t = 4s.
+                // At t=4s, Xa = 32m, Xb = 32m. They EXACTLY touch without crashing.
+                graphMaxT: 6,
+                graphMaxV: 15,
+                simMaxX: 40,
+                desc: "Car A brakes. Min distance when Va = Vb."
+            }
+        };
+
+        let currentParams;
+        
+        // Dynamic variables
+        let xA, vA, xB, vB;
+
+        // Camera and Viewport variables
+        let simCameraX = 0;
+        let ppm = 10; // pixels per meter
+        let graphScrollT = 0;
+        let viewDuration = 10;
+        let isDraggingGraph = false;
+        let isDraggingSim = false;
+
+        function setup() {
+            let container = document.getElementById('canvas-container');
+            let canvas = createCanvas(container.clientWidth, container.clientHeight);
+            canvas.parent('canvas-container');
+            
+            colorA = color(220, 38, 38); // red-600
+            colorB = color(37, 99, 235); // blue-600
+            colorBg = color(248, 249, 250); // off-white
+            colorGrid = color(203, 213, 225); // slate-300
+            colorText = color(71, 85, 105); // slate-600
+
+            changeMode('accel');
+        }
+
+        function windowResized() {
+            let container = document.getElementById('canvas-container');
+            resizeCanvas(container.clientWidth, container.clientHeight);
+        }
+
+        window.mousePressed = function() {
+            if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
+                let simHeight = height * 0.35;
+                if (mouseY > simHeight) {
+                    isDraggingGraph = true;
+                } else {
+                    isDraggingSim = true;
+                }
+            }
+        }
+
+        window.mouseDragged = function() {
+            if (isDraggingGraph) {
+                let gw = width - 80; // approx graph width
+                let dt = -movedX * (viewDuration / gw);
+                graphScrollT += dt;
+                if (graphScrollT < 0) graphScrollT = 0;
+            } else if (isDraggingSim) {
+                let dx = -movedX / ppm;
+                simCameraX += dx;
+                if (simCameraX < 0) simCameraX = 0;
+            }
+            // Prevent default scrolling on mobile when dragging canvas
+            if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
+                return false;
+            }
+        }
+
+        window.mouseReleased = function() {
+            isDraggingGraph = false;
+            isDraggingSim = false;
+        }
+
+        // JS UI Interactivity
+        window.changeMode = function(newMode) {
+            mode = newMode;
+            let rb = document.querySelector(`input[value="${mode}"]`);
+            if(rb) rb.checked = true;
+            
+            if (mode !== 'custom') {
+                let p = scenarios[mode];
+                document.getElementById('input-a-v0').value = p.A.v0;
+                document.getElementById('input-a-a').value = p.A.a;
+                document.getElementById('input-b-v0').value = p.B.v0;
+                document.getElementById('input-b-a').value = p.B.a;
+                document.getElementById('input-dx').value = p.B.x0 - p.A.x0;
+            }
+            resetSim();
+        }
+
+        window.applyCustomParams = function() {
+            let rb = document.querySelector(`input[value="custom"]`);
+            if(rb) rb.checked = true;
+            mode = 'custom';
+            resetSim();
+        }
+
+        window.playSim = function() {
+            if (hasFinished) {
+                resetSim();
+            }
+            isPlaying = true;
+        }
+
+        window.pauseSim = function() {
+            isPlaying = false;
+        }
+
+        window.resetSim = function() {
+            t = 0;
+            isPlaying = false;
+            hasFinished = false;
+            
+            let a_v0 = parseFloat(document.getElementById('input-a-v0').value) || 0;
+            let a_a = parseFloat(document.getElementById('input-a-a').value) || 0;
+            let b_v0 = parseFloat(document.getElementById('input-b-v0').value) || 0;
+            let b_a = parseFloat(document.getElementById('input-b-a').value) || 0;
+            let dx = parseFloat(document.getElementById('input-dx').value) || 0;
+
+            currentParams = {
+                A: { x0: 0, v0: a_v0, a: a_a },
+                B: { x0: dx, v0: b_v0, a: b_a }
+            };
+
+            // Calculate dynamic boundaries for graphing
+            let A_coeff = 0.5 * (a_a - b_a);
+            let B_coeff = a_v0 - b_v0;
+            let C_coeff = -dx;
+            let tMeet = -1;
+
+            if (Math.abs(A_coeff) > 1e-5) {
+                let disc = B_coeff*B_coeff - 4*A_coeff*C_coeff;
+                if (disc >= 0) {
+                    let t1 = (-B_coeff + Math.sqrt(disc)) / (2*A_coeff);
+                    let t2 = (-B_coeff - Math.sqrt(disc)) / (2*A_coeff);
+                    if (t1 > 0 && t2 > 0) tMeet = Math.min(t1, t2);
+                    else if (t1 > 0) tMeet = t1;
+                    else if (t2 > 0) tMeet = t2;
+                }
+            } else if (Math.abs(B_coeff) > 1e-5) {
+                let tm = -C_coeff / B_coeff;
+                if (tm > 0) tMeet = tm;
+            }
+
+            let tCritical = -1;
+            if (Math.abs(a_a - b_a) > 1e-5) {
+                tCritical = (b_v0 - a_v0) / (a_a - b_a);
+            }
+
+            let maxT = 10; 
+            if (tMeet > 0) maxT = tMeet * 1.2;
+            else if (tCritical > 0 && tCritical < 20) maxT = tCritical * 2.5;
+
+            currentParams.graphMaxT = Math.max(5, Math.ceil(maxT));
+
+            // Calculate actual max and min velocities including end time for dynamic scaling
+            let endVa = a_v0 + a_a * currentParams.graphMaxT;
+            let endVb = b_v0 + b_a * currentParams.graphMaxT;
+            let maxV = Math.max(a_v0, b_v0, endVa, endVb);
+            let minV = Math.min(a_v0, b_v0, endVa, endVb, 0); // Include 0 for x-axis
+
+            currentParams.graphMaxV = Math.max(1, maxV * 1.2);
+            currentParams.graphMinV = minV < 0 ? minV * 1.2 : 0;
+
+            let maxXa = a_v0 * currentParams.graphMaxT + 0.5 * a_a * currentParams.graphMaxT * currentParams.graphMaxT;
+            let maxXb = dx + b_v0 * currentParams.graphMaxT + 0.5 * b_a * currentParams.graphMaxT * currentParams.graphMaxT;
+            currentParams.simMaxX = Math.max(20, Math.ceil(Math.max(maxXa, maxXb) * 1.1));
+
+            simCameraX = 0;
+            graphScrollT = 0;
+            viewDuration = currentParams.graphMaxT;
+
+            updatePhysics();
+            document.getElementById('stat-status').innerText = "Ready";
+            document.getElementById('stat-status').className = "font-bold text-sm text-green-600 mt-1";
+        }
+
+        function updatePhysics() {
+            let pA = currentParams.A;
+            let pB = currentParams.B;
+
+            vA = pA.v0 + pA.a * t;
+            xA = pA.x0 + pA.v0 * t + 0.5 * pA.a * t * t;
+            
+            vB = pB.v0 + pB.a * t;
+            xB = pB.x0 + pB.v0 * t + 0.5 * pB.a * t * t;
+
+            // Stop conditions
+            if (xA >= xB) {
+                xA = xB; // Snap to exact position
+                isPlaying = false;
+                hasFinished = true;
+                let statusEl = document.getElementById('stat-status');
+                if (vA > vB) {
+                    statusEl.innerText = "Collision!";
+                    statusEl.className = "font-bold text-sm text-red-600 mt-1";
+                } else {
+                    statusEl.innerText = "Touched / Safe!";
+                    statusEl.className = "font-bold text-sm text-amber-600 mt-1";
+                }
+            } else if (vA <= 0 && vB >= 0 && xA < xB && pA.a <= 0 && pB.a >= 0) {
+                // Car A stopped and can't catch B
+                isPlaying = false;
+                hasFinished = true;
+                document.getElementById('stat-status').innerText = "A Stopped. Safe.";
+                document.getElementById('stat-status').className = "font-bold text-sm text-green-600 mt-1";
+            } else if (t >= currentParams.graphMaxT) {
+                // Time limit reached
+                isPlaying = false;
+                hasFinished = true;
+                document.getElementById('stat-status').innerText = "Time Limit Reached";
+                document.getElementById('stat-status').className = "font-bold text-sm text-slate-500 mt-1";
+            }
+
+            // Update DOM stats
+            document.getElementById('stat-t').innerText = t.toFixed(2) + " s";
+            document.getElementById('stat-dx').innerText = Math.max(0, xB - xA).toFixed(1) + " m";
+        }
+
+        function draw() {
+            background(colorBg);
+
+            if (isPlaying) {
+                t += dt;
+                updatePhysics();
+            }
+
+            // Layout calculations
+            let simHeight = height * 0.35;
+            let graphHeight = height * 0.65;
+            
+            let simY = 0;
+            let graphY = simHeight;
+
+            push();
+            translate(0, simY);
+            drawSimulationArea(width, simHeight);
+            pop();
+
+            push();
+            translate(0, graphY);
+            drawGraphArea(width, graphHeight);
+            pop();
+        }
+
+        function drawSimulationArea(w, h) {
+            let p = currentParams;
+            // Margin for drawing
+            let marginX = 40;
+            let drawW = w - marginX * 2;
+            
+            ppm = drawW / p.simMaxX;
+
+            // Auto-track camera
+            if (isPlaying && !isDraggingSim) {
+                let leadX = Math.max(xA, xB);
+                let screenLeadX = marginX + (leadX - simCameraX) * ppm;
+                let rightBoundary = w - marginX - 60; // Start moving when near right edge
+                if (screenLeadX > rightBoundary) {
+                    simCameraX = leadX - (rightBoundary - marginX) / ppm;
+                }
+            }
+            
+            // Map physical X to screen X with camera offset
+            let mapX = (val) => marginX + (val - simCameraX) * ppm;
+
+            // Draw Road Background
+            rectMode(CORNER);
+            fill(100, 116, 139); // Road color
+            noStroke();
+            rect(0, h/2 - 30, w, 60); 
+            
+            // Road dashed line
+            stroke(255);
+            strokeWeight(2);
+            drawingContext.setLineDash([15, 15]);
+            let dashOffset = (simCameraX * ppm) % 30;
+            push();
+            translate(-dashOffset, 0);
+            line(0, h/2, w + 30, h/2);
+            pop();
+            drawingContext.setLineDash([]);
+            
+            // Distance markers (Denser intervals)
+            textAlign(CENTER, TOP);
+            textSize(10);
+            fill(colorText);
+            noStroke();
+            
+            let xStep = 5;
+            if (ppm > 15) xStep = 2;
+            if (ppm < 3) xStep = 10;
+            if (ppm < 1) xStep = 20;
+
+            let firstMarker = Math.floor(simCameraX / xStep) * xStep;
+            let lastMarker = Math.ceil((simCameraX + w / ppm) / xStep) * xStep;
+
+            for(let i = firstMarker; i <= lastMarker; i+=xStep) {
+                if (i < 0) continue;
+                let px = mapX(i);
+                fill(colorGrid);
+                rectMode(CENTER);
+                rect(px, h/2 + 35, 2, 6);
+                fill(colorText);
+                text(i + "m", px, h/2 + 42);
+            }
+
+            let screenXa = mapX(xA);
+            let screenXb = mapX(xB);
+
+            // Draw Distance Line between cars
+            if (xB > xA) {
+                stroke(217, 119, 6); // amber-600
+                strokeWeight(1.5);
+                drawingContext.setLineDash([4, 4]);
+                // Moved slightly higher to make room for velocity text
+                line(screenXa, h/2 - 55, screenXb, h/2 - 55);
+                drawingContext.setLineDash([]);
+                
+                noStroke();
+                fill(217, 119, 6);
+                textSize(12);
+                textAlign(CENTER, BOTTOM);
+                text("Δx = " + (xB - xA).toFixed(1) + "m", (screenXa + screenXb)/2, h/2 - 60);
+            }
+
+            // Helper to draw a car with wheels
+            let drawCar = (x, y, col, label) => {
+                // Wheels
+                fill(30);
+                circle(x - 12, y + 10, 10);
+                circle(x + 12, y + 10, 10);
+                // Inner wheel detail
+                fill(150);
+                circle(x - 12, y + 10, 4);
+                circle(x + 12, y + 10, 4);
+                
+                // Car Body
+                fill(col);
+                rectMode(CENTER);
+                rect(x, y - 2, 40, 16, 6);
+                
+                // Cabin / Window
+                fill(200, 220, 255, 200);
+                rect(x + 4, y - 12, 16, 10, 3);
+                
+                // Label
+                fill(255);
+                noStroke();
+                textSize(11);
+                textAlign(CENTER, CENTER);
+                text(label, x - 8, y - 2);
+            };
+
+            // Draw Car B (Target) first
+            drawCar(screenXb, h/2, colorB, "B");
+            
+            // Draw Car A (Pursuer) second, so it overlaps B when they meet
+            drawCar(screenXa, h/2, colorA, "A");
+
+            // Draw Velocity Vectors and Instantaneous Velocity Text
+            let drawVelocity = (x, y, v, col, textYOffset) => {
+                if (Math.abs(v) > 0.01) {
+                    stroke(col);
+                    strokeWeight(2);
+                    drawArrow(x, y, v * 3, 0);
+                }
+                noStroke();
+                textSize(11);
+                let txt = v.toFixed(2) + " m/s";
+                let tw = textWidth(txt);
+                
+                // Semi-transparent background for readability
+                fill(255, 255, 255, 200);
+                rectMode(CENTER);
+                rect(x, y + textYOffset - 5, tw + 8, 14, 3);
+                
+                // Velocity Text
+                fill(col);
+                textAlign(CENTER, BOTTOM);
+                text(txt, x, y + textYOffset);
+                rectMode(CORNER);
+            };
+
+            // Vector B (Blue)
+            drawVelocity(screenXb, h/2 - 25, vB, colorB, -5);
+            // Vector A (Red) - Text placed higher to avoid overlap when passing
+            drawVelocity(screenXa, h/2 - 25, vA, colorA, -22);
+        }
+
+        function drawGraphArea(w, h) {
+            let p = currentParams;
+            let padding = { top: 20, right: 30, bottom: 40, left: 50 };
+            let gw = w - padding.left - padding.right;
+            let gh = h - padding.top - padding.bottom;
+
+            translate(padding.left, padding.top);
+
+            // Auto-scroll graph if time exceeds view
+            if (isPlaying && !isDraggingGraph) {
+                if (t > graphScrollT + viewDuration * 0.9) {
+                    graphScrollT = t - viewDuration * 0.9;
+                }
+            }
+
+            // Mapping functions with scroll offset
+            let mapT = (val) => map(val, graphScrollT, graphScrollT + viewDuration, 0, gw);
+            let mapV = (val) => map(val, p.graphMinV, p.graphMaxV, gh, 0);
+            let yZero = mapV(0);
+
+            // Draw Axes & Grid
+            stroke(colorGrid);
+            strokeWeight(1);
+            
+            // X grid (Time) - Denser intervals
+            textAlign(CENTER, TOP);
+            textSize(10);
+            fill(colorText);
+            noStroke();
+            
+            let tStep = 1;
+            if (viewDuration > 15) tStep = 2;
+            if (viewDuration > 30) tStep = 5;
+            
+            let firstT = Math.floor(graphScrollT / tStep) * tStep;
+            let lastT = Math.ceil((graphScrollT + viewDuration) / tStep) * tStep;
+
+            for (let i = firstT; i <= lastT; i+=tStep) {
+                let px = mapT(i);
+                if (px >= 0 && px <= gw) {
+                    stroke(colorGrid);
+                    line(px, 0, px, gh);
+                    noStroke();
+                    text(i, px, gh + 8);
+                }
+            }
+            text("Time (s) [Drag to Pan]", gw / 2, gh + 25);
+
+            // Y grid (Velocity)
+            textAlign(RIGHT, CENTER);
+            let vRange = p.graphMaxV - p.graphMinV;
+            let rawStep = vRange / 5;
+            let vStep = rawStep > 1 ? Math.ceil(rawStep) : (rawStep > 0.5 ? 0.5 : 0.2);
+            
+            let startV = Math.floor(p.graphMinV / vStep) * vStep;
+            let endV = Math.ceil(p.graphMaxV / vStep) * vStep;
+            
+            for (let i = startV; i <= endV; i += vStep) {
+                let py = mapV(i);
+                if (py >= 0 && py <= gh) {
+                    stroke(colorGrid);
+                    line(0, py, gw, py);
+                    noStroke();
+                    text(Number.isInteger(i) ? i : i.toFixed(1), -8, py);
+                }
+            }
+            
+            push();
+            translate(-35, gh / 2);
+            rotate(-HALF_PI);
+            textAlign(CENTER, CENTER);
+            text("Velocity (m/s)", 0, 0);
+            pop();
+
+            // Axes lines
+            stroke(100);
+            strokeWeight(2);
+            line(0, yZero, gw, yZero); // X axis at V=0
+            line(0, 0, 0, gh);   // Y axis
+
+            // Clip drawing area so graph doesn't spill over axes
+            drawingContext.save();
+            drawingContext.beginPath();
+            drawingContext.rect(0, 0, gw, gh);
+            drawingContext.clip();
+
+            // --- Draw Areas (Absolute Displacements) ---
+            // The area between the V-t line and the t-axis represents the absolute displacement.
+            noStroke();
+            
+            // Area for Car B (Blue)
+            fill(59, 130, 246, 70); // Tailwind blue-500 with alpha
+            beginShape();
+            vertex(mapT(0), yZero); // Start at origin (V=0)
+            for (let currT = 0; currT <= t; currT += 0.05) {
+                let currentVb = p.B.v0 + p.B.a * currT;
+                vertex(mapT(currT), mapV(currentVb));
+            }
+            vertex(mapT(t), mapV(vB)); // Ensure smooth edge at exact current t
+            vertex(mapT(t), yZero); // Drop down to V=0 axis
+            endShape(CLOSE);
+
+            // Area for Car A (Red)
+            fill(239, 68, 68, 70); // Tailwind red-500 with alpha
+            beginShape();
+            vertex(mapT(0), yZero); // Start at origin (V=0)
+            for (let currT = 0; currT <= t; currT += 0.05) {
+                let currentVa = p.A.v0 + p.A.a * currT;
+                vertex(mapT(currT), mapV(currentVa));
+            }
+            vertex(mapT(t), mapV(vA)); // Ensure smooth edge at exact current t
+            vertex(mapT(t), yZero); // Drop down to V=0 axis
+            endShape(CLOSE);
+
+            // Label the areas with real-time displacement values
+            if (t > 0.5) {
+                let dispA = p.A.v0 * t + 0.5 * p.A.a * t * t;
+                let dispB = p.B.v0 * t + 0.5 * p.B.a * t * t;
+
+                textAlign(CENTER, CENTER);
+                textSize(11);
+                
+                // Keep label centered in the visible portion of the graph
+                let visibleStart = Math.max(0, graphScrollT);
+                let visibleEnd = Math.min(t, graphScrollT + viewDuration);
+                let cx = mapT((visibleStart + visibleEnd) / 2);
+                let yA = mapV((p.A.v0 + vA) / 4);
+                let yB = mapV((p.B.v0 + vB) / 4);
+                
+                // Prevent text overlap if areas are very close
+                if (Math.abs(yA - yB) < 24) {
+                    if (yA < yB) { yA -= 12; yB += 12; }
+                    else { yA += 12; yB -= 12; }
+                }
+
+                rectMode(CENTER);
+
+                // Car A Area Label
+                let textA = "Area A (Δx) = " + dispA.toFixed(2) + "m";
+                let twA = textWidth(textA) + 8;
+                fill(255, 255, 255, 220); // Light background for readability
+                noStroke();
+                rect(cx, yA, twA, 18, 4);
+                fill(220, 38, 38); // Dark Red text
+                text(textA, cx, yA);
+                
+                // Car B Area Label
+                let textB = "Area B (Δx) = " + dispB.toFixed(2) + "m";
+                let twB = textWidth(textB) + 8;
+                fill(255, 255, 255, 220); // Light background for readability
+                rect(cx, yB, twB, 18, 4);
+                fill(37, 99, 235); // Dark Blue text
+                text(textB, cx, yB);
+                
+                rectMode(CORNER); // Reset rectMode
+            }
+
+            // --- Draw V-T Lines ---
+            strokeWeight(3);
+            
+            // Line B (Constant velocity)
+            stroke(colorB);
+            line(mapT(0), mapV(p.B.v0), mapT(t), mapV(vB));
+            
+            // Line A (Accelerating/Decelerating)
+            stroke(colorA);
+            line(mapT(0), mapV(p.A.v0), mapT(t), mapV(vA));
+
+            // --- Critical Point Marker (Va = Vb) ---
+            // Calculate intersection time
+            let tCritical = (p.B.v0 - p.A.v0) / (p.A.a - p.B.a);
+            
+            if (tCritical > 0 && tCritical <= p.graphMaxT) {
+                let vCritical = p.B.v0 + p.B.a * tCritical;
+                let px = mapT(tCritical);
+                let py = mapV(vCritical);
+
+                // Draw dashed line if we have passed or reached it
+                if (t >= tCritical) {
+                    stroke(0, 0, 0, 150);
+                    strokeWeight(1);
+                    drawingContext.setLineDash([5, 5]);
+                    line(px, py, px, yZero);
+                    drawingContext.setLineDash([]);
+                    
+                    noStroke();
+                    fill(100);
+                    circle(px, py, 6);
+                    
+                    fill(217, 119, 6); // amber-600 text for emphasis
+                    textSize(11);
+                    textAlign(CENTER, BOTTOM);
+                    let label = p.A.a > p.B.a ? "Max Distance\n(Va = Vb)" : "Min Distance\n(Va = Vb)";
+                    text(label, px, py - 10);
+                }
+            }
+
+            // Current point markers
+            noStroke();
+            fill(colorA);
+            circle(mapT(t), mapV(vA), 8);
+            fill(colorB);
+            circle(mapT(t), mapV(vB), 8);
+
+            drawingContext.restore(); // End clip
+
+            // Legend
+            let legX = gw - 80;
+            let legY = 20;
+            fill(colorBg);
+            stroke(colorGrid);
+            strokeWeight(1);
+            rect(legX - 10, legY - 15, 90, 50, 4);
+            
+            noStroke();
+            fill(colorA);
+            rect(legX, legY, 12, 4);
+            fill(colorText);
+            textAlign(LEFT, CENTER);
+            textSize(11);
+            text("Car A (v)", legX + 18, legY);
+            
+            fill(colorB);
+            rect(legX, legY + 20, 12, 4);
+            fill(colorText);
+            text("Car B (v)", legX + 18, legY + 20);
+        }
+
+        // Helper to draw arrows for velocity vectors
+        function drawArrow(baseX, baseY, vecX, vecY) {
+            push();
+            translate(baseX, baseY);
+            line(0, 0, vecX, vecY);
+            rotate(atan2(vecY, vecX));
+            let arrowSize = 5;
+            translate(dist(0, 0, vecX, vecY), 0);
+            triangle(0, arrowSize / 2, 0, -arrowSize / 2, arrowSize, 0);
+            pop();
+        }
+    </script>
+</body>
+</html>

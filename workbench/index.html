@@ -234,6 +234,21 @@
     </div>
   </div>
 
+  <!-- 资源详情与预览弹窗 -->
+  <div class="modal-backdrop hidden" id="previewMask">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="previewTitle">资源详情与预览</h3>
+        <button class="modal-close" id="closePreview" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body" id="previewBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="previewCancel" type="button">关闭</button>
+        <button class="btn btn-primary" id="previewOpen" type="button">打开资源</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 资源助手弹窗 -->
   <button class="assist-fab" id="assistFab" type="button" title="资源助手" aria-label="资源助手">🤖</button>
   <div class="assist-panel" id="assistPanel" hidden>
@@ -252,7 +267,8 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- 数据与逻辑 -->
-  <script src="data/course-data.js?v=20"></script>
-  <script src="app.js?v=20"></script>
+  <script src="data/course-data.js?v=21"></script>
+  <script src="data/catalog.js?v=21"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>

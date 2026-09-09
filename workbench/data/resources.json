@@ -1,0 +1,213 @@
+[
+  {
+    "id": "r178876252931582voe",
+    "title": "波的叠加",
+    "desc": "探索波叠加原理，直观演示波动叠加现象。",
+    "book": "b4",
+    "chapter": "b4c3",
+    "section": "b4c3s4",
+    "url": "pages/波的叠加.html",
+    "tags": [
+      "波的叠加"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788762640995prpgs",
+    "title": "波的干涉",
+    "desc": "探索波的干涉现象，体验仿真实验，加深对波动理论理解。",
+    "book": "b4",
+    "chapter": "b4c3",
+    "section": "b4c3s4",
+    "url": "pages/波的干涉.html",
+    "tags": [
+      "波的干涉",
+      "波的干涉"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788781076418tkh4z",
+    "title": "小船过河",
+    "desc": "",
+    "book": "b2",
+    "chapter": "b2c1",
+    "section": "b2c1s2",
+    "url": "pages/小船过河.html",
+    "tags": [
+      "小船过河"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788784692089aevjx",
+    "title": "小车追击",
+    "desc": "",
+    "book": "b1",
+    "chapter": "b1c2",
+    "section": "",
+    "url": "pages/小车追击.html",
+    "tags": [
+      "小车追击",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r17887851877392kphy",
+    "title": "螺旋测微",
+    "desc": "螺旋测微仿真资源，直观演示测量原理与操作技巧。",
+    "book": "",
+    "chapter": "",
+    "section": "",
+    "url": "pages/螺旋测微.html",
+    "tags": [
+      "螺旋测微",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788785375451ratw9",
+    "title": "游标卡尺",
+    "desc": "",
+    "book": "",
+    "chapter": "",
+    "section": "",
+    "url": "pages/游标卡尺-2-3-4.html",
+    "tags": [
+      "游标卡尺",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788786292183h59ua",
+    "title": "一维碰撞",
+    "desc": "",
+    "book": "b4",
+    "chapter": "b4c1",
+    "section": "",
+    "url": "pages/一维碰撞-2-3.html",
+    "tags": [
+      "一维碰撞",
+      "动量",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r17887881213373sywc",
+    "title": "电火花打点计时器",
+    "desc": "",
+    "book": "b1",
+    "chapter": "b1c1",
+    "section": "b1c1s3",
+    "url": "pages/电火花打点计时器.html",
+    "tags": [
+      "电火花打点计时器",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788829411102f7x7a",
+    "title": "力的合成",
+    "desc": "",
+    "book": "b1",
+    "chapter": "b1c3",
+    "section": "",
+    "url": "pages/力的合成-2-3-4-5.html",
+    "tags": [
+      "力的合成",
+      "相互作用——力",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788829555528panwh",
+    "title": "行星规律",
+    "desc": "",
+    "book": "b2",
+    "chapter": "b2c3",
+    "section": "",
+    "url": "pages/行星规律.html",
+    "tags": [
+      "行星规律",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r178883459092999vle",
+    "title": "光的几何",
+    "desc": "探索光的几何传播规律，直观演示光路及反射折射现象。",
+    "book": "b4",
+    "chapter": "b4c4",
+    "section": "",
+    "url": "pages/光的几何.html",
+    "tags": [
+      "光的几何",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788839169827bdbky",
+    "title": "原子变式",
+    "desc": "原子结构动态变化模拟，助力理解核反应与放射性。",
+    "book": "b6",
+    "chapter": "",
+    "section": "",
+    "url": "pages/原子变式.html",
+    "tags": [
+      "原子变式",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788867616794xug9y",
+    "title": "电磁合场",
+    "desc": "电磁粒子仿真器，可视化电磁场中粒子运动。",
+    "book": "",
+    "chapter": "",
+    "section": "",
+    "url": "pages/电磁合场-2-3.html",
+    "tags": [
+      "电磁合场",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788867897362kedj7",
+    "title": "挖空小球",
+    "desc": "提供挖空小球引力仿真，探索引力场与物体形状关系。",
+    "book": "",
+    "chapter": "",
+    "section": "",
+    "url": "pages/挖空小球.html",
+    "tags": [
+      "挖空小球",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  },
+  {
+    "id": "r1788873672802eluxd",
+    "title": "光的干涉",
+    "desc": "探究光的干涉现象，模拟实验过程，直观理解干涉原理。",
+    "book": "b4",
+    "chapter": "b4c4",
+    "section": "",
+    "url": "pages/光的干涉.html",
+    "tags": [
+      "光的干涉",
+      "光的干涉",
+      "仿真资源"
+    ],
+    "type": "仿真资源"
+  }
+]

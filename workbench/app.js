@@ -268,13 +268,47 @@
 
   // ---------- 渲染 ----------
   const MODULE_INFO = { materials: { name: "1. 教学材料上传", sub: "人教版各章节 · 小节文件浏览目录" }, plans: { name: "2. 教学计划安排", sub: "教学进度 / 大单元排课" }, goals: { name: "3. 教学目标评估", sub: "核心素养评价量规" }, analytics: { name: "4. 班级成绩分析", sub: "阶段考试统计" }, students: { name: "5. 学生重点跟进", sub: "拔尖培优" }, innovation: { name: "6. 创新思路记录", sub: "自制教具 / STEAM" }, gaokao: { name: "7. 高考题目分析", sub: "真题微专题" } };
+  let stateSubtab = "";
+  let previewIsModule = false;
   function render() {
     const info = MODULE_INFO[currentModule] || MODULE_INFO.materials; $("#header-module-name").textContent = info.name;
     if (currentModule === "materials") { $("#header-sub-name").textContent = info.sub; $("#subtabs-bar").style.display = "none"; renderMaterials(); }
-    else { $("#header-sub-name").textContent = info.sub; $("#subtabs-bar").style.display = "flex"; $("#subtabs-container").innerHTML = '<button class="subtab-btn active">概览</button>'; $("#subtabs-actions").innerHTML = '<button class="btn btn-secondary btn-sm">建设中</button>'; renderPlaceholder(currentModule, info); }
+    else { $("#header-sub-name").textContent = info.sub; renderModule(currentModule, info); }
     $$("#main-nav-menu .nav-item").forEach((b) => b.classList.toggle("active", b.getAttribute("data-module") === currentModule));
   }
-  function renderPlaceholder(id, info) { const desc = { plans: "教学计划安排模块正在建设中。", goals: "教学目标评估模块正在建设中。", analytics: "班级成绩分析模块正在建设中。", students: "学生重点跟进模块正在建设中。", innovation: "创新思路记录模块正在建设中。", gaokao: "高考题目分析模块正在建设中。" }[id] || "该模块正在建设中。"; $("#content-viewport").innerHTML = '<div class="module-placeholder"><div class="ph-icon">🚧</div><h3>' + (info.name.replace(/^\d+\.\s*/, "")) + "</h3><p>" + desc + '</p><span class="ph-badge">建设中 · 敬请期待</span></div>'; }
+  // 按设计稿渲染 2~7 模块：头部横幅 + 副标签页 + 示例文件卡片 + 图表框
+  function renderModule(id, info) {
+    const WB = window.WORKBENCH_DATA || {}; const mod = WB[id];
+    if (!mod || !mod.subtabs || !mod.subtabs.length) { renderPlaceholder(id, info); return; }
+    const stabs = mod.subtabs;
+    if (!stateSubtab || !stabs.some((s) => s.id === stateSubtab)) stateSubtab = stabs[0].id;
+    $("#subtabs-bar").style.display = "flex";
+    $("#subtabs-container").innerHTML = stabs.map((s) => '<button class="subtab-btn' + (s.id === stateSubtab ? " active" : "") + '" data-subtab-id="' + s.id + '">' + s.name + "</button>").join("");
+    $("#subtabs-actions").innerHTML = '<button class="btn btn-secondary btn-sm">示例数据</button>';
+    const active = stabs.find((s) => s.id === stateSubtab) || stabs[0];
+    const hero = '<div class="module-hero-banner"><div class="banner-text"><h2><span>' + (mod.icon || "") + " " + mod.name.replace(/^\d+\.\s*/, "") + '</span><span class="ph-badge" style="margin-left:10px;">示例占位数据</span></h2><p>' + (mod.desc || "") + "</p></div></div>";
+    const chartHtml = active.hasChart ? '<div class="chart-container-box"><div class="chart-header-row"><h4><span>📊</span> 数据看板</h4><span style="font-size:11px;color:var(--text-dim);">示例（无真实数据）</span></div><div class="chart-canvas-wrap"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:13px;text-align:center;">📈 示例图表占位<br/><span style="font-size:11px;">（接入真实分析模块后自动生成）</span></div></div></div>' : "";
+    const cards = (active.sampleFiles || []).map((f) => moduleCard(f)).join("");
+    const files = cards ? '<div class="pep-files-grid">' + cards + "</div>" : '<div class="module-placeholder"><div class="ph-icon">🗂️</div><h3>暂无示例文件</h3></div>';
+    $("#content-viewport").innerHTML = hero + '<div class="pep-module-wrap"><div class="pep-toolbar"><div class="tree-filter-pills"><button class="tree-filter-pill active">' + active.name + '</button></div><span style="font-size:12px;color:var(--text-dim);">' + (active.subtitle || "") + "</span></div>" + chartHtml + files + "</div>";
+  }
+  function moduleCard(f) {
+    const icon = iconBadge(f.type);
+    const kp = (f.keypoints || []).slice(0, 3).map((k) => '<span class="tag-pill">' + htmlEscape(k) + "</span>").join("");
+    return '<article class="pep-file-card" data-modfile="' + f.id + '"><div class="card-top-row">' + icon + '<div class="file-title-wrap"><div class="file-item-name">' + htmlEscape(f.name) + '</div><span class="file-section-badge">' + htmlEscape(f.tag || "") + '</span>' + (kp ? '<div class="file-tags-row">' + kp + "</div>" : "") + '</div></div><div class="file-card-footer"><span class="section-badge">' + htmlEscape((f.author || "") + " · " + (f.date || "")) + '</span><div class="file-actions-row"><button class="btn btn-primary btn-xs" data-modfile-open="' + f.id + '">👁 预览</button></div></div></article>';
+  }
+  function openModuleFile(fid) {
+    const mod = (window.WORKBENCH_DATA || {})[currentModule]; if (!mod) return;
+    for (const st of mod.subtabs) for (const f of (st.sampleFiles || [])) if (f.id === fid) { previewModuleFile(f); return; }
+  }
+  function previewModuleFile(f) {
+    previewIsModule = true;
+    $("#previewTitle").textContent = f.name || "文件预览";
+    $("#previewBody").innerHTML = (f.previewContent || "") + '<div class="file-tags-row" style="margin-top:12px;">' + (f.tag ? '<span class="tag-pill">' + htmlEscape(f.tag) + "</span>" : "") + (f.author ? '<span class="tag-pill">' + htmlEscape(f.author) + "</span>" : "") + (f.size ? '<span class="tag-pill">' + htmlEscape(f.size) + "</span>" : "") + (f.downloads != null ? '<span class="tag-pill">↓ ' + f.downloads + "</span>" : "") + "</div>";
+    $("#previewMask").classList.remove("hidden");
+  }
+  function renderPlaceholder(id, info) { $("#content-viewport").innerHTML = '<div class="module-placeholder"><div class="ph-icon">🚧</div><h3>' + info.name.replace(/^\d+\.\s*/, "") + '</h3><p>该模块正在建设中。</p><span class="ph-badge">敬请期待</span></div>'; }
+  function openPreviewSet(s, isModule) { previewIsModule = !!isModule; openPreview(s); }
 
   function smartDefault() {
     if (!state.bookId || !store.some((s) => s.bookId === state.bookId)) {
@@ -370,6 +404,7 @@
     const act = e.target.closest("[data-act]"); if (act) { const id = act.getAttribute("data-id"); const r = resources.find((x) => x.id === id); if (!r) return; const a = act.getAttribute("data-act"); if (a === "open") openResource(r); else if (a === "edit") openModal(r); else if (a === "del") handleDelete(r); return; }
     const card = e.target.closest(".pep-file-card");
     if (card && !e.target.closest("button")) { const s = store.find((x) => x.id === card.getAttribute("data-id")); if (s) openPreview(s); return; }
+    const mf = e.target.closest("[data-modfile-open]"); if (mf) { openModuleFile(mf.getAttribute("data-modfile-open")); return; }
     if (e.target.closest("#btn-open-upload-modal")) { openModal(); return; }
   }
 
@@ -384,7 +419,8 @@
     $("#fBook").addEventListener("change", populateChapterSelect); $("#fChapter").addEventListener("change", populateSectionSelect);
     $("#autoFillBtn").onclick = async () => { await smartFill(true); aiGenerateDesc(); }; $("#aiDescBtn").onclick = aiGenerateDesc; $("#saveResource").onclick = saveResource;
     $("#assistFab").onclick = openAssist; $("#assistClose").onclick = closeAssist; $("#assistSend").onclick = assistantSend; $("#assistInput").addEventListener("keydown", (e) => { if (e.key === "Enter") assistantSend(); });
-    $("#closePreview").onclick = closePreview; $("#previewCancel").onclick = closePreview; $("#previewOpen").onclick = () => { const r = resources.find((x) => x.id === previewId); if (r) openResource(r); else { const s = store.find((x) => x.id === previewId); if (s) openResource(s); } }; let pv = $("#previewMask"); if (pv) pv.addEventListener("click", (e) => { if (e.target === pv) closePreview(); });
+    $("#closePreview").onclick = closePreview; $("#previewCancel").onclick = closePreview; $("#previewOpen").onclick = () => { if (previewIsModule) { toast("示例数据，暂无实际文件可打开"); return; } const r = resources.find((x) => x.id === previewId); if (r) openResource(r); else { const s = store.find((x) => x.id === previewId); if (s) openResource(s); } }; let pv = $("#previewMask"); if (pv) pv.addEventListener("click", (e) => { if (e.target === pv) closePreview(); });
+    const stc = $("#subtabs-container"); if (stc) stc.addEventListener("click", (e) => { const b = e.target.closest("[data-subtab-id]"); if (b) { stateSubtab = b.getAttribute("data-subtab-id"); render(); } });
     $("#closeAdminModal").onclick = closeAdminModal; $("#cancelAdminModal").onclick = closeAdminModal; let am = $("#adminMask"); if (am) am.addEventListener("click", (e) => { if (e.target === am) closeAdminModal(); });
     $("#adminSave").onclick = saveAdmin; $("#clearTokenBtn").onclick = clearToken; $("#adminToken").addEventListener("keydown", (e) => { if (e.key === "Enter") saveAdmin(); });
     const dz = $("#dropzone"), fi = $("#fileInput"); dz.onclick = () => fi.click(); fi.addEventListener("change", () => setPendingFile(fi.files[0]));
@@ -393,5 +429,5 @@
     dz.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) setPendingFile(f); }); $("#clearFile").onclick = clearPendingFile;
   }
 
-  document.addEventListener("DOMContentLoaded", () => { bindEvents(); refreshAdminUI(); render(); loadAll().catch((e) => toast("初始化失败：" + (e && e.message), true)); });
+  document.addEventListener("DOMContentLoaded", () => { const hm = /\bm=([a-z]+)/.exec((location.hash || "").replace(/^#/, "")); if (hm && MODULE_INFO[hm[1]]) currentModule = hm[1]; bindEvents(); refreshAdminUI(); render(); loadAll().catch((e) => toast("初始化失败：" + (e && e.message), true)); });
 })();

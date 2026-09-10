@@ -116,7 +116,7 @@
     "desc": "",
     "book": "b1",
     "chapter": "b1c3",
-    "section": "",
+    "section": "b1c3s4",
     "url": "pages/力的合成-2-3-4-5.html",
     "tags": [
       "力的合成",
@@ -201,7 +201,7 @@
     "desc": "探究光的干涉现象，模拟实验过程，直观理解干涉原理。",
     "book": "b4",
     "chapter": "b4c4",
-    "section": "",
+    "section": "b4c4s3",
     "url": "pages/光的干涉.html",
     "tags": [
       "光的干涉",
@@ -225,9 +225,9 @@
     "id": "r17890475347348mn5h",
     "title": "3.3 专题   受力分析",
     "desc": "",
-    "book": "",
-    "chapter": "",
-    "section": "",
+    "book": "b1",
+    "chapter": "b1c3",
+    "section": "b1c3s3",
     "url": "pages/3.3-专题-受力分析.pptx",
     "tags": [],
     "type": "课件"
@@ -269,9 +269,9 @@
     "id": "r1789047626413iy8dk",
     "title": "3.4 力的合成与分解",
     "desc": "",
-    "book": "",
-    "chapter": "",
-    "section": "",
+    "book": "b1",
+    "chapter": "b1c3",
+    "section": "b1c3s4",
     "url": "pages/3.4-力的合成与分解.pptx",
     "tags": [],
     "type": "课件"

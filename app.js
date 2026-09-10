@@ -24,7 +24,7 @@
   const previewUrls = {};            // id -> objectURL（本会话刚保存的资源，可立刻打开，无需等 GitHub Pages）
   let pendingFile = null;            // 当前选中的待上传文件
   let editingId = null;              // 正在编辑的资源 id（null = 新增）
-  const ASSET_V = 22;                // 资源版本号（缓存破）
+  const ASSET_V = 23;                // 资源版本号（缓存破）
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"; // 方案A 后端（Cloudflare Worker）
   const WORKER_TOKEN_KEY = "worker_token";
   const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
@@ -511,6 +511,30 @@
     const mb = Math.max(0, Math.round((bytes || 0) / 1048576));
     return Math.min(600000, 120000 + mb * 15000);
   }
+  // 通用 GitHub JSON 请求（限流/超时自动重试退避）
+  async function ghJson(url, opts, timeout, retries) {
+    const t = timeout || 30000, max = (retries == null ? 2 : retries);
+    let lastErr = null;
+    for (let attempt = 0; attempt <= max; attempt++) {
+      let retry = false;
+      try {
+        const res = await ghFetch(url, opts, t);
+        const txt = await res.text();
+        let data = null; try { data = txt ? JSON.parse(txt) : null; } catch (e) {}
+        if (res.ok) return data;
+        const msg = (data && data.message) || "";
+        const err = new Error("GitHub " + res.status + (msg ? "（" + msg + "）" : ""));
+        if ((res.status === 403 || res.status === 429 || res.status >= 500) && attempt < max) { retry = true; lastErr = err; }
+        else throw err;
+      } catch (e) {
+        const net = /超时|Failed to fetch|NetworkError|load failed/i.test((e && e.message) || "");
+        if (net && attempt < max) { retry = true; lastErr = e; } else throw e;
+      }
+      if (!retry) break;
+      await sleep(1500 * (attempt + 1));   // 1.5s, 3s, 4.5s
+    }
+    throw lastErr || new Error("GitHub 请求失败");
+  }
 
   function b64(text) {
     return btoa(unescape(encodeURIComponent(text)));
@@ -638,6 +662,60 @@
       }
     }
     return path;
+  }
+
+  // ===== 批量上传：走 Git Data API，整批只产生 1 次提交（大幅降低限流、更适合大文件） =====
+  async function commitBatch(token, items) {
+    const api = "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO;
+    const authH = ghHeaders(token);
+    const jsonH = Object.assign({}, authH, { "Content-Type": "application/json" });
+    // 1) 当前 head 与 base tree
+    const ref = await ghJson(api + "/git/ref/heads/" + PUBLISH_BRANCH, { headers: authH }, 60000, 2);
+    const headSha = ref.object.sha;
+    const headCommit = await ghJson(api + "/git/commits/" + headSha, { headers: authH }, 60000, 2);
+    const baseTree = headCommit.tree.sha;
+    // 已有文件路径（用于重名去重）
+    const existing = new Set();
+    try {
+      const tr = await ghJson(api + "/git/trees/" + baseTree + "?recursive=1", { headers: authH }, 60000, 2);
+      (tr.tree || []).forEach((n) => { if (n.type === "blob") existing.add(n.path); });
+    } catch (e) {}
+    // 2) 逐个创建 blob（一次只读一个文件，省内存）
+    const tree = [];
+    const blobbed = [];
+    for (const it of items) {
+      try {
+        if (it.file.size > 95 * 1024 * 1024) throw new Error("文件过大（>95MB，GitHub 单文件上限 100MB）");
+        const contentB64 = await readFileAsBase64(it.file);
+        let path = "pages/" + slugPath(it.title, it.fileExt);
+        if (existing.has(path)) {
+          for (let i = 2; i < 500; i++) { const d = path.lastIndexOf("."), s = d > -1 ? path.slice(0, d) : path, de = d > -1 ? path.slice(d) : "", c = s + "-" + i + de; if (!existing.has(c)) { path = c; break; } }
+        }
+        existing.add(path);
+        const blob = await ghJson(api + "/git/blobs", { method: "POST", headers: jsonH, body: JSON.stringify({ content: contentB64, encoding: "base64" }) }, putTimeoutFor(it.file.size), 2);
+        tree.push({ path: path, mode: "100644", type: "blob", sha: blob.sha });
+        it._path = path;
+        blobbed.push(it);
+      } catch (e) { it.status = "bad"; it.err = (e && e.message) || "失败"; }
+      if (typeof it._onStep === "function") it._onStep();
+    }
+    if (!blobbed.length) return { ok: 0, entries: [] };
+    // 3) 新清单 blob + tree + 1 次 commit + 移动分支
+    const newEntries = blobbed.map((it) => ({ id: it.id, title: it.title, desc: "", book: it.book, chapter: it.chapter, section: it.section, url: it._path, tags: [], type: it.type }));
+    const newList = resources.concat(newEntries);
+    try {
+      const manBlob = await ghJson(api + "/git/blobs", { method: "POST", headers: jsonH, body: JSON.stringify({ content: b64(JSON.stringify(newList, null, 2)), encoding: "base64" }) }, 60000, 2);
+      tree.push({ path: "data/resources.json", mode: "100644", type: "blob", sha: manBlob.sha });
+      const newTree = await ghJson(api + "/git/trees", { method: "POST", headers: jsonH, body: JSON.stringify({ base_tree: baseTree, tree: tree }) }, 60000, 2);
+      const commit = await ghJson(api + "/git/commits", { method: "POST", headers: jsonH, body: JSON.stringify({ message: "批量新增资源：" + newEntries.length + " 个", tree: newTree.sha, parents: [headSha] }) }, 60000, 2);
+      await ghJson(api + "/git/refs/heads/" + PUBLISH_BRANCH, { method: "PATCH", headers: jsonH, body: JSON.stringify({ sha: commit.sha, force: false }) }, 60000, 2);
+      newEntries.forEach((e) => resources.push(e));
+      blobbed.forEach((it) => { it.status = "ok"; });
+      return { ok: blobbed.length, entries: newEntries, commit: commit.sha };
+    } catch (e) {
+      blobbed.forEach((it) => { it.status = "bad"; it.err = "提交失败：" + ((e && e.message) || "失败"); });
+      return { ok: 0, entries: [], error: (e && e.message) || "提交失败" };
+    }
   }
 
   async function publishResource(rec) {
@@ -1193,47 +1271,49 @@
     batchUploading = true; btn.disabled = true; btn.textContent = "上传中…"; prog.style.display = "block";
     const overType = $("#bType").value, overBook = $("#bBook").value, overChapter = $("#bChapter").value, overSection = $("#bSection").value;
     const token = getPublishToken();
-    const newEntries = [];
     let ok = 0, fail = 0, skipped = 0;
-    for (let i = 0; i < batchItems.length; i++) {
-      const it = batchItems[i];
-      if (it.status === "ok" || it.status === "skip") { if (it.status === "skip") skipped++; else ok++; continue; }
+
+    // 1) 先解析每个文件的元信息、跳过同名
+    prog.textContent = "正在识别并准备…";
+    const planned = [];
+    for (const it of batchItems) {
+      if (it.status === "ok") { ok++; continue; }
+      if (it.status === "skip") { skipped++; continue; }
+      if (it.file.size > 95 * 1024 * 1024) { it.status = "bad"; it.err = "文件过大（>95MB）"; fail++; renderBatchList(); continue; }
+      if (!it.meta) { try { it.meta = await detectForFile(it.file); } catch (e) { it.meta = { title: it.file.name.replace(/\.[^.]+$/, ""), type: "", book: "", chapter: "", section: "" }; } }
+      const m = it.meta;
+      const title = m.title || it.file.name.replace(/\.[^.]+$/, "");
+      if (resources.some((r) => r.title === title) || planned.some((p) => p.title === title)) { it.status = "skip"; it.err = "已存在同名资源，已跳过"; skipped++; renderBatchList(); continue; }
+      const em = /\.[^.]*$/.exec(it.file.name);
+      const type = overType || m.type || "练习";
+      planned.push({
+        file: it.file, it: it,
+        id: "r" + Date.now() + Math.random().toString(36).slice(2, 7),
+        title: title, type: type,
+        book: overBook || m.book || "",
+        chapter: overChapter || m.chapter || "",
+        section: (type === "试卷") ? "" : (overSection || m.section || ""),
+        fileExt: em ? em[0].toLowerCase() : ".html",
+      });
       it.status = "ing"; renderBatchList();
-      prog.textContent = "正在上传 " + (i + 1) + " / " + batchItems.length + " …（" + it.file.name + "）";
-      try {
-        if (it.file.size > 50 * 1024 * 1024) throw new Error("文件过大（>50MB）");
-        if (!it.meta) it.meta = await detectForFile(it.file);
-        const m = it.meta;
-        const type = overType || m.type || "练习";
-        const book = overBook || m.book || "";
-        const chapter = overChapter || m.chapter || "";
-        const section = (type === "试卷") ? "" : (overSection || m.section || "");
-        const title = m.title || it.file.name.replace(/\.[^.]+$/, "");
-        // 已存在同名资源 → 跳过（便于失败后重跑不产生重复）
-        if (resources.some((r) => r.title === title)) { it.status = "skip"; it.err = "已存在同名资源，已跳过"; skipped++; renderBatchList(); continue; }
-        const em = /\.[^.]*$/.exec(it.file.name);
-        const fileExt = em ? em[0].toLowerCase() : ".html";
-        const contentB64 = await readFileAsBase64(it.file);
-        const rec = { id: "r" + Date.now() + Math.random().toString(36).slice(2, 7), title: title, book: book, chapter: chapter, section: section, desc: "", tags: [], type: type, fileExt: fileExt, contentB64: contentB64, fileSize: it.file.size, _blob: it.file };
-        const path = await putResourceFile(token, rec);
-        const entry = { id: rec.id, title: title, desc: "", book: book, chapter: chapter, section: section, url: path, tags: [], type: type };
-        resources.push(entry); newEntries.push(entry);
-        if (rec._blob && it.file.size < 5 * 1024 * 1024) setPreview(rec.id, rec._blob);   // 只对小文件做本会话预览，避免占内存
-        it.status = "ok"; ok++;
-      } catch (e) { it.status = "bad"; it.err = (e && e.message) || "失败"; fail++; }
-      renderBatchList();
-      await sleep(500);   // 文件之间稍作间隔，降低 GitHub 次级限流概率
     }
-    if (newEntries.length) {
-      prog.textContent = "正在统一登记资源清单（" + newEntries.length + " 条）…";
-      try { await saveResources(token, "批量新增资源：" + newEntries.length + " 个"); }
-      catch (e) { toast("清单保存失败：" + e.message, true); }
+
+    // 2) 整批一个提交（Git Data API）
+    if (planned.length) {
+      const total = planned.length; let done = 0;
+      planned.forEach((p) => { p.it._onStep = () => { done++; prog.textContent = "正在上传 " + done + " / " + total + " …（" + p.it.file.name + "）"; renderBatchList(); }; });
+      prog.textContent = "正在上传 0 / " + total + " …";
+      const res = await commitBatch(token, planned);
+      ok += res.ok || 0; 
+      planned.forEach((p) => { if (p.it.status === "bad") fail++; });
     }
+
     baseList = [...resources, ...uploadedList]; render();
     batchUploading = false; btn.disabled = false; btn.textContent = "开始批量上传";
     const tail = (fail ? "，失败 " + fail + " 个" : "") + (skipped ? "，跳过 " + skipped + " 个（已存在）" : "");
-    prog.textContent = "完成：成功 " + ok + " 个" + tail + "。";
+    prog.textContent = "完成：成功 " + ok + " 个" + tail + "。（整批只产生 1 次提交）";
     toast("批量上传完成：成功 " + ok + " 个" + tail);
+    renderBatchList();
   }
   // =============== 批量上传 end ===============
 
@@ -1421,55 +1501,51 @@
     return s.replace(/^\s*\d+(\.\d+)*\s*/, "");
   }
 
+  // 归一化：去空白/括号内容/标点，统一 与=和、去“的”、全角转半角、小写
+  function normKey(str) {
+    return String(str || "")
+      .replace(/[\s\u3000]+/g, "")
+      .replace(/[（(【\[{「『《<][^）)】\]}」』》>]*[）)】\]}」』》>]/g, "")
+      .replace(/[，。、,.;；:：!！?？\-—_~·…"'“”‘’\/\\|]/g, "")
+      .replace(/与/g, "和")
+      .replace(/的/g, "")
+      .replace(/[０-９Ａ-Ｚａ-ｚ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .toLowerCase();
+  }
+  // 取“小节号” N.M（如 3.4 / 2.1）
+  function secNumOf(str) {
+    const m = String(str || "").match(/(\d{1,2})\s*[.．]\s*(\d{1,2})/);
+    return m ? (parseInt(m[1], 10) + "." + parseInt(m[2], 10)) : "";
+  }
+
+  // 识别 章节/小节：小节号(N.M)优先 + 归一化文本模糊匹配，取最高分（对 与/和、括号后缀、实验： 等差异更鲁棒）
   function detectLoc(s, content, bookId) {
     const books = COURSE.books.filter((b) => !bookId || b.id === bookId);
-    const hay = (s || "") + " " + (content || "");
-    const wantNum = parseChapterNum(hay);
-    const topic = removeNoise(s || "");
-    let chapter = null, section = null;
-    // 1) 数字章节“第X章”（标题在前，优先命中标题；按教材顺序首个）
-    if (wantNum) {
-      outer: for (const b of books) for (const c of b.chapters)
-        if (parseChapterNum(c.title) === wantNum) { chapter = c.id; break outer; }
+    const hayRaw = (s || "") + " " + (content || "");
+    const hayN = normKey(hayRaw);
+    const wantSec = secNumOf(s);
+    const wantNum = parseChapterNum(hayRaw);
+    const core = normKey(String(s || "").replace(/[（(【\[].*$/, ""));
+    let best = null;
+    for (const b of books) for (const c of b.chapters) for (const sec of c.sections) {
+      const nk = normKey(cleanSection(sec.title));
+      let score = 0;
+      if (wantSec && secNumOf(sec.title) === wantSec) score += 100;
+      if (nk.length >= 2 && hayN.indexOf(nk) > -1) score += 30 + nk.length * 2;
+      else if (nk.length >= 3 && core.length >= 3 && (core.indexOf(nk) > -1 || nk.indexOf(core) > -1)) score += 12 + nk.length;
+      if (wantNum && parseChapterNum(c.title) === wantNum) score += 25;
+      const cnk = normKey(cleanChapter(c.title));
+      if (cnk.length >= 3 && hayN.indexOf(cnk) > -1) score += 8;
+      if (score > 0 && (!best || score > best.score)) best = { chapter: c.id, section: sec.id, score: score };
     }
-    // 2) 标题里的主题词命中某章（章标题 + 各小节标题都算）
-    if (!chapter && topic.length >= 2) {
-      outer: for (const b of books) for (const c of b.chapters) {
-        const sig = cleanChapter(c.title) + " " + c.sections.map((sec) => cleanSection(sec.title)).join(" ");
-        if (sig.indexOf(topic) > -1) { chapter = c.id; break outer; }
-      }
+    if (best) return { chapter: best.chapter, section: best.section };
+    // 兜底：只定位到章
+    let ch = null, chLen = 0;
+    for (const b of books) for (const c of b.chapters) {
+      const cnk = normKey(cleanChapter(c.title));
+      if (cnk.length >= 3 && hayN.indexOf(cnk) > -1 && cnk.length > chLen) { ch = c.id; chLen = cnk.length; }
     }
-    // 3) 在“标题+内容”里找章节标题（取“最具体/最长”匹配，避免短名误中）
-    if (!chapter) {
-      let best = null, bestLen = 0;
-      for (const b of books) for (const c of b.chapters) {
-        const ct = cleanChapter(c.title);
-        if (ct && ct.length > bestLen && hay.indexOf(ct) > -1) { best = c.id; bestLen = ct.length; }
-      }
-      chapter = best;
-    }
-    // 5) 内容含小节标题但没给章节标题：反查该小节所属章节（取最长匹配）
-    if (!chapter) {
-      let bestC = null, bestS = null, bestLen = 0;
-      for (const b of books) for (const c of b.chapters) for (const sec of c.sections) {
-        const st = cleanSection(sec.title);
-        if (st && st.length > bestLen && hay.indexOf(st) > -1) { bestC = c.id; bestS = sec.id; bestLen = st.length; }
-      }
-      chapter = bestC; section = bestS;
-    }
-    // 4) 已知章节时，再定位小节（取最长匹配，避免“动量”误中“动量守恒”）
-    if (chapter && !section) {
-      const ch = allChapters.find((x) => x.id === chapter);
-      if (ch) {
-        let best = null, bestLen = 0;
-        for (const sec of ch.sections) {
-          const st = cleanSection(sec.title);
-          if (st && st.length > bestLen && hay.indexOf(st) > -1) { best = sec.id; bestLen = st.length; }
-        }
-        section = best;
-      }
-    }
-    return { chapter: chapter, section: section };
+    return { chapter: ch, section: null };
   }
 
   // ---------- 可选的大模型（AI）配置：浏览器直连、OpenAI 兼容；失败自动回退规则引擎 ----------
@@ -1886,6 +1962,7 @@
       .catch((e) => toast("初始化失败：" + e.message, true));
   });
 })();
+
 
 
 

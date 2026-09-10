@@ -24,7 +24,7 @@
   const previewUrls = {};            // id -> objectURL（本会话刚保存的资源，可立刻打开，无需等 GitHub Pages）
   let pendingFile = null;            // 当前选中的待上传文件
   let editingId = null;              // 正在编辑的资源 id（null = 新增）
-  const ASSET_V = 21;                // 资源版本号（缓存破）
+  const ASSET_V = 22;                // 资源版本号（缓存破）
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"; // 方案A 后端（Cloudflare Worker）
   const WORKER_TOKEN_KEY = "worker_token";
   const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
@@ -1160,6 +1160,7 @@
       const m = it.meta;
       const meta = m ? [m.type || "?", bookTitle(m.book) || "未分教材", chapterTitle(m.chapter) || "", sectionTitle(m.section) || ""].filter(Boolean).join(" · ") : "识别中…";
       const st = it.status === "ok" ? '<span class="batch-x batch-ok">✓ 已上传</span>'
+        : it.status === "skip" ? '<span class="batch-x" style="color:#b45309;" title="' + escHtml(it.err || "") + '">↷ 已存在(跳过)</span>'
         : it.status === "bad" ? '<span class="batch-x batch-bad" title="' + escHtml(it.err || "") + '">✗ ' + escHtml(String(it.err || "失败").slice(0, 46)) + "</span>"
         : it.status === "ing" ? '<span class="batch-x batch-ing">上传中…</span>'
         : '<span class="batch-x">待上传</span>';
@@ -1193,10 +1194,10 @@
     const overType = $("#bType").value, overBook = $("#bBook").value, overChapter = $("#bChapter").value, overSection = $("#bSection").value;
     const token = getPublishToken();
     const newEntries = [];
-    let ok = 0, fail = 0;
+    let ok = 0, fail = 0, skipped = 0;
     for (let i = 0; i < batchItems.length; i++) {
       const it = batchItems[i];
-      if (it.status === "ok") { ok++; continue; }
+      if (it.status === "ok" || it.status === "skip") { if (it.status === "skip") skipped++; else ok++; continue; }
       it.status = "ing"; renderBatchList();
       prog.textContent = "正在上传 " + (i + 1) + " / " + batchItems.length + " …（" + it.file.name + "）";
       try {
@@ -1208,6 +1209,8 @@
         const chapter = overChapter || m.chapter || "";
         const section = (type === "试卷") ? "" : (overSection || m.section || "");
         const title = m.title || it.file.name.replace(/\.[^.]+$/, "");
+        // 已存在同名资源 → 跳过（便于失败后重跑不产生重复）
+        if (resources.some((r) => r.title === title)) { it.status = "skip"; it.err = "已存在同名资源，已跳过"; skipped++; renderBatchList(); continue; }
         const em = /\.[^.]*$/.exec(it.file.name);
         const fileExt = em ? em[0].toLowerCase() : ".html";
         const contentB64 = await readFileAsBase64(it.file);
@@ -1228,8 +1231,9 @@
     }
     baseList = [...resources, ...uploadedList]; render();
     batchUploading = false; btn.disabled = false; btn.textContent = "开始批量上传";
-    prog.textContent = "完成：成功 " + ok + " 个" + (fail ? "，失败 " + fail + " 个" : "") + "。";
-    toast("批量上传完成：成功 " + ok + " 个" + (fail ? "，失败 " + fail + " 个" : ""));
+    const tail = (fail ? "，失败 " + fail + " 个" : "") + (skipped ? "，跳过 " + skipped + " 个（已存在）" : "");
+    prog.textContent = "完成：成功 " + ok + " 个" + tail + "。";
+    toast("批量上传完成：成功 " + ok + " 个" + tail);
   }
   // =============== 批量上传 end ===============
 
@@ -1882,5 +1886,6 @@
       .catch((e) => toast("初始化失败：" + e.message, true));
   });
 })();
+
 
 

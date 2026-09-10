@@ -24,7 +24,7 @@
   const previewUrls = {};            // id -> objectURL（本会话刚保存的资源，可立刻打开，无需等 GitHub Pages）
   let pendingFile = null;            // 当前选中的待上传文件
   let editingId = null;              // 正在编辑的资源 id（null = 新增）
-  const ASSET_V = 20;                // 资源版本号（缓存破）
+  const ASSET_V = 21;                // 资源版本号（缓存破）
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"; // 方案A 后端（Cloudflare Worker）
   const WORKER_TOKEN_KEY = "worker_token";
   const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
@@ -493,17 +493,23 @@
   }
 
   // 带超时的 fetch：避免网络卡住导致“保存/删除一直转圈/无反应”
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   async function ghFetch(url, opts, timeout) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeout || 30000);
     try {
       return await fetch(url, Object.assign({}, opts, { signal: ctrl.signal }));
     } catch (e) {
-      if (e && e.name === "AbortError") throw new Error("连接 GitHub 超时，请检查网络后重试");
+      if (e && e.name === "AbortError") throw new Error("连接 GitHub 超时（可能文件较大或网络较慢），请重试");
       throw e;
     } finally {
       clearTimeout(timer);
     }
+  }
+  // 按文件体积估算上传超时：基础 120s + 每 MB 15s，上限 10 分钟
+  function putTimeoutFor(bytes) {
+    const mb = Math.max(0, Math.round((bytes || 0) / 1048576));
+    return Math.min(600000, 120000 + mb * 15000);
   }
 
   function b64(text) {
@@ -545,29 +551,42 @@
     return { sha: data.sha, text: fromB64(data.content) };
   }
 
-  // contentB64 为文件字节的 base64（HTML/二进制均适用）
-  async function ghPutFile(token, path, contentB64, message, sha) {
+  // contentB64 为文件字节的 base64（HTML/二进制均适用）；timeout/retries 可调；对限流/超时自动重试退避
+  async function ghPutFile(token, path, contentB64, message, sha, timeout, retries) {
     const body = { message: message, branch: PUBLISH_BRANCH, content: contentB64 };
     if (sha) body.sha = sha;
-    const res = await ghFetch(
+    const url =
       "https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO +
-        "/contents/" + path,
-      {
-        method: "PUT",
-        headers: Object.assign({}, ghHeaders(token), {
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify(body),
-      }
-    );
-    if (!res.ok) {
-      let msg = "";
+      "/contents/" + path;
+    const t = timeout || 30000;
+    const max = (retries == null) ? 2 : retries;
+    let lastErr = null;
+    for (let attempt = 0; attempt <= max; attempt++) {
+      let shouldRetry = false;
       try {
-        msg = (await res.json()).message || "";
-      } catch (e) {}
-      throw new Error("写入失败（" + res.status + (msg ? " " + msg : "") + "）");
+        const res = await ghFetch(
+          url,
+          { method: "PUT", headers: Object.assign({}, ghHeaders(token), { "Content-Type": "application/json" }), body: JSON.stringify(body) },
+          t
+        );
+        if (res.ok) return await res.json();
+        let msg = "";
+        try { msg = (await res.json()).message || ""; } catch (e) {}
+        const status = res.status;
+        // 可重试：限流(403/429) 与 服务端错误(5xx)
+        const retryable = (status === 403 || status === 429 || status >= 500);
+        const err = new Error("写入失败（" + status + (msg ? " " + msg : "") + "）");
+        if (retryable && attempt < max) { shouldRetry = true; lastErr = err; }
+        else throw err;
+      } catch (e) {
+        const netErr = /超时|Failed to fetch|NetworkError|load failed|aborted/i.test((e && e.message) || "");
+        if (netErr && attempt < max) { shouldRetry = true; lastErr = e; }
+        else throw e;
+      }
+      if (!shouldRetry) break;
+      await sleep(1200 * (attempt + 1));   // 1.2s, 2.4s, 3.6s 退避
     }
-    return await res.json();
+    throw lastErr || new Error("写入失败");
   }
 
   // 在清单源文件中追加一条资源对象
@@ -601,10 +620,11 @@
   // 把文件写入仓库 pages/（重名自动加序号），返回最终路径；不改清单
   async function putResourceFile(token, rec) {
     const message = "新增资源：" + rec.title;
+    const timeout = putTimeoutFor(rec.fileSize);
     let path = "pages/" + slugPath(rec.title, rec.fileExt);
     for (let dup = 0; dup < 30; dup++) {
       try {
-        await ghPutFile(token, path, rec.contentB64, message);
+        await ghPutFile(token, path, rec.contentB64, message, undefined, timeout, 2);
         break;
       } catch (e) {
         if (/409|422|already exists|sha was not supplied|does not match/i.test(e.message) && dup < 29) {
@@ -1140,7 +1160,7 @@
       const m = it.meta;
       const meta = m ? [m.type || "?", bookTitle(m.book) || "未分教材", chapterTitle(m.chapter) || "", sectionTitle(m.section) || ""].filter(Boolean).join(" · ") : "识别中…";
       const st = it.status === "ok" ? '<span class="batch-x batch-ok">✓ 已上传</span>'
-        : it.status === "bad" ? '<span class="batch-x batch-bad" title="' + escHtml(it.err || "") + '">✗ 失败</span>'
+        : it.status === "bad" ? '<span class="batch-x batch-bad" title="' + escHtml(it.err || "") + '">✗ ' + escHtml(String(it.err || "失败").slice(0, 46)) + "</span>"
         : it.status === "ing" ? '<span class="batch-x batch-ing">上传中…</span>'
         : '<span class="batch-x">待上传</span>';
       const cls = it.status === "ok" ? "ok" : it.status === "bad" ? "bad" : "";
@@ -1191,14 +1211,15 @@
         const em = /\.[^.]*$/.exec(it.file.name);
         const fileExt = em ? em[0].toLowerCase() : ".html";
         const contentB64 = await readFileAsBase64(it.file);
-        const rec = { id: "r" + Date.now() + Math.random().toString(36).slice(2, 7), title: title, book: book, chapter: chapter, section: section, desc: "", tags: [], type: type, fileExt: fileExt, contentB64: contentB64, _blob: it.file };
+        const rec = { id: "r" + Date.now() + Math.random().toString(36).slice(2, 7), title: title, book: book, chapter: chapter, section: section, desc: "", tags: [], type: type, fileExt: fileExt, contentB64: contentB64, fileSize: it.file.size, _blob: it.file };
         const path = await putResourceFile(token, rec);
         const entry = { id: rec.id, title: title, desc: "", book: book, chapter: chapter, section: section, url: path, tags: [], type: type };
         resources.push(entry); newEntries.push(entry);
-        if (rec._blob) setPreview(rec.id, rec._blob);
+        if (rec._blob && it.file.size < 5 * 1024 * 1024) setPreview(rec.id, rec._blob);   // 只对小文件做本会话预览，避免占内存
         it.status = "ok"; ok++;
       } catch (e) { it.status = "bad"; it.err = (e && e.message) || "失败"; fail++; }
       renderBatchList();
+      await sleep(500);   // 文件之间稍作间隔，降低 GitHub 次级限流概率
     }
     if (newEntries.length) {
       prog.textContent = "正在统一登记资源清单（" + newEntries.length + " 条）…";
@@ -1256,6 +1277,7 @@
       fileExt,
       contentB64: null,
       createdAt: Date.now(),
+      fileSize: pendingFile ? pendingFile.size : 0,
       _blob: pendingFile,             // 记录原文件，用于本会话立即预览
     };
 
@@ -1860,4 +1882,5 @@
       .catch((e) => toast("初始化失败：" + e.message, true));
   });
 })();
+
 

@@ -431,3 +431,16 @@ a { color: inherit; text-decoration: none; }
   .topbar { flex-wrap: wrap; }
   .searchwrap { order: 3; width: 100%; max-width: none; margin-left: 0; }
 }
+
+/* ===== 批量上传 ===== */
+.modal.wide { max-width: 720px; width: 92vw; }
+.batch-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow: auto; }
+.batch-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 12px; background: var(--panel); }
+.batch-row.ok { border-color: #bfe7cf; background: #f4fbf6; }
+.batch-row.bad { border-color: #f3c2c2; background: #fdf5f5; }
+.batch-idx { width: 20px; height: 20px; border-radius: 6px; background: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex: none; }
+.batch-name { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 44%; }
+.batch-meta { color: var(--text-soft); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.batch-x { margin-left: auto; color: var(--text-soft); font-size: 12px; flex: none; }
+.batch-ok { color: #16a34a; } .batch-bad { color: #dc2626; } .batch-ing { color: var(--brand); }
+.dropzone.drag { border-color: var(--brand); background: var(--brand-soft); }

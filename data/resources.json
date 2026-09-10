@@ -286,5 +286,239 @@
     "url": "pages/3.1-重力与弹力（课件）-2022-2023学年高一物理同步精品课堂(人教版2019必修第一册)-2.pptx",
     "tags": [],
     "type": "练习"
+  },
+  {
+    "id": "r17890528652599jdon",
+    "title": "1.1 质点 参考系",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c1",
+    "section": "b1c1s1",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/1.1.pptx",
+    "tags": [
+      "1.1 质点 参考系"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r17890528652602qp3c",
+    "title": "1.2 时间 位移",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c1",
+    "section": "b1c1s2",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/1.2.pptx",
+    "tags": [
+      "1.2 时间 位移"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r17890528652602ihbw",
+    "title": "1.3 位置变化快慢的描述——速度",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c1",
+    "section": "b1c1s3",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/1.3.pptx",
+    "tags": [
+      "1.3 位置变化快慢的描述——速度"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r1789052865260hgjl2",
+    "title": "2.3 专题一  匀变速直线运动的推论",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c2",
+    "section": "b1c2s3",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/2.3.pptx",
+    "tags": [
+      "2.3 匀变速直线运动的位移与时间的关系"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r178905317499594939",
+    "title": "2.3 专题二  追及相遇问题",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c2",
+    "section": "b1c2s3",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/2.3-2.pptx",
+    "tags": [
+      "2.3 匀变速直线运动的位移与时间的关系"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r1789053539668ahs1a",
+    "title": "2.3 匀变速直线运动的位移与时间的关系",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c2",
+    "section": "b1c2s3",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/2.3-3.pptx",
+    "tags": [
+      "2.3 匀变速直线运动的位移与时间的关系"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r1789053539668323ay",
+    "title": "2.4 专题  竖直上抛运动",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c2",
+    "section": "b1c2s4",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/2.4.pptx",
+    "tags": [
+      "2.4 自由落体运动"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r17890537796968tbzb",
+    "title": "2.4 自由落体运动",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c2",
+    "section": "b1c2s4",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/2.4-2.pptx",
+    "tags": [
+      "2.4 自由落体运动"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r1789053779696bgngh",
+    "title": "3.1 实验1 探究弹簧弹力与形变量的关系",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c3",
+    "section": "b1c3s1",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/3.1.1.pptx",
+    "tags": [
+      "3.1 重力与弹力"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r1789053779696yf3wk",
+    "title": "3.1 重力与弹力（第二课时：弹力）",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c3",
+    "section": "b1c3s1",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/3.1.pptx",
+    "tags": [
+      "3.1 重力与弹力"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r1789053779696qgb98",
+    "title": "3.2 摩擦力（第二课时——静摩擦力）",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c3",
+    "section": "b1c3s2",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/3.2.pptx",
+    "tags": [
+      "3.2 摩擦力"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r1789053779697wewp1",
+    "title": "3.3 牛顿第三定律（第一课时）",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c3",
+    "section": "b1c3s3",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/3.3.pptx",
+    "tags": [
+      "3.3 牛顿第三定律"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r1789053779697abb9r",
+    "title": "3.5 共点力的平衡",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c3",
+    "section": "b1c3s5",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/3.5.pptx",
+    "tags": [
+      "3.5 共点力的平衡"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r17890541625908gq04",
+    "title": "4.1 牛顿第一定律（课件）-2022-2023学年高一物理同步精品课堂(人教版2019必修第一册)",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c4",
+    "section": "b1c4s1",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/4.1.-2022-2023.2019.pptx",
+    "tags": [
+      "4.1 牛顿第一定律"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r1789054598627nhozj",
+    "title": "4.2  实验：探究加速度与力、质量的关系",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c4",
+    "section": "b1c4s2",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/4.2.pptx",
+    "tags": [
+      "4.2 实验：探究加速度与力、质量的关系"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r1789054746254rzotu",
+    "title": "4.4  力学单位制",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c4",
+    "section": "b1c4s4",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/4.4.pptx",
+    "tags": [
+      "4.4 力学单位制"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r1789054906276lkbws",
+    "title": "4.5  牛顿运动定律的应用",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c4",
+    "section": "b1c4s5",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/4.5.pptx",
+    "tags": [
+      "4.5 牛顿运动定律的应用"
+    ],
+    "type": "课件"
+  },
+  {
+    "id": "r1789055293452mxdph",
+    "title": "4.6  超重和失重",
+    "desc": "人教版必修第一册 · 课件",
+    "book": "b1",
+    "chapter": "b1c4",
+    "section": "b1c4s6",
+    "url": "https://github.com/xty1763/xgzx_physics_lib/releases/download/%E8%AF%BE%E4%BB%B6-%E5%BF%85%E4%BF%AE%E4%B8%80/4.6.pptx",
+    "tags": [
+      "4.6 超重和失重"
+    ],
+    "type": "课件"
   }
 ]

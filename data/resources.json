@@ -209,5 +209,49 @@
       "仿真资源"
     ],
     "type": "仿真资源"
+  },
+  {
+    "id": "r17890474863916tm9i",
+    "title": "3.2 摩擦力（第一课时——滑动摩擦力）",
+    "desc": "",
+    "book": "b1",
+    "chapter": "b1c3",
+    "section": "b1c3s2",
+    "url": "pages/3.2-摩擦力（第一课时——滑动摩擦力）.pptx",
+    "tags": [],
+    "type": "课件"
+  },
+  {
+    "id": "r17890475347348mn5h",
+    "title": "3.3 专题   受力分析",
+    "desc": "",
+    "book": "",
+    "chapter": "",
+    "section": "",
+    "url": "pages/3.3-专题-受力分析.pptx",
+    "tags": [],
+    "type": "课件"
+  },
+  {
+    "id": "r17890475443919yk2x",
+    "title": "4.3  牛顿第二定律",
+    "desc": "",
+    "book": "b1",
+    "chapter": "b1c4",
+    "section": "b1c4s3",
+    "url": "pages/4.3-牛顿第二定律.pptx",
+    "tags": [],
+    "type": "课件"
+  },
+  {
+    "id": "r1789047570382y0jzx",
+    "title": "1.4 速度变化快慢的描述——加速度",
+    "desc": "",
+    "book": "b1",
+    "chapter": "b1c1",
+    "section": "b1c1s4",
+    "url": "pages/1.4-速度变化快慢的描述——加速度.pptx",
+    "tags": [],
+    "type": "课件"
   }
 ]

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>高中物理教学资源库</title>
   <meta name="description" content="高中物理教学资源库 —— 按章节分类、支持搜索与上传的导航页面。" />
-  <link rel="stylesheet" href="styles.css?v=19" />
+  <link rel="stylesheet" href="styles.css?v=20" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%232f6fed'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle' fill='white' font-family='Arial'%3E%E7%89%A9%3C/text%3E%3C/svg%3E" />
 </head>
 <body>
@@ -25,6 +25,7 @@
     </div>
 
     <button class="btn primary" id="uploadBtn" type="button" style="display:none;">⬆ 上传资源</button>
+    <button class="btn ghost" id="batchUploadBtn" type="button" style="display:none;">⬆⬆ 批量上传</button>
     <button class="btn ghost" id="adminBtn" type="button">🔑 管理员登录</button>
     <!-- 方案A(多用户授权/Cloudflare Worker)已暂停：隐藏“授权登录”入口，保留代码便于日后恢复 -->
     <button class="btn ghost" id="workerBtn" type="button" style="display:none;">👥 授权登录</button>
@@ -125,6 +126,59 @@
     </div>
   </div>
 
+  <!-- 批量上传弹窗 -->
+  <div class="modal-mask" id="batchMask">
+    <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="batchTitle">
+      <header>
+        <h3 id="batchTitle">批量上传资源</h3>
+        <button class="close" id="closeBatchModal" type="button" aria-label="关闭">✕</button>
+      </header>
+      <div class="body">
+        <p class="hint">一次可选<strong>多个文件</strong>：每个文件的<strong>标题＝文件名</strong>，并会按文件名/内容<strong>自动识别</strong>教材/章节/类型；也可用下面的「统一设置」把某一项强制应用到全部文件。</p>
+        <div class="field">
+          <label>统一设置（可选；留空＝按文件自动识别）</label>
+          <div class="fieldrow">
+            <div class="field">
+              <label for="bType">类型</label>
+              <select id="bType"><option value="">按文件自动识别</option></select>
+            </div>
+            <div class="field">
+              <label for="bBook">教材</label>
+              <select id="bBook"><option value="">按文件自动识别</option></select>
+            </div>
+          </div>
+          <div class="fieldrow">
+            <div class="field">
+              <label for="bChapter">章节</label>
+              <select id="bChapter"><option value="">按文件自动识别</option></select>
+            </div>
+            <div class="field">
+              <label for="bSection">小节</label>
+              <select id="bSection"><option value="">按文件自动识别</option></select>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label>选择文件（可多选，或拖拽多个文件）</label>
+          <div class="dropzone" id="batchDropzone">
+            <div class="big">📚</div>
+            <div>点击选择多个文件，或把多个文件拖到这里</div>
+            <small>支持 HTML / PDF / Word / PPT / Excel / 图片 / 视频 / 压缩包等</small>
+            <input id="batchFileInput" type="file" multiple accept=".html,.htm,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.png,.jpg,.jpeg,.webp,.gif,.mp4,.zip" hidden />
+          </div>
+        </div>
+        <div id="batchList" class="batch-list"></div>
+        <div id="batchProgress" class="hint" style="display:none;"></div>
+        <p class="hint">保存后会逐个写入仓库并统一登记到资源清单；打卡片出现后约 1 分钟访客即可访问。</p>
+      </div>
+      <footer>
+        <button class="btn" id="batchClear" type="button">清空列表</button>
+        <button class="btn" id="cancelBatchModal" type="button">取消</button>
+        <button class="btn primary" id="startBatch" type="button">开始批量上传</button>
+      </footer>
+    </div>
+  </div>
+
   <!-- 管理员登录弹窗 -->
   <div class="modal-mask" id="adminMask">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
@@ -208,7 +262,8 @@
   <div class="toast" id="toast"></div>
 
   <!-- 数据与逻辑 -->
-  <script src="data/course-data.js?v=19"></script>
-  <script src="app.js?v=19"></script>
+  <script src="data/course-data.js?v=20"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>
+

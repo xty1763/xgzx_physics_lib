@@ -45,7 +45,7 @@
     "desc": "",
     "book": "b1",
     "chapter": "b1c2",
-    "section": "",
+    "section": "b1c2s1",
     "url": "pages/小车追击.html",
     "tags": [
       "小车追击",
@@ -130,8 +130,8 @@
     "title": "行星规律",
     "desc": "",
     "book": "b2",
-    "chapter": "b2c3",
-    "section": "",
+    "chapter": "b2c1",
+    "section": "b2c1s4",
     "url": "pages/行星规律.html",
     "tags": [
       "行星规律",
@@ -158,8 +158,8 @@
     "title": "原子变式",
     "desc": "原子结构动态变化模拟，助力理解核反应与放射性。",
     "book": "b6",
-    "chapter": "",
-    "section": "",
+    "chapter": "b6c4",
+    "section": "b6c4s4",
     "url": "pages/原子变式.html",
     "tags": [
       "原子变式",
@@ -171,9 +171,9 @@
     "id": "r1788867616794xug9y",
     "title": "电磁合场",
     "desc": "电磁粒子仿真器，可视化电磁场中粒子运动。",
-    "book": "",
-    "chapter": "",
-    "section": "",
+    "book": "b5",
+    "chapter": "b5c2",
+    "section": "b5c2s3",
     "url": "pages/电磁合场-2-3.html",
     "tags": [
       "电磁合场",

@@ -24,7 +24,7 @@
   const previewUrls = {};            // id -> objectURL（本会话刚保存的资源，可立刻打开，无需等 GitHub Pages）
   let pendingFile = null;            // 当前选中的待上传文件
   let editingId = null;              // 正在编辑的资源 id（null = 新增）
-  const ASSET_V = 19;                // 资源版本号（缓存破）
+  const ASSET_V = 20;                // 资源版本号（缓存破）
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev"; // 方案A 后端（Cloudflare Worker）
   const WORKER_TOKEN_KEY = "worker_token";
   const OWNER_TOKEN_KEY = "gh_publish_token"; // 现有的“管理员（站长）令牌”
@@ -598,9 +598,8 @@
     ].join("\n");
   }
 
-  async function publishResource(rec) {
-    const token = getPublishToken();
-    if (!token) throw new Error("请先填写 GitHub 访问令牌");
+  // 把文件写入仓库 pages/（重名自动加序号），返回最终路径；不改清单
+  async function putResourceFile(token, rec) {
     const message = "新增资源：" + rec.title;
     let path = "pages/" + slugPath(rec.title, rec.fileExt);
     for (let dup = 0; dup < 30; dup++) {
@@ -618,6 +617,13 @@
         }
       }
     }
+    return path;
+  }
+
+  async function publishResource(rec) {
+    const token = getPublishToken();
+    if (!token) throw new Error("请先填写 GitHub 访问令牌");
+    const path = await putResourceFile(token, rec);
     resources.push({
       id: rec.id, title: rec.title, desc: rec.desc || "", book: rec.book || "",
       chapter: rec.chapter || "", section: rec.section || "", url: path,
@@ -848,6 +854,7 @@
     const worker = !!getWorkerToken();
     const has = owner || worker;
     $("#uploadBtn").style.display = has ? "" : "none";
+    if ($("#batchUploadBtn")) $("#batchUploadBtn").style.display = has ? "" : "none";
     $("#adminBtn").textContent = owner ? "⚙ 管理员设置" : "🔑 管理员登录";
     $("#adminLoggedInRow").style.display = owner ? "block" : "none";
     if ($("#workeredInRow")) $("#workeredInRow").style.display = worker ? "block" : "none";
@@ -1068,6 +1075,142 @@
     $("#filePill").style.display = "none";
     $("#fileName").textContent = "";
   }
+
+  // ================= 批量上传 =================
+  let batchItems = [];            // [{file, meta, status, err}]
+  let batchUploading = false;
+  function escHtml(s) { return String(s == null ? "" : s).replace(/[<>&"]/g, (m) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[m])); }
+
+  function populateBatchSelects() {
+    const t = $("#bType"), b = $("#bBook"), c = $("#bChapter"), s = $("#bSection");
+    if (t) { t.innerHTML = '<option value="">按文件自动识别</option>'; COURSE.resourceTypes.forEach((x) => { const o = document.createElement("option"); o.value = x; o.textContent = x; t.appendChild(o); }); }
+    if (b) { b.innerHTML = '<option value="">按文件自动识别</option>'; COURSE.books.forEach((x) => { const o = document.createElement("option"); o.value = x.id; o.textContent = x.title; b.appendChild(o); }); }
+    const fillChapters = () => {
+      if (!c) return;
+      c.innerHTML = '<option value="">按文件自动识别</option>';
+      chaptersOfBook(b ? b.value : "").forEach((x) => { const o = document.createElement("option"); o.value = x.id; o.textContent = x.title; c.appendChild(o); });
+      fillSections();
+    };
+    const fillSections = () => {
+      if (!s) return;
+      s.innerHTML = '<option value="">按文件自动识别</option>';
+      const ch = chapterOf(c ? c.value : "");
+      if (ch) ch.sections.forEach((x) => { const o = document.createElement("option"); o.value = x.id; o.textContent = x.title; s.appendChild(o); });
+    };
+    if (b) b.onchange = fillChapters;
+    if (c) c.onchange = fillSections;
+    if (t && !t._bound) { t._bound = true; }
+  }
+
+  // 依据文件名 + 文本类文件内容，识别 标题/类型/教材/章节/小节
+  async function detectForFile(file) {
+    const title = file.name.replace(/\.[^.]+$/, "");
+    const ext = extOf(file.name);
+    let content = "";
+    if (TEXT_EXT_RE.test(ext)) { try { content = await readTextSample(file); } catch (e) { content = ""; } }
+    const s = (title + " " + content).trim();
+    const type = detectType(title, ext, content);
+    let book = detectBook(s);
+    const loc = detectLoc(title, content, book);
+    if (loc && loc.chapter && !book) book = bookOfChapter(loc.chapter);
+    return { title: title, ext: ext, type: type || "", book: book || "", chapter: (loc && loc.chapter) || "", section: (loc && loc.section) || "" };
+  }
+
+  async function addBatchFiles(files) {
+    const arr = Array.prototype.slice.call(files || []);
+    let skipped = 0;
+    arr.forEach((f) => {
+      if (!FILE_RE.test(f.name)) { skipped++; return; }
+      if (batchItems.some((it) => it.file.name === f.name && it.file.size === f.size)) return;   // 去重
+      batchItems.push({ file: f, meta: null, status: "" });
+    });
+    if (skipped) toast("已跳过 " + skipped + " 个不支持的文件类型", true);
+    renderBatchList();
+    for (const it of batchItems) { if (!it.meta) { try { it.meta = await detectForFile(it.file); } catch (e) { it.meta = { title: it.file.name.replace(/\.[^.]+$/, ""), type: "", book: "", chapter: "", section: "" }; } } }
+    renderBatchList();
+    const prog = $("#batchProgress");
+    if (prog && !batchUploading) { prog.style.display = batchItems.length ? "block" : "none"; prog.textContent = batchItems.length ? ("已选 " + batchItems.length + " 个文件；点“开始批量上传”逐个发布并统一登记。") : ""; }
+  }
+
+  function renderBatchList() {
+    const wrap = $("#batchList");
+    if (!wrap) return;
+    if (!batchItems.length) { wrap.innerHTML = ""; return; }
+    wrap.innerHTML = batchItems.map((it, i) => {
+      const m = it.meta;
+      const meta = m ? [m.type || "?", bookTitle(m.book) || "未分教材", chapterTitle(m.chapter) || "", sectionTitle(m.section) || ""].filter(Boolean).join(" · ") : "识别中…";
+      const st = it.status === "ok" ? '<span class="batch-x batch-ok">✓ 已上传</span>'
+        : it.status === "bad" ? '<span class="batch-x batch-bad" title="' + escHtml(it.err || "") + '">✗ 失败</span>'
+        : it.status === "ing" ? '<span class="batch-x batch-ing">上传中…</span>'
+        : '<span class="batch-x">待上传</span>';
+      const cls = it.status === "ok" ? "ok" : it.status === "bad" ? "bad" : "";
+      return '<div class="batch-row ' + cls + '"><span class="batch-idx">' + (i + 1) + '</span><span class="batch-name">' + escHtml(it.file.name) + '</span><span class="batch-meta">' + escHtml(meta) + "</span>" + st + "</div>";
+    }).join("");
+  }
+
+  function clearBatch() {
+    if (batchUploading) return;
+    batchItems = [];
+    const fi = $("#batchFileInput"); if (fi) fi.value = "";
+    renderBatchList();
+    const prog = $("#batchProgress"); if (prog) { prog.textContent = ""; prog.style.display = "none"; }
+  }
+
+  function openBatchModal() {
+    populateBatchSelects();
+    $("#batchMask").classList.add("show");
+    $("#batchProgress").style.display = batchItems.length ? "block" : "none";
+    renderBatchList();
+  }
+  function closeBatchModal() { $("#batchMask").classList.remove("show"); }
+
+  async function startBatchUpload() {
+    if (batchUploading) return;
+    if (!getPublishToken()) { toast("请先登录（管理员）", true); openAdminModal(); return; }
+    if (!batchItems.length) { toast("请先选择要上传的文件", true); return; }
+    const btn = $("#startBatch"); const prog = $("#batchProgress");
+    batchUploading = true; btn.disabled = true; btn.textContent = "上传中…"; prog.style.display = "block";
+    const overType = $("#bType").value, overBook = $("#bBook").value, overChapter = $("#bChapter").value, overSection = $("#bSection").value;
+    const token = getPublishToken();
+    const newEntries = [];
+    let ok = 0, fail = 0;
+    for (let i = 0; i < batchItems.length; i++) {
+      const it = batchItems[i];
+      if (it.status === "ok") { ok++; continue; }
+      it.status = "ing"; renderBatchList();
+      prog.textContent = "正在上传 " + (i + 1) + " / " + batchItems.length + " …（" + it.file.name + "）";
+      try {
+        if (it.file.size > 50 * 1024 * 1024) throw new Error("文件过大（>50MB）");
+        if (!it.meta) it.meta = await detectForFile(it.file);
+        const m = it.meta;
+        const type = overType || m.type || "练习";
+        const book = overBook || m.book || "";
+        const chapter = overChapter || m.chapter || "";
+        const section = (type === "试卷") ? "" : (overSection || m.section || "");
+        const title = m.title || it.file.name.replace(/\.[^.]+$/, "");
+        const em = /\.[^.]*$/.exec(it.file.name);
+        const fileExt = em ? em[0].toLowerCase() : ".html";
+        const contentB64 = await readFileAsBase64(it.file);
+        const rec = { id: "r" + Date.now() + Math.random().toString(36).slice(2, 7), title: title, book: book, chapter: chapter, section: section, desc: "", tags: [], type: type, fileExt: fileExt, contentB64: contentB64, _blob: it.file };
+        const path = await putResourceFile(token, rec);
+        const entry = { id: rec.id, title: title, desc: "", book: book, chapter: chapter, section: section, url: path, tags: [], type: type };
+        resources.push(entry); newEntries.push(entry);
+        if (rec._blob) setPreview(rec.id, rec._blob);
+        it.status = "ok"; ok++;
+      } catch (e) { it.status = "bad"; it.err = (e && e.message) || "失败"; fail++; }
+      renderBatchList();
+    }
+    if (newEntries.length) {
+      prog.textContent = "正在统一登记资源清单（" + newEntries.length + " 条）…";
+      try { await saveResources(token, "批量新增资源：" + newEntries.length + " 个"); }
+      catch (e) { toast("清单保存失败：" + e.message, true); }
+    }
+    baseList = [...resources, ...uploadedList]; render();
+    batchUploading = false; btn.disabled = false; btn.textContent = "开始批量上传";
+    prog.textContent = "完成：成功 " + ok + " 个" + (fail ? "，失败 " + fail + " 个" : "") + "。";
+    toast("批量上传完成：成功 " + ok + " 个" + (fail ? "，失败 " + fail + " 个" : ""));
+  }
+  // =============== 批量上传 end ===============
 
   function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
@@ -1688,6 +1831,22 @@
       if (f) setPendingFile(f);
     });
     $("#clearFile").onclick = clearPendingFile;
+
+    // ---------- 批量上传 ----------
+    const bb = $("#batchUploadBtn"); if (bb) bb.onclick = openBatchModal;
+    const cb = $("#closeBatchModal"); if (cb) cb.onclick = closeBatchModal;
+    const cbm = $("#cancelBatchModal"); if (cbm) cbm.onclick = closeBatchModal;
+    const bmask = $("#batchMask"); if (bmask) bmask.addEventListener("click", (e) => { if (e.target === bmask) closeBatchModal(); });
+    const bc = $("#batchClear"); if (bc) bc.onclick = clearBatch;
+    const sb = $("#startBatch"); if (sb) sb.onclick = startBatchUpload;
+    const bdz = $("#batchDropzone"), bfi = $("#batchFileInput");
+    if (bdz && bfi) {
+      bdz.onclick = () => bfi.click();
+      bfi.addEventListener("change", () => { addBatchFiles(bfi.files); bfi.value = ""; });
+      ["dragenter", "dragover"].forEach((ev) => bdz.addEventListener(ev, (e) => { e.preventDefault(); bdz.classList.add("drag"); }));
+      ["dragleave", "drop"].forEach((ev) => bdz.addEventListener(ev, (e) => { e.preventDefault(); bdz.classList.remove("drag"); }));
+      bdz.addEventListener("drop", (e) => { if (e.dataTransfer && e.dataTransfer.files.length) addBatchFiles(e.dataTransfer.files); });
+    }
   }
 
   // ---------- 启动 ----------
@@ -1701,3 +1860,4 @@
       .catch((e) => toast("初始化失败：" + e.message, true));
   });
 })();
+

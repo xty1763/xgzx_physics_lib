@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>位移公式推导实验平台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border-bottom: 2px solid #fdbb2d;
+        }
+
+        .header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            color: #fdbb2d;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .content {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+        }
+
+        .control-panel {
+            flex: 1;
+            min-width: 300px;
+            padding: 20px;
+            background: rgba(30, 30, 50, 0.8);
+            border-right: 2px solid #1a2a6c;
+        }
+
+        .simulation-area {
+            flex: 2;
+            min-width: 400px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .control-group {
+            margin-bottom: 25px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+
+        .control-group h3 {
+            margin-bottom: 15px;
+            color: #fdbb2d;
+            border-bottom: 1px solid #444;
+            padding-bottom: 8px;
+        }
+
+        .slider-container {
+            margin: 15px 0;
+        }
+
+        .slider-container label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .slider-container input[type="range"] {
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        select {
+            width: 100%;
+            padding: 9px 8px;
+            border-radius: 6px;
+            border: 1px solid #555;
+            background: #1e1e32;
+            color: #fff;
+            font-size: 0.95rem;
+            cursor: pointer;
+            outline: none;
+        }
+
+        select:focus {
+            border-color: #fdbb2d;
+        }
+
+        .value-display {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 11px;
+            background: #1a2a6c;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+
+        button:hover {
+            background: #2a3a9c;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        #reset {
+            background: #444;
+        }
+
+        #reset:hover {
+            background: #555;
+        }
+
+        .explanation {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .explanation h3 {
+            color: #fdbb2d;
+            margin-bottom: 10px;
+        }
+
+        .explanation p {
+            margin-bottom: 8px;
+        }
+
+        .explanation .formula {
+            text-align: center;
+            font-size: 1.15rem;
+            margin: 12px 0;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.55);
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            color: #7CFC9B;
+        }
+
+        .explanation strong {
+            color: #fdbb2d;
+            font-family: 'Courier New', monospace;
+        }
+
+        .canvas-container {
+            width: 100%;
+            max-width: 700px;
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 400px;
+        }
+
+        .data-display {
+            width: 100%;
+            max-width: 700px;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .data-item {
+            text-align: center;
+            min-width: 110px;
+        }
+
+        .data-value {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #fdbb2d;
+        }
+
+        .data-label {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                flex-direction: column;
+            }
+
+            .control-panel {
+                border-right: none;
+                border-bottom: 2px solid #1a2a6c;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .data-value {
+                font-size: 1.3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>位移公式推导实验平台</h1>
+        <p>通过微元法展示速度-时间图像下的面积与位移关系</p>
+    </div>
+
+    <div class="content">
+        <div class="control-panel">
+            <div class="control-group">
+                <h3>运动参数</h3>
+
+                <div class="slider-container">
+                    <label for="curveType">速度曲线类型</label>
+                    <select id="curveType">
+                        <option value="linear">① 匀变速直线运动：v = v₀ + a·t</option>
+                        <option value="quadratic">② 变加速运动：v = v₀ + (a/20)·t²</option>
+                        <option value="sine">③ 变加速运动：v = v₀ + a·sin(πt/20)</option>
+                    </select>
+                </div>
+
+                <div class="slider-container">
+                    <label for="initialVelocity">初速度 v₀ (m/s)</label>
+                    <input type="range" id="initialVelocity" min="0" max="20" value="5" step="0.5">
+                    <div class="value-display">
+                        <span>0</span>
+                        <span id="initialVelocityValue">5.0 m/s</span>
+                        <span>20</span>
+                    </div>
+                </div>
+
+                <div class="slider-container">
+                    <label for="acceleration">加速度 a (m/s²)</label>
+                    <input type="range" id="acceleration" min="0" max="10" value="2" step="0.1">
+                    <div class="value-display">
+                        <span>0</span>
+                        <span id="accelerationValue">2.0 m/s²</span>
+                        <span>10</span>
+                    </div>
+                </div>
+
+                <div class="slider-container">
+                    <label for="numRectangles">微元数量 n</label>
+                    <input type="range" id="numRectangles" min="1" max="50" value="10" step="1">
+                    <div class="value-display">
+                        <span>1</span>
+                        <span id="numRectanglesValue">10</span>
+                        <span>50</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button id="reset">重置参数</button>
+            </div>
+
+            <div class="explanation">
+                <h3>微元法原理</h3>
+                <p>把总时间 T = 10 s 分成 n 个相等的小段 Δt = T / n。</p>
+                <p>在每个 Δt 内，速度近似看作常数 v(tᵢ)，该微元内的位移 Δs = v(tᵢ)·Δt。</p>
+                <p>总位移 s ≈ Σ v(tᵢ)·Δt，也就是图中绿色矩形面积之和。</p>
+                <p>当 n → ∞ 时，矩形面积之和无限逼近速度曲线下的面积：</p>
+                <div class="formula" id="formulaDisplay">s = v₀t + ½at²</div>
+                <p>当前速度函数：<strong id="curveExpr">v = v₀ + a·t</strong></p>
+                <p>无论 v(t) 是直线还是曲线，微元法（面积法）都成立——这正是定积分的思想。</p>
+            </div>
+        </div>
+
+        <div class="simulation-area">
+            <div class="canvas-container">
+                <canvas id="motionCanvas"></canvas>
+            </div>
+
+            <div class="data-display">
+                <div class="data-item">
+                    <div class="data-label">总时间 T</div>
+                    <div class="data-value">10.0 s</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">末速度 v(T)</div>
+                    <div class="data-value" id="currentVelocity">-- m/s</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">微元法位移</div>
+                    <div class="data-value" id="areaDisplacement">0.00 m</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">公式法位移</div>
+                    <div class="data-value" id="formulaDisplacement">0.00 m</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ================= 常量与曲线定义 ================= */
+    const T_MAX = 10;          // 总时间固定为最大值 10 s
+
+    const CURVES = {
+        // ① 匀变速直线运动
+        linear: {
+            vExpr: 'v = v₀ + a·t',
+            sFormula: 's = v₀t + ½at²',
+            v: (v0, a, t) => v0 + a * t,
+            s: (v0, a, t) => v0 * t + 0.5 * a * t * t
+        },
+        // ② 二次型变加速运动
+        quadratic: {
+            vExpr: 'v = v₀ + (a/20)·t²',
+            sFormula: 's = v₀t + (a/60)t³',
+            v: (v0, a, t) => v0 + (a / 20) * t * t,
+            s: (v0, a, t) => v0 * t + (a / 60) * t * t * t
+        },
+        // ③ 正弦型变加速运动
+        sine: {
+            vExpr: 'v = v₀ + a·sin(πt/20)',
+            sFormula: 's = v₀t + (20a/π)(1 − cos(πt/20))',
+            v: (v0, a, t) => v0 + a * Math.sin(Math.PI * t / 20),
+            s: (v0, a, t) => v0 * t + (20 * a / Math.PI) * (1 - Math.cos(Math.PI * t / 20))
+        }
+    };
+
+    /* ================= DOM ================= */
+    const canvas = document.getElementById('motionCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const initialVelocitySlider = document.getElementById('initialVelocity');
+    const accelerationSlider = document.getElementById('acceleration');
+    const numRectanglesSlider = document.getElementById('numRectangles');
+    const curveTypeSelect = document.getElementById('curveType');
+
+    const initialVelocityValue = document.getElementById('initialVelocityValue');
+    const accelerationValue = document.getElementById('accelerationValue');
+    const numRectanglesValue = document.getElementById('numRectanglesValue');
+
+    const currentVelocityDisplay = document.getElementById('currentVelocity');
+    const areaDisplacementDisplay = document.getElementById('areaDisplacement');
+    const formulaDisplacementDisplay = document.getElementById('formulaDisplacement');
+
+    const formulaDisplay = document.getElementById('formulaDisplay');
+    const curveExprDisplay = document.getElementById('curveExpr');
+    const resetButton = document.getElementById('reset');
+
+    /* ================= 参数 ================= */
+    const params = {
+        initialVelocity: parseFloat(initialVelocitySlider.value),
+        acceleration: parseFloat(accelerationSlider.value),
+        numRectangles: parseInt(numRectanglesSlider.value, 10),
+        curveType: curveTypeSelect.value
+    };
+
+    /* ================= 工具函数 ================= */
+    // 生成"好看"的纵轴刻度
+    function niceScale(maxVal) {
+        if (!(maxVal > 0)) return { step: 5, top: 20 };
+        const rough = maxVal / 4;
+        const pow = Math.pow(10, Math.floor(Math.log10(rough)));
+        const n = rough / pow;
+        let step;
+        if (n <= 1) step = 1;
+        else if (n <= 2) step = 2;
+        else if (n <= 2.5) step = 2.5;
+        else if (n <= 5) step = 5;
+        else step = 10;
+        step *= pow;
+        const top = Math.ceil(maxVal / step) * step;
+        return { step: step, top: top };
+    }
+
+    function formatNum(x) {
+        if (Math.abs(x - Math.round(x)) < 1e-9) return String(Math.round(x));
+        return x.toFixed(1);
+    }
+
+    /* ================= 画布尺寸 ================= */
+    function setupCanvas() {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        const w = Math.max(rect.width, 300);
+        const h = rect.height || 400;
+
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        draw();
+    }
+
+    /* ================= 主绘制 ================= */
+    function draw() {
+        const dpr = window.devicePixelRatio || 1;
+        const W = canvas.width / dpr;
+        const H = canvas.height / dpr;
+
+        ctx.clearRect(0, 0, W, H);
+
+        const curve = CURVES[params.curveType];
+        const v0 = params.initialVelocity;
+        const a = params.acceleration;
+        const n = params.numRectangles;
+
+        /* --- 计算纵轴量程（取整条曲线上的最大速度） --- */
+        let maxV = 0;
+        const SAMPLES = 240;
+        for (let i = 0; i <= SAMPLES; i++) {
+            const t = (i / SAMPLES) * T_MAX;
+            maxV = Math.max(maxV, curve.v(v0, a, t));
+        }
+        const scale = niceScale(maxV);
+        const vStep = scale.step;
+        const vTop = scale.top;
+
+        /* --- 绘图区边界 --- */
+        const padL = 62, padR = 36, padT = 28, padB = 50;
+        const x0 = padL, x1 = W - padR, y0 = H - padB, y1 = padT;
+
+        const mapX = t => x0 + (t / T_MAX) * (x1 - x0);
+        const mapY = v => y0 - (v / vTop) * (y0 - y1);
+
+        /* --- 网格线 --- */
+        ctx.strokeStyle = '#eceff5';
+        ctx.lineWidth = 1;
+        const yTicks = Math.round(vTop / vStep);
+        for (let i = 0; i <= yTicks; i++) {
+            const y = mapY(i * vStep);
+            ctx.beginPath();
+            ctx.moveTo(x0, y);
+            ctx.lineTo(x1, y);
+            ctx.stroke();
+        }
+        for (let t = 1; t < T_MAX; t++) {
+            const x = mapX(t);
+            ctx.beginPath();
+            ctx.moveTo(x, y0);
+            ctx.lineTo(x, y1);
+            ctx.stroke();
+        }
+
+        /* --- 微元矩形（左端点取样） --- */
+        const dt = T_MAX / n;
+        let totalArea = 0;
+
+        for (let i = 0; i < n; i++) {
+            const tStart = i * dt;
+            const tEnd = tStart + dt;
+            const vSample = curve.v(v0, a, tStart);
+
+            const xa = mapX(tStart);
+            const xb = mapX(tEnd);
+            const yTop = mapY(vSample);
+
+            ctx.fillStyle = 'rgba(0, 190, 100, 0.25)';
+            ctx.fillRect(xa, yTop, xb - xa, y0 - yTop);
+
+            ctx.strokeStyle = 'rgba(0, 140, 70, 0.85)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(xa + 0.5, yTop + 0.5, Math.max(xb - xa - 1, 0.5), Math.max(y0 - yTop - 1, 0.5));
+
+            totalArea += vSample * dt;
+        }
+
+        /* --- 速度曲线 --- */
+        ctx.strokeStyle = '#1a2a6c';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        const CURVE_STEPS = 480;
+        for (let i = 0; i <= CURVE_STEPS; i++) {
+            const t = (i / CURVE_STEPS) * T_MAX;
+            const x = mapX(t);
+            const y = mapY(curve.v(v0, a, t));
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        /* --- 坐标轴 --- */
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x0, y1);
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y0);
+        ctx.stroke();
+
+        // 箭头
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.moveTo(x1 + 9, y0);
+        ctx.lineTo(x1 - 1, y0 - 5);
+        ctx.lineTo(x1 - 1, y0 + 5);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(x0, y1 - 9);
+        ctx.lineTo(x0 - 5, y1 + 1);
+        ctx.lineTo(x0 + 5, y1 + 1);
+        ctx.closePath();
+        ctx.fill();
+
+        /* --- 刻度与刻度值 --- */
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.font = '12px Arial';
+        ctx.fillStyle = '#666';
+
+        // 横轴
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        for (let t = 0; t <= T_MAX; t++) {
+            const x = mapX(t);
+            ctx.beginPath();
+            ctx.moveTo(x, y0);
+            ctx.lineTo(x, y0 + 6);
+            ctx.stroke();
+            ctx.fillText(String(t), x, y0 + 10);
+        }
+
+        // 纵轴
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        for (let i = 0; i <= yTicks; i++) {
+            const v = i * vStep;
+            const y = mapY(v);
+            ctx.beginPath();
+            ctx.moveTo(x0 - 6, y);
+            ctx.lineTo(x0, y);
+            ctx.stroke();
+            ctx.fillText(formatNum(v), x0 - 10, y);
+        }
+
+        /* --- 轴标题 --- */
+        ctx.fillStyle = '#333';
+        ctx.font = '13px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('t / s', (x0 + x1) / 2, y0 + 34);
+
+        ctx.save();
+        ctx.translate(16, (y0 + y1) / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('v / (m·s⁻¹)', 0, 0);
+        ctx.restore();
+
+        /* --- 数据面板 --- */
+        const vEnd = curve.v(v0, a, T_MAX);
+        const exact = curve.s(v0, a, T_MAX);
+
+        currentVelocityDisplay.textContent = vEnd.toFixed(2) + ' m/s';
+        areaDisplacementDisplay.textContent = totalArea.toFixed(2) + ' m';
+        formulaDisplacementDisplay.textContent = exact.toFixed(2) + ' m';
+    }
+
+    /* ================= 公式文本刷新 ================= */
+    function refreshFormula() {
+        const curve = CURVES[params.curveType];
+        formulaDisplay.textContent = curve.sFormula;
+        curveExprDisplay.textContent = curve.vExpr;
+    }
+
+    /* ================= 事件绑定 ================= */
+    initialVelocitySlider.addEventListener('input', function () {
+        params.initialVelocity = parseFloat(this.value);
+        initialVelocityValue.textContent = params.initialVelocity.toFixed(1) + ' m/s';
+        draw();
+    });
+
+    accelerationSlider.addEventListener('input', function () {
+        params.acceleration = parseFloat(this.value);
+        accelerationValue.textContent = params.acceleration.toFixed(1) + ' m/s²';
+        draw();
+    });
+
+    numRectanglesSlider.addEventListener('input', function () {
+        params.numRectangles = parseInt(this.value, 10);
+        numRectanglesValue.textContent = params.numRectangles;
+        draw();
+    });
+
+    curveTypeSelect.addEventListener('change', function () {
+        params.curveType = this.value;
+        refreshFormula();
+        draw();
+    });
+
+    resetButton.addEventListener('click', function () {
+        initialVelocitySlider.value = 5;
+        accelerationSlider.value = 2;
+        numRectanglesSlider.value = 10;
+        curveTypeSelect.value = 'linear';
+
+        params.initialVelocity = 5;
+        params.acceleration = 2;
+        params.numRectangles = 10;
+        params.curveType = 'linear';
+
+        initialVelocityValue.textContent = '5.0 m/s';
+        accelerationValue.textContent = '2.0 m/s²';
+        numRectanglesValue.textContent = '10';
+
+        refreshFormula();
+        draw();
+    });
+
+    /* ================= 初始化 ================= */
+    window.addEventListener('load', function () {
+        refreshFormula();
+        setupCanvas();
+    });
+
+    let resizeTimer = null;
+    window.addEventListener('resize', function () {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(setupCanvas, 120);
+    });
+})();
+</script>
+</body>
+</html>

@@ -8,13 +8,23 @@
 (function () {
   "use strict";
 
-  const ASSET_V = 24;
+  const ASSET_V = 25;
   const PEP = window.PEP_TEXTBOOKS || [];
   const COURSE = window.COURSE || { books: [], resourceTypes: [] };
   const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev";
   const WORKER_TOKEN_KEY = "worker_token";
   const TOKEN_KEY = "gh_publish_token";
-  const BASE_DIR = "workbench/";
+  // 与主库（根站点）共用一份资源清单：写回根仓库 data/ 与 pages/；读取始终拉 GitHub 上的最新清单，
+  // 这样本站部署在任何服务器上都拿得到最新数据，上传后刷新立刻可见。
+  const BASE_DIR = "";
+  const LIB_BASE = "https://xty1763.github.io/xgzx_physics_lib/";
+  // 清单候选源（按顺序尝试，全部支持 CORS；带超时，国内网络下也能命中可用的那个）
+  const LIB_SOURCES = [
+    "https://raw.githubusercontent.com/xty1763/xgzx_physics_lib/main/data/resources.json",
+    "https://xty1763.github.io/xgzx_physics_lib/data/resources.json",
+    "https://cdn.jsdelivr.net/gh/xty1763/xgzx_physics_lib@main/data/resources.json",
+  ];
+  function absUrl(u) { const s = String(u || ""); return /^https?:\/\//i.test(s) ? s : (s ? LIB_BASE + s.replace(/^\/+/, "") : ""); }
 
   // ---------- 状态 ----------
   const state = { bookId: null, chapterId: null, sectionId: null, cat: "all", secTag: "all", search: "", view: "grid", treeSearch: "" };
@@ -72,12 +82,28 @@
   function rebuildStore() { store = resources.map(mapResource).filter(Boolean); }
 
   // ---------- 资源列表 ----------
+  // 多源拉取最新清单（任一可用即可），全部失败再退回本地副本
+  async function fetchManifest() {
+    for (const s of LIB_SOURCES) {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        const res = await fetch(s + (s.indexOf("?") > -1 ? "&" : "?") + "t=" + Date.now(), { cache: "no-store", signal: ctrl.signal });
+        clearTimeout(timer);
+        if (!res.ok) continue;
+        const j = await res.json();
+        if (Array.isArray(j) && j.length) return j;
+      } catch (e) { /* 试下一个源 */ }
+    }
+    return null;
+  }
   async function loadAll() {
-    try {
-      const res = await fetch("data/resources.json?v=" + ASSET_V, { cache: "no-store" });
-      if (!res.ok) throw new Error("加载清单失败");
-      resources = await res.json(); if (!Array.isArray(resources)) resources = [];
-    } catch (e) { resources = []; }
+    let list = await fetchManifest();
+    if (!list) {
+      try { const r2 = await fetch("data/resources.json?v=" + ASSET_V, { cache: "no-store" }); const j = await r2.json(); list = Array.isArray(j) ? j : []; }
+      catch (e2) { list = []; }
+    }
+    resources = list || [];
     rebuildStore();
     smartDefault();
     hydrateCounts();
@@ -91,7 +117,7 @@
 
   function show(target) { if (previewUrls[target.id]) return Object.assign({}, target, { url: previewUrls[target.id] }); return target; }
   function setPreview(id, blob) { if (!id || !blob) return; if (previewUrls[id]) { try { URL.revokeObjectURL(previewUrls[id]); } catch (e) {} } previewUrls[id] = URL.createObjectURL(blob); }
-  function openResource(r) { if (r && r.url) window.open(r.url, "_blank", "noopener"); else toast("该资源暂无可打开的地址", true); }
+  function openResource(r) { const u = r && absUrl(r.url); if (u) window.open(u, "_blank", "noopener"); else toast("该资源暂无可打开的地址", true); }
 
   // 设计稿的文件详情/预览弹窗
   let previewId = null;

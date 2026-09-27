@@ -1,0 +1,3372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <!-- 单文件版：样式/数据/逻辑已全部内联；部署时只需这一个文件（或改名为 index.html） -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>高中物理教师智能教学工作台 - 人教版各章节小节教研资源中心</title>
+  <meta name="description" content="高中物理教学资源库 —— 按人教版教材→章→节分类、搜索与类型筛选，支持上传/编辑/删除，含资源助手与智能简介。" />
+  <style>
+
+    :root {
+      --bg-base: #0a0f1d;
+      --bg-surface: #111827;
+      --bg-card: #1b2537;
+      --bg-card-hover: #24324a;
+      --bg-elevated: #2d3d57;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-focus: #38bdf8;
+      
+      --primary: #38bdf8;
+      --primary-glow: rgba(56, 189, 248, 0.25);
+      --primary-hover: #0284c7;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-purple: #8b5cf6;
+      --accent-rose: #f43f5e;
+      --accent-indigo: #6366f1;
+
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      --font-mono: "JetBrains Mono", "SF Mono", Consolas, Menlo, monospace;
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+      --shadow-lg: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    button, input, select, textarea {
+      font-family: inherit;
+      color: inherit;
+    }
+
+    /* Layout System */
+    .workbench-layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      min-height: 100vh;
+      background: radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.04) 0%, transparent 40%),
+                  radial-gradient(circle at 90% 80%, rgba(99, 102, 241, 0.04) 0%, transparent 40%),
+                  var(--bg-base);
+    }
+
+    /* Sidebar Navigation */
+    .sidebar {
+      background-color: var(--bg-surface);
+      border-right: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      user-select: none;
+    }
+
+    .sidebar-header {
+      padding: 20px 18px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .atom-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #0284c7, #6366f1);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+      flex-shrink: 0;
+    }
+
+    .atom-core {
+      width: 8px;
+      height: 8px;
+      background: #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #38bdf8;
+    }
+
+    .atom-orbit {
+      position: absolute;
+      width: 26px;
+      height: 10px;
+      border: 1.5px solid rgba(255, 255, 255, 0.65);
+      border-radius: 50%;
+    }
+    .orbit-1 { transform: rotate(35deg); }
+    .orbit-2 { transform: rotate(-35deg); }
+
+    .brand-text h2 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: linear-gradient(90deg, #f8fafc, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-text .sub-title {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: block;
+      margin-top: 1px;
+    }
+
+    /* Teacher Profile in Sidebar */
+    .teacher-badge {
+      margin: 14px 16px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .teacher-avatar {
+      width: 34px;
+      height: 34px;
+      background: linear-gradient(135deg, #38bdf8, #2563eb);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    .teacher-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .teacher-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge-tag {
+      font-size: 10px;
+      padding: 1px 6px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--primary);
+      border-radius: 4px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    .teacher-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+
+    /* Navigation List */
+    .nav-menu {
+      flex: 1;
+      padding: 8px 12px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-dim);
+      padding: 10px 10px 4px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      font-size: 13px;
+      font-weight: 500;
+      width: 100%;
+    }
+
+    .nav-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-main);
+      transform: translateX(2px);
+    }
+
+    .nav-item.active {
+      background: linear-gradient(90deg, rgba(56, 189, 248, 0.15), rgba(99, 102, 241, 0.08));
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: var(--primary);
+      font-weight: 600;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .nav-icon {
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+    }
+
+    .nav-label {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .nav-count {
+      font-size: 11px;
+      padding: 1px 7px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    .nav-item.active .nav-count {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--primary);
+    }
+
+    .sidebar-footer {
+      padding: 14px 16px;
+      border-top: 1px solid var(--border-subtle);
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .quick-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      text-align: center;
+    }
+
+    .stat-mini {
+      padding: 6px 4px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .mini-val {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      font-family: var(--font-mono);
+    }
+
+    .mini-lbl {
+      display: block;
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* Main Area */
+    .workbench-main {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    /* Top Header */
+    .top-header {
+      background-color: rgba(17, 24, 39, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 30;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .module-breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .crumb-root { color: var(--text-dim); }
+    .crumb-sep { color: var(--text-dim); font-size: 11px; }
+    .crumb-current { color: var(--text-main); font-weight: 600; }
+    .crumb-sub { color: var(--accent-cyan); font-weight: 500; }
+
+    .header-center {
+      flex: 1;
+      max-width: 480px;
+    }
+
+    .header-search-bar {
+      position: relative;
+      width: 100%;
+    }
+
+    .header-search-bar input {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      padding: 8px 16px 8px 36px;
+      font-size: 13px;
+      color: var(--text-main);
+      transition: all 0.2s;
+    }
+
+    .header-search-bar input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+      background: var(--bg-surface);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: var(--text-dim);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .current-term-pill {
+      font-size: 11px;
+      padding: 4px 10px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--accent-emerald);
+      border-radius: 20px;
+      font-weight: 600;
+    }
+
+    .notifications-bell {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .notifications-bell:hover {
+      background: var(--bg-card-hover);
+    }
+
+    .bell-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent-rose);
+      border-radius: 50%;
+      position: absolute;
+      top: 6px;
+      right: 6px;
+    }
+
+    /* Subtabs Bar */
+    .subtabs-bar {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 48px;
+    }
+
+    .subtabs-scroll {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 6px 0;
+    }
+
+    .subtab-btn {
+      padding: 6px 14px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .subtab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .subtab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* Content Viewport */
+    .content-viewport {
+      padding: 24px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Buttons & Standard Controls */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+      user-select: none;
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    .btn-xs {
+      padding: 3px 8px;
+      font-size: 11px;
+      border-radius: 4px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #0369a1, #1d4ed8);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      border-color: var(--border-subtle);
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-outline-primary {
+      background: transparent;
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .btn-outline-primary:hover {
+      background: var(--primary-glow);
+    }
+
+    /* ==========================================================================
+       PEP TEXTBOOK MATERIALS MODULE - COMPREHENSIVE SECTION BROWSER
+       ========================================================================== */
+    .pep-module-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* Textbook Switcher Tabs */
+    .pep-book-tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .pep-book-tab {
+      padding: 10px 16px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .pep-book-tab:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+      background: var(--bg-card);
+    }
+
+    .pep-book-tab.active {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(30, 58, 138, 0.2));
+      border: 1px solid var(--primary);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+    }
+
+    .book-tab-badge {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .pep-book-tab.active .book-tab-badge {
+      background: var(--primary);
+      color: #0a0f1d;
+    }
+
+    .book-tab-info {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .book-tab-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .book-tab-sub {
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* Main PEP Layout: Tree on Left, File Area on Right */
+    .pep-main-layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    /* Tree Directory Sidebar (Accurate to Sections) */
+    .pep-tree-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+      position: sticky;
+      top: 80px;
+    }
+
+    .tree-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .tree-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tree-title-row h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .tree-search-wrap {
+      position: relative;
+    }
+
+    .tree-search-wrap input {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px 6px 28px;
+      font-size: 12px;
+      color: var(--text-main);
+    }
+
+    .tree-search-wrap input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .tree-search-icon {
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .tree-filter-pills {
+      display: flex;
+      gap: 4px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .tree-filter-pill {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+
+    .tree-filter-pill:hover {
+      color: var(--text-main);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .tree-filter-pill.active {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--primary);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* Tree Nodes */
+    .tree-nodes-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .chapter-node {
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--bg-card);
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .chapter-node.selected-chapter {
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+
+    .chapter-head {
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.02);
+      transition: background 0.15s;
+    }
+
+    .chapter-head:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .chapter-toggle-icon {
+      font-size: 11px;
+      color: var(--text-dim);
+      transition: transform 0.2s;
+      width: 14px;
+      text-align: center;
+    }
+
+    .chapter-node.expanded .chapter-toggle-icon {
+      transform: rotate(90deg);
+      color: var(--primary);
+    }
+
+    .chapter-title-wrap {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .chapter-code-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chapter-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .chapter-count-tag {
+      font-size: 10px;
+      padding: 0 5px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 4px;
+    }
+
+    /* Section Sub-List (Precise Section Navigation) */
+    .section-list {
+      display: none;
+      padding: 4px 8px 8px;
+      flex-direction: column;
+      gap: 3px;
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    .chapter-node.expanded .section-list {
+      display: flex;
+    }
+
+    .section-node {
+      padding: 7px 10px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-muted);
+      transition: all 0.15s;
+      border: 1px solid transparent;
+    }
+
+    .section-node:hover {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-main);
+      transform: translateX(2px);
+    }
+
+    .section-node.active-section {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .section-bullet {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .section-node.active-section .section-bullet {
+      background: var(--primary);
+      box-shadow: 0 0 6px var(--primary);
+    }
+
+    .section-title {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .section-page-ref {
+      font-size: 10px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    .section-badge {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    .section-node.active-section .section-badge {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--primary);
+    }
+
+    .section-tag-mini {
+      font-size: 9px;
+      padding: 0 4px;
+      border-radius: 3px;
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-amber);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .section-tag-exp {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    /* Right Side: Chapter & Section Detail Banner + Files */
+    .pep-content-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Section Overview & Guidance Card */
+    .section-overview-card {
+      background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(30, 41, 59, 0.9));
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .section-overview-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #38bdf8, #6366f1, #10b981);
+    }
+
+    .section-path-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .section-path-crumbs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .section-path-crumbs strong {
+      color: var(--primary);
+    }
+
+    .section-jump-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-overview-main {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .section-heading-block {
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .section-heading-block h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .section-highlight-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid var(--primary);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .section-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+
+    .section-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .section-meta-item strong {
+      color: var(--text-main);
+    }
+
+    .section-teaching-targets {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .target-title {
+      font-weight: 600;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .target-desc {
+      color: var(--text-main);
+      line-height: 1.5;
+    }
+
+    .key-concepts-chips {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .concept-chip {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.35);
+      color: #a5b4fc;
+    }
+
+    .formula-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #6ee7b7;
+    }
+
+    /* Fast Targeted Upload Dropzone */
+    .chapter-upload-zone {
+      background: var(--bg-surface);
+      border: 2px dashed rgba(56, 189, 248, 0.3);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      transition: all 0.2s;
+    }
+
+    .chapter-upload-zone:hover {
+      border-color: var(--primary);
+      background: rgba(56, 189, 248, 0.03);
+    }
+
+    .upload-zone-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .upload-zone-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: var(--primary);
+      flex-shrink: 0;
+    }
+
+    .upload-zone-text h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .upload-zone-text p {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* Toolbar & Category Filters */
+    .pep-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .category-filter-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .cat-btn {
+      padding: 6px 12px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .cat-btn:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+      color: var(--text-main);
+    }
+
+    .cat-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #0a0f1d;
+      font-weight: 700;
+    }
+
+    .view-mode-group {
+      display: flex;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    .view-btn {
+      background: var(--bg-surface);
+      border: none;
+      padding: 6px 10px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .view-btn.active {
+      background: var(--bg-card);
+      color: var(--primary);
+    }
+
+    /* Files Container & Cards Grid */
+    .pep-files-container {
+      min-height: 280px;
+    }
+
+    .pep-files-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+
+    .pep-file-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .pep-file-card:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      background: var(--bg-card);
+    }
+
+    .card-top-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .file-icon-badge {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      flex-shrink: 0;
+    }
+
+    .icon-doc, .icon-docx { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .icon-ppt, .icon-pptx { background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); }
+    .icon-pdf { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .icon-xls, .icon-xlsx { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .icon-mp4, .icon-video { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); }
+
+    .file-title-wrap {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .file-item-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .file-section-badge {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(6, 182, 212, 0.15);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      color: var(--accent-cyan);
+      margin-top: 4px;
+    }
+
+    .file-tags-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+
+    .tag-pill {
+      font-size: 10px;
+      padding: 1px 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      color: var(--text-dim);
+    }
+
+    .badge-sample {
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--accent-emerald);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .file-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-dim);
+      padding-top: 10px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .file-actions-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Table View for Files */
+    .pep-files-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    .pep-files-table th {
+      background: var(--bg-card);
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .pep-files-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-main);
+    }
+
+    .pep-files-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Module General Card Components (for modules 2-7) */
+    .module-hero-banner {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .banner-text h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .banner-text p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      max-width: 600px;
+    }
+
+    .chart-container-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .chart-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chart-header-row h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chart-canvas-wrap {
+      height: 240px;
+      width: 100%;
+      position: relative;
+    }
+
+    /* Modals & Dialogs */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-backdrop.hidden {
+      display: none;
+    }
+
+    .modal-dialog {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 680px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      animation: modalSlideIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes modalSlideIn {
+      from { transform: scale(0.96) translateY(10px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-card);
+    }
+
+    .modal-header h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      font-size: 20px;
+      color: var(--text-dim);
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .modal-close:hover {
+      color: var(--text-main);
+    }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      background: var(--bg-card);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .form-control {
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      font-size: 13px;
+      color: var(--text-main);
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    /* Toast Notification */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .toast-item {
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid var(--primary);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      color: var(--text-main);
+      padding: 12px 18px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      backdrop-filter: blur(8px);
+      pointer-events: auto;
+      animation: toastIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes toastIn {
+      from { transform: translateX(50px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    @media (max-width: 960px) {
+      .workbench-layout {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        display: none;
+      }
+      .pep-main-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  
+
+/* ===== Additional UI: assistant panel, form controls, dropzone, placeholders ===== */
+.hint{font-size:12px;color:var(--text-dim);margin-top:4px;line-height:1.5}
+.hint code{background:rgba(255,255,255,0.08);padding:0 4px;border-radius:4px;color:var(--accent-cyan)}
+.form-control{min-height:38px;border-radius:var(--radius-sm)}
+textarea.form-control{resize:vertical}
+select.form-control{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-group + .form-group{margin-top:12px}
+
+/* Dropzone & file pill */
+.dropzone{border:2px dashed rgba(56,189,248,0.3);border-radius:var(--radius-md);padding:22px;text-align:center;color:var(--text-dim);cursor:pointer;transition:all .2s;background:rgba(255,255,255,0.01)}
+.dropzone:hover{border-color:var(--primary);background:rgba(56,189,248,0.03)}
+.dropzone.drag{border-color:var(--primary);background:rgba(56,189,248,0.08)}
+.dropzone .big{font-size:34px;margin-bottom:6px}
+.dropzone small{display:block;margin-top:6px;color:var(--text-dim);font-size:11px}
+.filepill{margin-top:10px;display:flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--text-main)}
+.filepill .x{margin-left:auto;background:transparent;border:none;color:var(--text-dim);font-size:14px;cursor:pointer}
+.filepill .x:hover{color:var(--accent-rose)}
+
+/* Resource assistant panel */
+.assist-fab{position:fixed;right:24px;bottom:24px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#0284c7,#6366f1);border:none;color:#fff;font-size:24px;cursor:pointer;box-shadow:0 6px 20px rgba(56,189,248,0.4);z-index:80;transition:transform .2s}
+.assist-fab:hover{transform:scale(1.06)}
+.assist-panel{position:fixed;right:24px;bottom:88px;width:360px;max-width:calc(100vw - 40px);height:460px;max-height:70vh;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;z-index:90;overflow:hidden}
+.assist-panel[hidden]{display:none}
+.assist-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg-card);border-bottom:1px solid var(--border-subtle)}
+.assist-title{font-size:14px;font-weight:700;color:var(--text-main)}
+.assist-head .close{background:transparent;border:none;font-size:20px;color:var(--text-dim);cursor:pointer}
+.assist-head .close:hover{color:var(--text-main)}
+.assist-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.assist-msg{max-width:86%;padding:9px 12px;border-radius:var(--radius-md);font-size:13px;line-height:1.5;word-break:break-word}
+.assist-msg.bot{background:var(--bg-card);color:var(--text-main);align-self:flex-start;border:1px solid var(--border-subtle)}
+.assist-msg.user{background:linear-gradient(135deg,#0284c7,#2563eb);color:#fff;align-self:flex-end}
+.assist-msg ul{margin:6px 0 0 16px}
+.assist-msg li{font-size:12px;margin-bottom:4px}
+.assist-hit{color:var(--primary);cursor:pointer;font-weight:600}
+.assist-hit:hover{text-decoration:underline}
+.assist-hit small{color:var(--text-dim)}
+.assist-btnrow{margin-top:8px}
+.assist-inputrow{display:flex;gap:8px;padding:12px;border-top:1px solid var(--border-subtle);background:var(--bg-card)}
+.assist-inputrow input{flex:1;background:var(--bg-base);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:8px 12px;color:var(--text-main);font-size:13px}
+.assist-inputrow input:focus{outline:none;border-color:var(--primary)}
+
+/* Module placeholder */
+.module-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:80px 24px;text-align:center;color:var(--text-muted)}
+.module-placeholder .ph-icon{font-size:56px}
+.module-placeholder h3{font-size:18px;color:var(--text-main);font-weight:700}
+.module-placeholder p{font-size:13px;color:var(--text-dim);max-width:420px;line-height:1.6}
+.ph-badge{margin-top:6px;padding:4px 14px;border-radius:20px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:var(--accent-amber);font-size:12px;font-weight:600}
+
+/* Table view list-style tweaks */
+.pep-files-table .td-actions{white-space:nowrap}
+.pep-files-table .btn-xs{padding:2px 8px;font-size:11px}
+
+/* Responsive */
+@media (max-width: 900px){
+  .pep-main-layout{grid-template-columns:1fr}
+  .pep-tree-panel{position:static;max-height:none}
+  .pep-files-grid{grid-template-columns:1fr}
+}
+
+</style>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%232f6fed'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle' fill='white' font-family='Arial'%3E%E7%89%A9%3C/text%3E%3C/svg%3E" />
+</head>
+<body class="dark-theme">
+  <div id="app" class="workbench-layout">
+
+    <!-- Sidebar Navigation (Modules) -->
+    <aside id="sidebar-nav" class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-logo">
+          <div class="atom-icon">
+            <span class="atom-core"></span>
+            <span class="atom-orbit orbit-1"></span>
+            <span class="atom-orbit orbit-2"></span>
+          </div>
+          <div class="brand-text">
+            <h2>物理教研·工作台</h2>
+            <span class="sub-title">高中物理人教版备课中心</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="teacher-badge">
+        <div class="teacher-avatar">物</div>
+        <div class="teacher-info">
+          <div class="teacher-name">高中物理教研 <span class="badge-tag">资源库</span></div>
+          <div class="teacher-meta">新钢中学 · 物理教研组 · 部署于 GitHub Pages</div>
+        </div>
+      </div>
+
+      <nav class="nav-menu" id="main-nav-menu">
+        <div class="nav-section-title">核心功能板块</div>
+        <button class="nav-item active" data-module="materials">
+          <span class="nav-icon">📚</span>
+          <span class="nav-label">1. 教学材料上传 (人教版)</span>
+          <span class="nav-count" id="count-materials">…</span>
+        </button>
+        <button class="nav-item" data-module="plans">
+          <span class="nav-icon">📅</span>
+          <span class="nav-label">2. 教学计划安排</span>
+          <span class="nav-count">建设中</span>
+        </button>
+        <button class="nav-item" data-module="goals">
+          <span class="nav-icon">🎯</span>
+          <span class="nav-label">3. 教学目标评估</span>
+          <span class="nav-count">建设中</span>
+        </button>
+        <button class="nav-item" data-module="analytics">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">4. 班级成绩分析</span>
+          <span class="nav-count">建设中</span>
+        </button>
+        <button class="nav-item" data-module="students">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">5. 学生重点跟进</span>
+          <span class="nav-count">建设中</span>
+        </button>
+        <button class="nav-item" data-module="innovation">
+          <span class="nav-icon">💡</span>
+          <span class="nav-label">6. 创新思路记录</span>
+          <span class="nav-count">建设中</span>
+        </button>
+        <button class="nav-item" data-module="gaokao">
+          <span class="nav-icon">🏆</span>
+          <span class="nav-label">7. 高考题目分析</span>
+          <span class="nav-count">建设中</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="quick-stats">
+          <div class="stat-mini">
+            <span class="mini-val" id="stat-books">6全册</span>
+            <span class="mini-lbl">人教教材</span>
+          </div>
+          <div class="stat-mini">
+            <span class="mini-val" id="stat-sections">…</span>
+            <span class="mini-lbl">小节精细库</span>
+          </div>
+          <div class="stat-mini">
+            <span class="mini-val" id="stat-files">…</span>
+            <span class="mini-lbl">已上传资源</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace Area -->
+    <main class="workbench-main">
+      <!-- Top Header Bar -->
+      <header id="main-header" class="top-header">
+        <div class="header-left">
+          <div class="module-breadcrumbs">
+            <span class="crumb-root">工作台</span>
+            <span class="crumb-sep">/</span>
+            <span id="header-module-name" class="crumb-current">1. 教学材料上传</span>
+            <span class="crumb-sep">/</span>
+            <span id="header-sub-name" class="crumb-sub">人教版各章节文件浏览目录</span>
+          </div>
+        </div>
+
+        <div class="header-center">
+          <div class="header-search-bar">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="global-search" placeholder="全局搜索标题、描述、标签、教材、章节或类型…" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="header-right">
+          <div class="current-term-pill" id="term-pill">人教版 · 2019 新课标</div>
+          <button id="quick-add-btn" class="btn btn-primary btn-sm" style="display:none;">
+            <span>+ 上传教学材料</span>
+          </button>
+          <div class="notifications-bell" id="btn-notifications" title="资源助手">
+            <span>🔔</span><span class="bell-dot"></span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Sub-Tabs Navigation Bar (modules 2-7 placeholders) -->
+      <div class="subtabs-bar" id="subtabs-bar" style="display:none;">
+        <div class="subtabs-scroll" id="subtabs-container"></div>
+        <div class="subtabs-actions" id="subtabs-actions"></div>
+      </div>
+
+      <!-- Dynamic Content View Area -->
+      <div class="content-viewport" id="content-viewport"></div>
+    </main>
+  </div>
+
+  <!-- 上传资源弹窗 -->
+  <div class="modal-backdrop hidden" id="modalMask">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <h3 id="modalTitle">上传资源</h3>
+        <button class="modal-close" id="closeModal" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body">
+        <button class="btn btn-secondary btn-sm" id="autoFillBtn" type="button">✨ 自动识别填表</button>
+        <button class="btn btn-secondary btn-sm" id="aiDescBtn" type="button">✨ 智能简介</button>
+        <div class="form-group">
+          <label class="form-label" for="fTitle">资源名称 *</label>
+          <input id="fTitle" class="form-control" type="text" placeholder="例如：匀变速直线运动演示" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="fType">资源类型</label>
+          <select id="fType" class="form-control"></select>
+          <p class="hint" id="typeHint" style="display:none;">试卷不挂具体小节（可不选章节/小节）。</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="fBook">教材</label>
+          <select id="fBook" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="fChapter">章节</label>
+          <select id="fChapter" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="fSection">小节</label>
+          <select id="fSection" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="fDesc">一句话描述</label>
+          <textarea id="fDesc" class="form-control" placeholder="简单说明这个资源的内容/用法（可选）"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="fTags">标签（用逗号或空格分隔）</label>
+          <input id="fTags" class="form-control" type="text" placeholder="例如：演示 实验 动画" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">选择文件</label>
+          <div class="dropzone" id="dropzone">
+            <div class="big">📄</div>
+            <div>点击选择，或把文件拖到这里</div>
+            <small>支持 HTML / PDF / Word / PPT / Excel / 图片 / 视频 / 压缩包等</small>
+            <input id="fileInput" type="file" accept=".html,.htm,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.png,.jpg,.jpeg,.webp,.gif,.mp4,.zip" hidden />
+          </div>
+          <div class="filepill" id="filePill" style="display:none;">
+            <span id="fileName"></span>
+            <button class="x" id="clearFile" type="button" aria-label="移除">✕</button>
+          </div>
+        </div>
+        <p class="hint">保存后资源会发布到线上（写入仓库并登记到资源清单），约 1 分钟后所有访客均可访问。</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelModal" type="button">取消</button>
+        <button class="btn btn-primary" id="saveResource" type="button">保存资源</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 管理员 / AI 设置弹窗 -->
+  <div class="modal-backdrop hidden" id="adminMask">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
+      <div class="modal-header">
+        <h3 id="adminTitle">管理员登录 / AI 设置</h3>
+        <button class="modal-close" id="closeAdminModal" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="adminToken">GitHub 访问令牌（只保存在本浏览器，用于发布/编辑/删除资源）</label>
+          <input id="adminToken" class="form-control" type="password" placeholder="github_pat_…" autocomplete="off" />
+          <p class="hint">没有令牌的访客看不到“上传资源”按钮；填入一次后本浏览器即保留并使用它。</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="aiEndpoint">AI 接口地址（OpenAI 兼容接口，用于资源助手/智能简介）</label>
+          <input id="aiEndpoint" class="form-control" type="text" placeholder="https://open.bigmodel.cn/api/paas/v4/chat/completions" autocomplete="off" />
+          <p class="hint">已默认智谱（GLM，国内可达、浏览器可直连）。想要 AI 生效：① 在 <a href="https://open.bigmodel.cn" target="_blank" rel="noopener">open.bigmodel.cn</a>
+          用手机号注册并实名；② 在「API 密钥」生成一个 key 复制；③ 把 key 粘到下方「AI Key」，点「登录」。模型默认免费版 <code>glm-4-flash</code>，可换成任一模型 ID。</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="aiModel">AI 模型</label>
+          <input id="aiModel" class="form-control" type="text" placeholder="glm-4-flash" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="aiKey">AI Key（智谱的 API 密钥，仅保存在本浏览器）</label>
+          <input id="aiKey" class="form-control" type="password" placeholder="你的智谱 key" autocomplete="off" />
+        </div>
+        <div id="adminLoggedInRow" style="display:none;">
+          <button class="btn btn-secondary" id="clearTokenBtn" type="button">退出 / 清除本机令牌</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelAdminModal" type="button">取消</button>
+        <button class="btn btn-primary" id="adminSave" type="button">登录</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 资源详情与预览弹窗 -->
+  <div class="modal-backdrop hidden" id="previewMask">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="previewTitle">资源详情与预览</h3>
+        <button class="modal-close" id="closePreview" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body" id="previewBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="previewCancel" type="button">关闭</button>
+        <button class="btn btn-primary" id="previewOpen" type="button">打开资源</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 资源助手弹窗 -->
+  <button class="assist-fab" id="assistFab" type="button" title="资源助手" aria-label="资源助手">🤖</button>
+  <div class="assist-panel" id="assistPanel" hidden>
+    <div class="assist-head">
+      <div class="assist-title">🤖 资源助手</div>
+      <button class="close" id="assistClose" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="assist-body" id="assistMessages"></div>
+    <div class="assist-inputrow">
+      <input id="assistInput" type="text" placeholder="例如：必修一 第二章 自由落体 课件" autocomplete="off" />
+      <button class="btn btn-primary" id="assistSend" type="button">发送</button>
+    </div>
+  </div>
+
+  <!-- Toast Notification System -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- 数据与逻辑 -->
+  <script>
+/*
+ * 高中物理教学资源库 —— 教材与章节定义
+ * 人教版（2019）普通高中教科书，共 6 册。
+ * 结构：book → chapter → section。
+ * 需要扩充/修改时，直接改这个文件即可（保持 id 唯一）。
+ */
+window.COURSE = {
+  subject: "高中物理（人教版 2019）",
+  // 资源类型分类（可在此新增/修改；试卷不计入小节，见下方资源说明）
+  resourceTypes: ["练习", "试卷", "课件", "教案", "仿真资源"],
+  books: [
+    {
+      id: "b1",
+      title: "必修第一册",
+      chapters: [
+        {
+          id: "b1c1",
+          title: "第一章 运动的描述",
+          sections: [
+            { id: "b1c1s1", title: "1.1 质点 参考系" },
+            { id: "b1c1s2", title: "1.2 时间 位移" },
+            { id: "b1c1s3", title: "1.3 位置变化快慢的描述——速度" },
+            { id: "b1c1s4", title: "1.4 速度变化快慢的描述——加速度" }
+          ]
+        },
+        {
+          id: "b1c2",
+          title: "第二章 匀变速直线运动的研究",
+          sections: [
+            { id: "b1c2s1", title: "2.1 实验：探究小车速度随时间变化的规律" },
+            { id: "b1c2s2", title: "2.2 匀变速直线运动的速度与时间的关系" },
+            { id: "b1c2s3", title: "2.3 匀变速直线运动的位移与时间的关系" },
+            { id: "b1c2s4", title: "2.4 自由落体运动" }
+          ]
+        },
+        {
+          id: "b1c3",
+          title: "第三章 相互作用——力",
+          sections: [
+            { id: "b1c3s1", title: "3.1 重力与弹力" },
+            { id: "b1c3s2", title: "3.2 摩擦力" },
+            { id: "b1c3s3", title: "3.3 牛顿第三定律" },
+            { id: "b1c3s4", title: "3.4 力的合成和分解" },
+            { id: "b1c3s5", title: "3.5 共点力的平衡" }
+          ]
+        },
+        {
+          id: "b1c4",
+          title: "第四章 运动和力的关系",
+          sections: [
+            { id: "b1c4s1", title: "4.1 牛顿第一定律" },
+            { id: "b1c4s2", title: "4.2 实验：探究加速度与力、质量的关系" },
+            { id: "b1c4s3", title: "4.3 牛顿第二定律" },
+            { id: "b1c4s4", title: "4.4 力学单位制" },
+            { id: "b1c4s5", title: "4.5 牛顿运动定律的应用" },
+            { id: "b1c4s6", title: "4.6 超重和失重" }
+          ]
+        }
+      ]
+    },
+    {
+      id: "b2",
+      title: "必修第二册",
+      chapters: [
+        {
+          id: "b2c1",
+          title: "第五章 抛体运动",
+          sections: [
+            { id: "b2c1s1", title: "5.1 曲线运动" },
+            { id: "b2c1s2", title: "5.2 运动的合成与分解" },
+            { id: "b2c1s3", title: "5.3 实验：探究平抛运动的特点" },
+            { id: "b2c1s4", title: "5.4 抛体运动的规律" }
+          ]
+        },
+        {
+          id: "b2c2",
+          title: "第六章 圆周运动",
+          sections: [
+            { id: "b2c2s1", title: "6.1 圆周运动" },
+            { id: "b2c2s2", title: "6.2 向心力" },
+            { id: "b2c2s3", title: "6.3 向心加速度" },
+            { id: "b2c2s4", title: "6.4 生活中的圆周运动" }
+          ]
+        },
+        {
+          id: "b2c3",
+          title: "第七章 万有引力与宇宙航行",
+          sections: [
+            { id: "b2c3s1", title: "7.1 行星的运动" },
+            { id: "b2c3s2", title: "7.2 万有引力定律" },
+            { id: "b2c3s3", title: "7.3 万有引力理论的成就" },
+            { id: "b2c3s4", title: "7.4 宇宙航行" },
+            { id: "b2c3s5", title: "7.5 相对论时空观与牛顿力学的局限性" }
+          ]
+        },
+        {
+          id: "b2c4",
+          title: "第八章 机械能守恒定律",
+          sections: [
+            { id: "b2c4s1", title: "8.1 功与功率" },
+            { id: "b2c4s2", title: "8.2 重力势能" },
+            { id: "b2c4s3", title: "8.3 动能和动能定理" },
+            { id: "b2c4s4", title: "8.4 机械能守恒定律" },
+            { id: "b2c4s5", title: "8.5 实验：验证机械能守恒定律" }
+          ]
+        }
+      ]
+    },
+    {
+      id: "b3",
+      title: "必修第三册",
+      chapters: [
+        {
+          id: "b3c1",
+          title: "第九章 静电场及其应用",
+          sections: [
+            { id: "b3c1s1", title: "9.1 电荷" },
+            { id: "b3c1s2", title: "9.2 库仑定律" },
+            { id: "b3c1s3", title: "9.3 电场 电场强度" },
+            { id: "b3c1s4", title: "9.4 静电的防止和利用" }
+          ]
+        },
+        {
+          id: "b3c2",
+          title: "第十章 静电场中的能量",
+          sections: [
+            { id: "b3c2s1", title: "10.1 电势能和电势" },
+            { id: "b3c2s2", title: "10.2 电势差" },
+            { id: "b3c2s3", title: "10.3 电势差与电场强度的关系" },
+            { id: "b3c2s4", title: "10.4 电容器的电容" },
+            { id: "b3c2s5", title: "10.5 带电粒子在电场中的运动" }
+          ]
+        },
+        {
+          id: "b3c3",
+          title: "第十一章 电路及其应用",
+          sections: [
+            { id: "b3c3s1", title: "11.1 电源和电流" },
+            { id: "b3c3s2", title: "11.2 导体的电阻" },
+            { id: "b3c3s3", title: "11.3 实验：导体电阻率的测量" },
+            { id: "b3c3s4", title: "11.4 串联电路和并联电路" },
+            { id: "b3c3s5", title: "11.5 实验：练习使用多用电表" }
+          ]
+        },
+        {
+          id: "b3c4",
+          title: "第十二章 电能 能量守恒定律",
+          sections: [
+            { id: "b3c4s1", title: "12.1 电路中的能量转化" },
+            { id: "b3c4s2", title: "12.2 闭合电路的欧姆定律" },
+            { id: "b3c4s3", title: "12.3 实验：电池电动势和内阻的测量" },
+            { id: "b3c4s4", title: "12.4 能源与可持续发展" }
+          ]
+        },
+        {
+          id: "b3c5",
+          title: "第十三章 电磁感应与电磁波初步",
+          sections: [
+            { id: "b3c5s1", title: "13.1 磁场 磁感线" },
+            { id: "b3c5s2", title: "13.2 磁感应强度 磁通量" },
+            { id: "b3c5s3", title: "13.3 电磁感应现象及应用" },
+            { id: "b3c5s4", title: "13.4 电磁波的产生及应用" },
+            { id: "b3c5s5", title: "13.5 能量量子化" }
+          ]
+        }
+      ]
+    },
+    {
+      id: "b4",
+      title: "选择性必修第一册",
+      chapters: [
+        {
+          id: "b4c1",
+          title: "第一章 动量守恒定律",
+          sections: [
+            { id: "b4c1s1", title: "1.1 动量" },
+            { id: "b4c1s2", title: "1.2 动量定理" },
+            { id: "b4c1s3", title: "1.3 动量守恒定律" },
+            { id: "b4c1s4", title: "1.4 实验：验证动量守恒定律" }
+          ]
+        },
+        {
+          id: "b4c2",
+          title: "第二章 机械振动",
+          sections: [
+            { id: "b4c2s1", title: "2.1 简谐运动" },
+            { id: "b4c2s2", title: "2.2 简谐运动的描述" },
+            { id: "b4c2s3", title: "2.3 简谐运动的回复力和能量" },
+            { id: "b4c2s4", title: "2.4 单摆" },
+            { id: "b4c2s5", title: "2.5 实验：用单摆测定重力加速度" },
+            { id: "b4c2s6", title: "2.6 受迫振动 共振" }
+          ]
+        },
+        {
+          id: "b4c3",
+          title: "第三章 机械波",
+          sections: [
+            { id: "b4c3s1", title: "3.1 波的形成" },
+            { id: "b4c3s2", title: "3.2 波的描述" },
+            { id: "b4c3s3", title: "3.3 波的反射、折射和衍射" },
+            { id: "b4c3s4", title: "3.4 波的干涉" },
+            { id: "b4c3s5", title: "3.5 多普勒效应" }
+          ]
+        },
+        {
+          id: "b4c4",
+          title: "第四章 光及其应用",
+          sections: [
+            { id: "b4c4s1", title: "4.1 光的折射" },
+            { id: "b4c4s2", title: "4.2 全反射" },
+            { id: "b4c4s3", title: "4.3 光的干涉" },
+            { id: "b4c4s4", title: "4.4 实验：用双缝干涉测量光的波长" },
+            { id: "b4c4s5", title: "4.5 光的衍射" },
+            { id: "b4c4s6", title: "4.6 光的偏振 激光" }
+          ]
+        }
+      ]
+    },
+    {
+      id: "b5",
+      title: "选择性必修第二册",
+      chapters: [
+        {
+          id: "b5c1",
+          title: "第一章 安培力与洛伦兹力",
+          sections: [
+            { id: "b5c1s1", title: "1.1 磁场对通电导线的作用力" },
+            { id: "b5c1s2", title: "1.2 磁场对运动电荷的作用力" },
+            { id: "b5c1s3", title: "1.3 带电粒子在匀强磁场中的运动" },
+            { id: "b5c1s4", title: "1.4 质谱仪与回旋加速器" }
+          ]
+        },
+        {
+          id: "b5c2",
+          title: "第二章 电磁感应",
+          sections: [
+            { id: "b5c2s1", title: "2.1 楞次定律" },
+            { id: "b5c2s2", title: "2.2 法拉第电磁感应定律" },
+            { id: "b5c2s3", title: "2.3 涡流、电磁阻尼和电磁驱动" },
+            { id: "b5c2s4", title: "2.4 互感和自感" }
+          ]
+        },
+        {
+          id: "b5c3",
+          title: "第三章 交变电流",
+          sections: [
+            { id: "b5c3s1", title: "3.1 交变电流" },
+            { id: "b5c3s2", title: "3.2 交变电流的描述" },
+            { id: "b5c3s3", title: "3.3 变压器" },
+            { id: "b5c3s4", title: "3.4 电能的输送" }
+          ]
+        },
+        {
+          id: "b5c4",
+          title: "第四章 电磁振荡与电磁波",
+          sections: [
+            { id: "b5c4s1", title: "4.1 电磁振荡" },
+            { id: "b5c4s2", title: "4.2 电磁场与电磁波" },
+            { id: "b5c4s3", title: "4.3 无线电波的发射和接收" },
+            { id: "b5c4s4", title: "4.4 电磁波谱" }
+          ]
+        },
+        {
+          id: "b5c5",
+          title: "第五章 传感器",
+          sections: [
+            { id: "b5c5s1", title: "5.1 认识传感器" },
+            { id: "b5c5s2", title: "5.2 常见传感器的工作原理及应用" }
+          ]
+        }
+      ]
+    },
+    {
+      id: "b6",
+      title: "选择性必修第三册",
+      chapters: [
+        {
+          id: "b6c1",
+          title: "第一章 分子动理论",
+          sections: [
+            { id: "b6c1s1", title: "1.1 分子动理论的基本内容" },
+            { id: "b6c1s2", title: "1.2 实验：用油膜法估测油酸分子的大小" },
+            { id: "b6c1s3", title: "1.3 分子运动速率分布规律" },
+            { id: "b6c1s4", title: "1.4 分子动能和分子势能" }
+          ]
+        },
+        {
+          id: "b6c2",
+          title: "第二章 气体、固体和液体",
+          sections: [
+            { id: "b6c2s1", title: "2.1 温度和温标" },
+            { id: "b6c2s2", title: "2.2 气体的等温变化" },
+            { id: "b6c2s3", title: "2.3 气体的等压变化和等容变化" },
+            { id: "b6c2s4", title: "2.4 固体" },
+            { id: "b6c2s5", title: "2.5 液体" }
+          ]
+        },
+        {
+          id: "b6c3",
+          title: "第三章 热力学定律",
+          sections: [
+            { id: "b6c3s1", title: "3.1 功、热和内能" },
+            { id: "b6c3s2", title: "3.2 热力学第一定律" },
+            { id: "b6c3s3", title: "3.3 能量守恒定律" },
+            { id: "b6c3s4", title: "3.4 热力学第二定律" }
+          ]
+        },
+        {
+          id: "b6c4",
+          title: "第四章 原子结构和波粒二象性",
+          sections: [
+            { id: "b6c4s1", title: "4.1 光电效应" },
+            { id: "b6c4s2", title: "4.2 光电效应方程" },
+            { id: "b6c4s3", title: "4.3 原子的核式结构模型" },
+            { id: "b6c4s4", title: "4.4 氢原子光谱和玻尔的原子模型" },
+            { id: "b6c4s5", title: "4.5 粒子的波动性和量子力学的建立" }
+          ]
+        },
+        {
+          id: "b6c5",
+          title: "第五章 原子核",
+          sections: [
+            { id: "b6c5s1", title: "5.1 原子核的组成" },
+            { id: "b6c5s2", title: "5.2 放射性元素的衰变" },
+            { id: "b6c5s3", title: "5.3 核力与结合能" },
+            { id: "b6c5s4", title: "5.4 核裂变与核聚变" }
+          ]
+        }
+      ]
+    }
+  ]
+};
+
+</script>
+  <script>
+/* 人教版 6 册教材 · 章 · 节（带课时/难点/目标/核心概念/公式）—— 取自物理界面1.html 设计稿 */
+window.PEP_TEXTBOOKS = [
+      {
+        id: "bx1",
+        name: "必修第一册",
+        shortName: "必修一",
+        grade: "高一上学期",
+        color: "#38bdf8",
+        chapters: [
+          {
+            id: "bx1_c1",
+            code: "第一章",
+            title: "运动的描述",
+            desc: "建立质点、参考系、位移、速度与加速度等质点运动学基本物理观念",
+            sections: [
+              {
+                id: "bx1_c1_s1",
+                code: "第1节",
+                title: "质点 参考系",
+                pageRange: "P.2 - P.8",
+                hours: "1课时",
+                difficulty: "基础",
+                target: "理解质点的概念及其建立过程，掌握物体视为质点的条件；明确参考系在描述运动中的作用。",
+                keyConcepts: ["理想化模型", "质点条件", "参考系相对性"],
+                formulas: ["Δx = x₂ - x₁"]
+              },
+              {
+                id: "bx1_c1_s2",
+                code: "第2节",
+                title: "时间 位移",
+                pageRange: "P.9 - P.14",
+                hours: "1课时",
+                difficulty: "基础",
+                target: "区分时刻与时间间隔，理解位置、位移和路程的关系；掌握矢量与标量的运算差异。",
+                keyConcepts: ["时刻与时间", "位移与路程", "矢量与标量", "坐标系"],
+                formulas: ["s ≥ |Δx|", "Δt = t₂ - t₁"]
+              },
+              {
+                id: "bx1_c1_s3",
+                code: "第3节",
+                title: "位置变化快慢——速度",
+                pageRange: "P.15 - P.22",
+                hours: "2课时",
+                difficulty: "重点",
+                target: "理解平均速度与瞬时速度的物理意义与极限思想；学会利用打点计时器/传感器测定瞬时速度。",
+                keyConcepts: ["平均速度", "瞬时速度", "速率", "v-t图像", "打点计时器"],
+                formulas: ["v̄ = Δx/Δt", "v = lim(Δt→0) Δx/Δt"]
+              },
+              {
+                id: "bx1_c1_s4",
+                code: "第4节",
+                title: "速度变化快慢——加速度",
+                pageRange: "P.23 - P.31",
+                hours: "2课时",
+                difficulty: "难点",
+                target: "深刻理解加速度是描述速度变化快慢的物理量；掌握加速度方向与速度变化量方向的一致性。",
+                keyConcepts: ["速度变化量Δv", "加速度定义", "加速与减速判据", "矢量方向"],
+                formulas: ["a = (v - v₀)/Δt", "Δv = v₂ - v₁"]
+              }
+            ]
+          },
+          {
+            id: "bx1_c2",
+            code: "第二章",
+            title: "匀变速直线运动的研究",
+            desc: "掌握匀变速直线运动规律、v-t图像分析方法及自由落体运动",
+            sections: [
+              {
+                id: "bx1_c2_s1",
+                code: "第1节",
+                title: "实验：探究小车速度随时间变化的规律",
+                pageRange: "P.34 - P.40",
+                hours: "2课时",
+                difficulty: "实验",
+                target: "通过打点计时器采集纸带数据，掌握逐差法与v-t图像斜率法求解加速度。",
+                keyConcepts: ["实验数据处理", "逐差法", "v-t图像拟合", "误差分析"],
+                formulas: ["a = (x₄+x₅+x₆ - x₁-x₂-x₃) / 9T²", "v_n = (x_n + x_{n+1}) / 2T"]
+              },
+              {
+                id: "bx1_c2_s2",
+                code: "第2节",
+                title: "匀变速直线运动的速度与时间的关系",
+                pageRange: "P.41 - P.46",
+                hours: "1课时",
+                difficulty: "重点",
+                target: "推导并掌握匀变速直线运动的速度公式，能够结合实际交通刹车情景熟练求解。",
+                keyConcepts: ["速度公式", "斜率物理意义", "刹车安全问题"],
+                formulas: ["v = v₀ + at"]
+              },
+              {
+                id: "bx1_c2_s3",
+                code: "第3节",
+                title: "匀变速直线运动的位移与时间的关系",
+                pageRange: "P.47 - P.53",
+                hours: "2课时",
+                difficulty: "重点",
+                target: "运用微元累加思想推导位移公式及导出公式，掌握逆向思维法与平均速度法。",
+                keyConcepts: ["微元法", "面积法求位移", "导出公式", "比例推论"],
+                formulas: ["x = v₀t + ½at²", "v² - v₀² = 2ax", "x = (v₀ + v)t / 2"]
+              },
+              {
+                id: "bx1_c2_s4",
+                code: "第4节",
+                title: "自由落体运动",
+                pageRange: "P.54 - P.61",
+                hours: "2课时",
+                difficulty: "探究",
+                target: "探究自由落体运动性质，测定重力加速度g，领会伽利略科学探究方法。",
+                keyConcepts: ["自由落体", "重力加速度g", "频闪摄影", "反应时间测定"],
+                formulas: ["v = gt", "h = ½gt²", "v² = 2gh"]
+              }
+            ]
+          },
+          {
+            id: "bx1_c3",
+            code: "第三章",
+            title: "相互作用——力",
+            desc: "重力、弹力（胡克定律）、摩擦力及共点力平衡与力的合成与分解",
+            sections: [
+              {
+                id: "bx1_c3_s1",
+                code: "第1节",
+                title: "重力与弹力",
+                pageRange: "P.64 - P.71",
+                hours: "2课时",
+                difficulty: "重点",
+                target: "认识重力、重心与支持力、拉力的形变本质，实验探究胡克定律并掌握弹性限度。",
+                keyConcepts: ["重力与重心", "微小形变", "弹力方向", "胡克定律"],
+                formulas: ["G = mg", "F = kx"]
+              },
+              {
+                id: "bx1_c3_s2",
+                code: "第2节",
+                title: "摩擦力",
+                pageRange: "P.72 - P.78",
+                hours: "2课时",
+                difficulty: "难点",
+                target: "区分静摩擦力与滑动摩擦力，理解最大静摩擦力与正压力的关系及摩擦力做功特性。",
+                keyConcepts: ["静摩擦力", "最大静摩擦力", "滑动摩擦力", "动摩擦因数μ"],
+                formulas: ["f_滑 = μN", "0 ≤ f_静 ≤ f_max"]
+              },
+              {
+                id: "bx1_c3_s3",
+                code: "第3节",
+                title: "牛顿第三定律",
+                pageRange: "P.79 - P.84",
+                hours: "1课时",
+                difficulty: "基础",
+                target: "借助力传感器探究作用力与反作用力的同生共灭性，明确作用力反作用力与平衡力的本质区别。",
+                keyConcepts: ["作用力与反作用力", "同生共灭", "性质相同", "相互作用"],
+                formulas: ["F = -F'"]
+              },
+              {
+                id: "bx1_c3_s4",
+                code: "第4节",
+                title: "力的合成和分解",
+                pageRange: "P.85 - P.92",
+                hours: "2课时",
+                difficulty: "重点",
+                target: "掌握平行四边形定则与正交分解法，理解等效替代的物理思想。",
+                keyConcepts: ["等效替代", "平行四边形定则", "正交分解", "三角形定则"],
+                formulas: ["F_合 = √(F₁² + F₂² + 2F₁F₂cosθ)", "F_x = Fcosθ, F_y = Fsinθ"]
+              },
+              {
+                id: "bx1_c3_s5",
+                code: "第5节",
+                title: "共点力的平衡",
+                pageRange: "P.93 - P.98",
+                hours: "2课时",
+                difficulty: "高考热点",
+                target: "掌握共点力作用下物体的平衡条件，熟练运用合成法、分解法、动态三角形法解决受力分析问题。",
+                keyConcepts: ["平衡状态", "合外力为零", "动态平衡", "相似三角形法"],
+                formulas: ["∑F_x = 0, ∑F_y = 0", "F_合 = 0"]
+              }
+            ]
+          },
+          {
+            id: "bx1_c4",
+            code: "第四章",
+            title: "运动和力的关系",
+            desc: "牛顿第一定律、牛顿第二定律、力学单位制及动力学两类基本问题",
+            sections: [
+              {
+                id: "bx1_c4_s1",
+                code: "第1节",
+                title: "牛顿第一定律",
+                pageRange: "P.100 - P.105",
+                hours: "1课时",
+                difficulty: "基础",
+                target: "回顾伽利略理想斜面实验，深刻理解惯性是物体的固有属性，质量是惯性大小的唯一量度。",
+                keyConcepts: ["理想实验", "惯性定律", "惯性与质量", "维持运动无需力"],
+                formulas: ["v = const (当 ∑F = 0)"]
+              },
+              {
+                id: "bx1_c4_s2",
+                code: "第2节",
+                title: "实验：探究加速度与力、质量的关系",
+                pageRange: "P.106 - P.112",
+                hours: "2课时",
+                difficulty: "实验",
+                target: "掌握控制变量法在物理实验中的应用；掌握平衡摩擦力的方法与化曲为直的数据处理技巧。",
+                keyConcepts: ["控制变量法", "平衡摩擦力", "a-F图像", "a-(1/m)图像"],
+                formulas: ["a ∝ F (m一定)", "a ∝ 1/m (F一定)"]
+              },
+              {
+                id: "bx1_c4_s3",
+                code: "第3节",
+                title: "牛顿第二定律",
+                pageRange: "P.113 - P.118",
+                hours: "2课时",
+                difficulty: "核心考点",
+                target: "理解牛顿第二定律的瞬时性、矢量性、同体性与独立性；掌握1牛顿力的科学定义。",
+                keyConcepts: ["瞬时性", "矢量性", "力与加速度同向", "因果关系"],
+                formulas: ["F_合 = ma", "∑F_x = ma_x, ∑F_y = ma_y"]
+              },
+              {
+                id: "bx1_c4_s4",
+                code: "第4节",
+                title: "力学单位制",
+                pageRange: "P.119 - P.123",
+                hours: "1课时",
+                difficulty: "基础",
+                target: "了解基本量与基本单位（m, kg, s），掌握导出单位的推导方法，能够利用量纲分析检验公式正确性。",
+                keyConcepts: ["基本量", "基本单位", "导出单位", "量纲检验"],
+                formulas: ["1 N = 1 kg·m/s²"]
+              },
+              {
+                id: "bx1_c4_s5",
+                code: "第5节",
+                title: "牛顿运动定律的应用",
+                pageRange: "P.124 - P.131",
+                hours: "2课时",
+                difficulty: "难点",
+                target: "掌握已知受力求运动和已知运动求受力的动力学两类基本解题程序，突破斜面滑块模型与传送带模型。",
+                keyConcepts: ["受力分析桥梁", "加速度纽带", "板块模型", "传送带模型"],
+                formulas: ["F_合 → a → 运动学公式(x, v, t)"]
+              },
+              {
+                id: "bx1_c4_s6",
+                code: "第6节",
+                title: "超重和失重",
+                pageRange: "P.132 - P.138",
+                hours: "1课时",
+                difficulty: "应用",
+                target: "通过体重计与压力传感器实验，理解超重与失重的加速度判断准则，认识完全失重状态下的特殊现象。",
+                keyConcepts: ["视重与实重", "向上加速/向下减速(超重)", "完全失重", "太空授课"],
+                formulas: ["F_N = m(g + a) (超重)", "F_N = m(g - a) (失重)"]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: "bx2",
+        name: "必修第二册",
+        shortName: "必修二",
+        grade: "高一下学期",
+        color: "#06b6d4",
+        chapters: [
+          {
+            id: "bx2_c5",
+            code: "第五章",
+            title: "抛体运动",
+            desc: "曲线运动条件、运动合成与分解及平抛运动规律与实验探究",
+            sections: [
+              { id: "bx2_c5_s1", code: "第1节", title: "曲线运动", pageRange: "P.2 - P.7", hours: "1课时", difficulty: "基础", target: "理解曲线运动速度方向及受力与轨迹弯曲方向的关系。", keyConcepts: ["切线方向", "合外力指向凹侧", "变速运动"], formulas: ["v切线方向"] },
+              { id: "bx2_c5_s2", code: "第2节", title: "运动的合成与分解", pageRange: "P.8 - P.14", hours: "2课时", difficulty: "重点", target: "掌握分运动的独立性与等时性，突破小船渡河与绳杆牵连速度模型。", keyConcepts: ["独立性", "等时性", "渡河最短时间", "渡河最短位移", "关联速度"], formulas: ["v_合 = √(v_x² + v_y²)", "t = d / v_垂直"] },
+              { id: "bx2_c5_s3", code: "第3节", title: "实验：探究平抛运动的特点", pageRange: "P.15 - P.20", hours: "2课时", difficulty: "实验", target: "设计实验描绘平抛运动轨迹，证实水平分运动为匀速、竖直分运动为自由落体。", keyConcepts: ["频闪摄影", "平抛仪", "水平匀速", "竖直落体"], formulas: ["x = v₀t", "y = ½gt²"] },
+              { id: "bx2_c5_s4", code: "第4节", title: "抛体运动的规律", pageRange: "P.21 - P.28", hours: "2课时", difficulty: "高考热点", target: "熟练推导平抛运动速度偏角与位移偏角关系，掌握斜面平抛落点与击中问题。", keyConcepts: ["速度分解", "位移分解", "tanθ = 2tanα", "斜面抛体"], formulas: ["v_y = gt, v = √(v₀² + g²t²)", "tanθ = gt/v₀", "tanα = y/x = gt/2v₀"] }
+            ]
+          },
+          {
+            id: "bx2_c6",
+            code: "第六章",
+            title: "圆周运动",
+            desc: "线速度、角速度、向心加速度、向心力以及生活中的圆周运动模型",
+            sections: [
+              { id: "bx2_c6_s1", code: "第1节", title: "圆周运动", pageRange: "P.30 - P.35", hours: "1课时", difficulty: "基础", target: "掌握线速度、角速度、周期和转速的定义及相互换算关系。", keyConcepts: ["线速度v", "角速度ω", "周期T", "转速n", "皮带与齿轮传动"], formulas: ["v = ωr", "ω = 2π/T = 2πn", "v = 2πr/T"] },
+              { id: "bx2_c6_s2", code: "第2节", title: "向心力", pageRange: "P.36 - P.42", hours: "2课时", difficulty: "重点", target: "探究向心力大小与质量、角速度、半径的关系，明确向心力是按效果命名的力。", keyConcepts: ["向心力来源", "效果力", "向心力演示仪", "圆锥摆"], formulas: ["F_n = m v²/r = m ω²r = m (4π²/T²)r"] },
+              { id: "bx2_c6_s3", code: "第3节", title: "向心加速度", pageRange: "P.43 - P.48", hours: "1课时", difficulty: "难点", target: "运用矢量三角形极限推导向心加速度公式，理解向心加速度只改变速度方向。", keyConcepts: ["向心加速度", "速度方向改变率", "推导极限法"], formulas: ["a_n = v²/r = ω²r = ωv"] },
+              { id: "bx2_c6_s4", code: "第4节", title: "生活中的圆周运动", pageRange: "P.49 - P.58", hours: "2课时", difficulty: "高考热点", target: "解决火车转弯外轨超高、汽车过拱桥、竖直面绳杆模型及离心运动问题。", keyConcepts: ["火车弯道垫高", "拱形桥失重", "竖直平面圆周运动", "绳模型最高点临界", "杆模型轻支撑"], formulas: ["v_临界 = √(gr) (绳)", "tanθ = v²/(gR) (转弯)", "F_N = m(g - v²/R) (拱桥)"] }
+            ]
+          },
+          {
+            id: "bx2_c7",
+            code: "第七章",
+            title: "万有引力与宇宙航行",
+            desc: "开普勒行星运动定律、万有引力定律与人造卫星宇宙航行",
+            sections: [
+              { id: "bx2_c7_s1", code: "第1节", title: "行星的运动", pageRange: "P.60 - P.65", hours: "1课时", difficulty: "基础", target: "理解开普勒三定律，认识行星绕太阳运动的椭圆轨道与面积速度恒定。", keyConcepts: ["开普勒第一定律", "第二定律(面积速度)", "第三定律(a³/T²=k)"], formulas: ["a³/T² = k"] },
+              { id: "bx2_c7_s2", code: "第2节", title: "万有引力定律", pageRange: "P.66 - P.72", hours: "2课时", difficulty: "重点", target: "掌握牛顿月-地检验推导逻辑，理解卡文迪什扭秤实验测定G的放大思想。", keyConcepts: ["月地检验", "平方反比定律", "卡文迪什扭秤", "引力常量G"], formulas: ["F = G(m₁m₂)/r²", "G = 6.67×10⁻¹¹ N·m²/kg²"] },
+              { id: "bx2_c7_s3", code: "第3节", title: "万有引力理论的成就", pageRange: "P.73 - P.79", hours: "2课时", difficulty: "重点", target: "掌握天体质量和密度的测定方法（黄金代换式与环绕法），理解海王星发现。", keyConcepts: ["称量地球", "天体质量测定", "天体密度", "黄金代换式"], formulas: ["GM = gR²", "M = 4π²r³ / (GT²)", "ρ = 3π / (GT²) (表面环绕)"] },
+              { id: "bx2_c7_s4", code: "第4节", title: "宇宙航行", pageRange: "P.80 - P.88", hours: "2课时", difficulty: "高考热点", target: "掌握三大宇宙速度推导，熟练应用高轨低速大周期口诀，理解空间站变轨对接。", keyConcepts: ["第一宇宙速度7.9km/s", "第二宇宙速度11.2km/s", "第三宇宙速度16.7km/s", "同步卫星", "变轨对接"], formulas: ["v = √(GM/r)", "ω = √(GM/r³)", "T = 2π√(r³/GM)"] },
+              { id: "bx2_c7_s5", code: "第5节", title: "相对论时空观与黑洞", pageRange: "P.89 - P.96", hours: "1课时", difficulty: "拓展", target: "初步了解爱因斯坦狭义与广义相对论时空观、光速不变原理及黑洞引力红移。", keyConcepts: ["光速不变原理", "钟慢尺缩", "引力弯曲", "史瓦西半径"], formulas: ["Δt = Δτ / √(1 - v²/c²)", "R_s = 2GM/c²"] }
+            ]
+          },
+          {
+            id: "bx2_c8",
+            code: "第八章",
+            title: "机械能守恒定律",
+            desc: "功与功率、动能定理、重力势能及机械能守恒定律应用与验证",
+            sections: [
+              { id: "bx2_c8_s1", code: "第1节", title: "功与功率", pageRange: "P.98 - P.105", hours: "2课时", difficulty: "重点", target: "理解正功与负功的物理意义，掌握恒力做功与机车恒功率启动两种启动过程。", keyConcepts: ["功的定义", "正负功", "平均功率与瞬时功率", "机车启动P=Fv"], formulas: ["W = Fscosα", "P = W/t = Fvcosα", "F - f = ma"] },
+              { id: "bx2_c8_s2", code: "第2节", title: "重力势能", pageRange: "P.106 - P.111", hours: "1课时", difficulty: "重点", target: "掌握重力做功与路径无关特征，理解重力势能的系统性与相对性（零势能参考面）。", keyConcepts: ["重力做功特征", "重力势能Ep", "重力做功与势能变化关系", "零势能面"], formulas: ["W_G = -ΔE_p = mgh₁ - mgh₂", "E_p = mgh"] },
+              { id: "bx2_c8_s3", code: "第3节", title: "动能和动能定理", pageRange: "P.112 - P.119", hours: "2课时", difficulty: "核心考点", target: "推导动能定理，掌握合力做功与总动能变化的关系，熟练运用动能定理解决多过程变力做功问题。", keyConcepts: ["动能定义", "动能定理", "变力做功求解", "多过程分步与全程法"], formulas: ["E_k = ½mv²", "W_合 = ΔE_k = ½mv₂² - ½mv₁²"] },
+              { id: "bx2_c8_s4", code: "第4节", title: "机械能守恒定律", pageRange: "P.120 - P.127", hours: "2课时", difficulty: "难点", target: "掌握机械能守恒的条件（只有重力或弹力做功），运用守恒定律解决过山车、弹簧振子等复杂系统问题。", keyConcepts: ["机械能定义", "守恒条件", "能量转化与守恒", "系统势能"], formulas: ["E_k1 + E_p1 = E_k2 + E_p2", "ΔE_k = -ΔE_p"] },
+              { id: "bx2_c8_s5", code: "第5节", title: "实验：验证机械能守恒定律", pageRange: "P.128 - P.136", hours: "2课时", difficulty: "实验", target: "利用自由落体纸带或光电门传感器验证 gh ≈ ½v²，掌握打点计时器第1、2点间距判据。", keyConcepts: ["纸带验证", "光电门气垫导轨", "误差分析(阻力)", "速度瞬时计算"], formulas: ["gh = ½v_n²", "v_n = (h_{n+1} - h_{n-1}) / 2T"] }
+            ]
+          }
+        ]
+      },
+      {
+        id: "bx3",
+        name: "必修第三册",
+        shortName: "必修三",
+        grade: "高二上学期",
+        color: "#10b981",
+        chapters: [
+          {
+            id: "bx3_c9",
+            code: "第九章",
+            title: "静电场及其应用",
+            desc: "电荷守恒定律、库仑定律、电场强度与静电屏蔽",
+            sections: [
+              { id: "bx3_c9_s1", code: "第1节", title: "电荷", pageRange: "P.2 - P.8", hours: "1课时", difficulty: "基础", target: "理解三种起电方式与电荷守恒定律，掌握元电荷e。", keyConcepts: ["摩擦起电", "感应起电", "接触起电", "元电荷e=1.6×10⁻¹⁹C"], formulas: ["Q = ne", "∑Q = const"] },
+              { id: "bx3_c9_s2", code: "第2节", title: "库仑定律", pageRange: "P.9 - P.15", hours: "2课时", difficulty: "重点", target: "掌握点电荷相互作用规律及库仑定律适用条件，熟练求解库仑力平衡问题。", keyConcepts: ["点电荷模型", "库仑定律", "静电力常量k", "三点共线平衡规律"], formulas: ["F = k(q₁q₂)/r²", "k = 8.99×10⁹ N·m²/C²"] },
+              { id: "bx3_c9_s3", code: "第3节", title: "电场 电场强度", pageRange: "P.16 - P.23", hours: "2课时", difficulty: "难点", target: "理解电场的物质性，掌握电场强度的定义式与点电荷场强决定式，绘制典型电场线。", keyConcepts: ["电场物质性", "检验电荷与场源电荷", "场强E定义式", "点电荷场强", "电场线"], formulas: ["E = F/q", "E = kQ/r²", "E_合 = ∑E_i"] },
+              { id: "bx3_c9_s4", code: "第4节", title: "静电的防止与利用", pageRange: "P.24 - P.31", hours: "1课时", difficulty: "应用", target: "理解静电感应平衡状态下导体内部场强为零，掌握静电屏蔽与尖端放电原理。", keyConcepts: ["静电平衡", "内部场强为零", "净电荷分布外表面", "静电屏蔽", "尖端放电"], formulas: ["E_内 = 0", "φ_导体 = const"] }
+            ]
+          },
+          {
+            id: "bx3_c10",
+            code: "第十章",
+            title: "静电场中的能量",
+            desc: "电势能、电势、电势差及带电粒子在电场中的加速与偏转",
+            sections: [
+              { id: "bx3_c10_s1", code: "第1节", title: "电势能和电势", pageRange: "P.34 - P.41", hours: "2课时", difficulty: "难点", target: "掌握静电力做功与电势能变化关系，理解电势是电场能的性质。", keyConcepts: ["静电力做功与路径无关", "电势能Ep", "电势φ定义", "等势面"], formulas: ["W_AB = E_{pA} - E_{pB} = -ΔE_p", "φ = E_p / q"] },
+              { id: "bx3_c10_s2", code: "第2节", title: "电势差", pageRange: "P.42 - P.48", hours: "1课时", difficulty: "重点", target: "掌握电势差定义式与电势差与电势关系，计算静电力做功。", keyConcepts: ["电势差U_AB", "电势差与参考点无关", "做功公式"], formulas: ["U_{AB} = φ_A - φ_B", "W_{AB} = q U_{AB}"] },
+              { id: "bx3_c10_s3", code: "第3节", title: "电势差与电场强度的关系", pageRange: "P.49 - P.55", hours: "2课时", difficulty: "重点", target: "推导匀强电场中 U = Ed 关系式，理解电场强度沿等势面法线方向指向电势降低最快的方向。", keyConcepts: ["匀强电场关系式", "沿场强方向电势降低最快", "等差等势面"], formulas: ["E = U / d", "U = Ed"] },
+              { id: "bx3_c10_s4", code: "第4节", title: "电容器的电容", pageRange: "P.56 - P.63", hours: "2课时", difficulty: "高考热点", target: "掌握电容定义式与平行板电容器决定式，分析电容器充电恒压与断开恒电荷动态变化规律。", keyConcepts: ["电容C定义", "平行板电容决定式", "介电常数ε", "恒压U不变模型", "恒荷Q不变模型"], formulas: ["C = Q / U", "C = εS / (4πkd)"] },
+              { id: "bx3_c10_s5", code: "第5节", title: "带电粒子在电场中的运动", pageRange: "P.64 - P.74", hours: "2课时", difficulty: "核心考点", target: "熟练掌握带电粒子在匀强电场中的加速与类平抛偏转规律，掌握示波管工作原理。", keyConcepts: ["电场加速动能定理", "电场偏转类平抛", "侧移量y", "偏转角tanθ", "反向延长线交点"], formulas: ["qU = ½mv²", "y = ½at² = qUL² / (2mdv₀²)", "tanθ = qUL / (mdv₀²)"] }
+            ]
+          },
+          {
+            id: "bx3_c11",
+            code: "第十一章",
+            title: "电路及其应用",
+            desc: "电源、电动势、电阻定律、欧姆定律与电表改装及伏安法测电阻",
+            sections: [
+              { id: "bx3_c11_s1", code: "第1节", title: "电源和电流", pageRange: "P.76 - P.81", hours: "1课时", difficulty: "基础", target: "理解恒定电场形成机制与电流微观表达式，掌握电源电动势概念。", keyConcepts: ["恒定电流", "电流微观表达式I=nqSv", "电动势E物理意义", "内阻r"], formulas: ["I = q/t = nqSv", "E = W_非/q"] },
+              { id: "bx3_c11_s2", code: "第2节", title: "导体的电阻", pageRange: "P.82 - P.88", hours: "2课时", difficulty: "重点", target: "探究导体电阻决定因素，掌握电阻定律及电阻率随温度变化规律。", keyConcepts: ["欧姆定律", "伏安特性曲线", "电阻定律", "电阻率ρ与温度"], formulas: ["I = U/R", "R = ρL/S"] },
+              { id: "bx3_c11_s3", code: "第3节", title: "实验：导体电阻率的测量", pageRange: "P.89 - P.96", hours: "2课时", difficulty: "实验", target: "掌握螺旋测微器与游标卡尺读数，掌握电流表内接法与外接法误差分析。", keyConcepts: ["螺旋测微器(0.01mm)", "游标卡尺(0.1/0.05/0.02mm)", "电流表内外接误差", "分压式与限流式接法"], formulas: ["R_x = U/I", "内接大电阻误差小", "外接小电阻误差小"] }
+            ]
+          }
+        ]
+      },
+      {
+        id: "xb1",
+        name: "选择性必修第一册",
+        shortName: "选必一",
+        grade: "高二下学期",
+        color: "#8b5cf6",
+        chapters: [
+          {
+            id: "xb1_c1",
+            code: "第一章",
+            title: "动量守恒定律",
+            desc: "动量定理、动量守恒定律、弹性碰撞与非弹性碰撞及反冲运动",
+            sections: [
+              { id: "xb1_c1_s1", code: "第1节", title: "动量", pageRange: "P.2 - P.7", hours: "1课时", difficulty: "重点", target: "理解动量是矢量，掌握动量变化量Δp的矢量运算法则。", keyConcepts: ["动量p=mv", "动量变化量Δp", "矢量三角形"], formulas: ["p = mv", "Δp = p₂ - p₁ = m v₂ - m v₁"] },
+              { id: "xb1_c1_s2", code: "第2节", title: "动量定理", pageRange: "P.8 - P.14", hours: "2课时", difficulty: "重点", target: "推导动量定理，掌握冲量定义式，运用动量定理解决缓冲保护与连续流体冲击力问题。", keyConcepts: ["冲量I=Ft", "动量定理", "缓冲减冲", "微元流体模型(柱体水流/光压)"], formulas: ["I = F·Δt", "I_合 = Δp = mv₂ - mv₁", "F = (Δm/Δt)v"] },
+              { id: "xb1_c1_s3", code: "第3节", title: "动量守恒定律", pageRange: "P.15 - P.22", hours: "2课时", difficulty: "核心考点", target: "掌握动量守恒定律的成立条件（合外力为零/内力远大于外力/某一方向守恒），熟练建立守恒方程。", keyConcepts: ["系统内力与外力", "守恒条件", "单方向动量守恒", "人船模型"], formulas: ["m₁v₁ + m₂v₂ = m₁v₁' + m₂v₂'", "m₁x₁ = m₂x₂ (人船)"] },
+              { id: "xb1_c1_s4", code: "第4节", title: "实验：验证动量守恒定律", pageRange: "P.23 - P.28", hours: "2课时", difficulty: "实验", target: "利用斜槽轨道碰撞或气垫导轨光电门验证碰撞前后动量守恒。", keyConcepts: ["斜槽平抛落点法", "防倒冲", "气垫导轨", "误差判定"], formulas: ["m₁·OP = m₁·OM + m₂·ON'"] },
+              { id: "xb1_c1_s5", code: "第5节", title: "弹性碰撞和非弹性碰撞", pageRange: "P.29 - P.36", hours: "2课时", difficulty: "难点", target: "深入剖析完全弹性碰撞、非弹性碰撞与完全非弹性碰撞的能量转化规律，掌握速度结论式。", keyConcepts: ["完全弹性碰撞(无损)", "完全非弹性碰撞(机械能损失最大)", "碰撞可能与不可能判据"], formulas: ["v₁' = (m₁-m₂)v₁ / (m₁+m₂)", "v₂' = 2m₁v₁ / (m₁+m₂)", "v_共 = (m₁v₁+m₂v₂)/(m₁+m₂)"] },
+              { id: "xb1_c1_s6", code: "第6节", title: "反冲现象 火箭", pageRange: "P.37 - P.44", hours: "1课时", difficulty: "应用", target: "理解火箭推进与反冲运动规律，了解我国航天事业成就（长征系列运载火箭）。", keyConcepts: ["反冲运动", "火箭推进原理", "齐奥尔科夫斯基公式", "航天大国"], formulas: ["M v_车 = - m v_气", "v = u ln(M₀/M)"] }
+            ]
+          },
+          {
+            id: "xb1_c2",
+            code: "第二章",
+            title: "机械振动",
+            desc: "简谐运动、单摆周期公式、阻尼振动与受迫振动及共振",
+            sections: [
+              { id: "xb1_c2_s1", code: "第1节", title: "简谐运动", pageRange: "P.46 - P.52", hours: "1课时", difficulty: "重点", target: "理解简谐运动的回复力特征与x-t正弦图像。", keyConcepts: ["回复力F=-kx", "位移与回复力反向", "x-t正弦曲线"], formulas: ["F = -kx", "x = A sin(ωt + φ)"] },
+              { id: "xb1_c2_s2", code: "第2节", title: "简谐运动的描述", pageRange: "P.53 - P.58", hours: "1课时", difficulty: "基础", target: "掌握振幅、周期、频率与相位的物理含义。", keyConcepts: ["振幅A", "周期T与频率f", "初相与相位差"], formulas: ["T = 1/f = 2π/ω"] },
+              { id: "xb1_c2_s3", code: "第3节", title: "单摆", pageRange: "P.59 - P.65", hours: "2课时", difficulty: "重点", target: "推导小角度单摆简谐运动条件，掌握惠更斯单摆周期公式。", keyConcepts: ["小角度摆动(θ<5°)", "切向重力分力作回复力", "单摆周期公式"], formulas: ["T = 2π√(L/g)"] },
+              { id: "xb1_c2_s4", code: "第4节", title: "实验：用单摆测量重力加速度", pageRange: "P.66 - P.71", hours: "2课时", difficulty: "实验", target: "掌握秒表计时累积法（测30~50次全振动），运用T²-L图像斜率精准测定g。", keyConcepts: ["有效摆长L=l+d/2", "累积计时", "T²-L图像法", "系统误差消除"], formulas: ["g = 4π²L / T² = 4π² / k (k为斜率)"] },
+              { id: "xb1_c2_s5", code: "第5节", title: "受迫振动 共振", pageRange: "P.72 - P.78", hours: "1课时", difficulty: "应用", target: "区分自由振动、阻尼振动与受迫振动，理解共振发生的条件（驱动力频率等于固有频率）。", keyConcepts: ["固有频率f₀", "驱动力频率f_驱", "共振曲线", "减震与共振利用"], formulas: ["f_受迫 = f_驱", "f_驱 = f₀ 时振幅极大"] }
+            ]
+          },
+          {
+            id: "xb1_c3",
+            code: "第三章",
+            title: "机械波",
+            desc: "波的形成、波速公式、波的干涉衍射与多普勒效应",
+            sections: [
+              { id: "xb1_c3_s1", code: "第1节", title: "波的形成和传播", pageRange: "P.80 - P.86", hours: "1课时", difficulty: "基础", target: "理解机械波传播的是振动形式和能量，介质质点只在平衡位置附近振动不随波迁移。", keyConcepts: ["质点振动", "横波与纵波", "质点不随波迁移", "前带后后跟前"], formulas: ["波传播距离 s = vt"] },
+              { id: "xb1_c3_s2", code: "第2节", title: "简谐波的图像", pageRange: "P.87 - P.93", hours: "2课时", difficulty: "难点", target: "区分振动图像(y-t)与波动图像(y-x)，掌握同侧法、微移法判定质点振动方向与波传播方向。", keyConcepts: ["波动图像", "波长λ", "同侧法判断方向", "微移法"], formulas: ["y = A sin(2π(t/T - x/λ))"] },
+              { id: "xb1_c3_s3", code: "第3节", title: "波长、频率和波速", pageRange: "P.94 - P.99", hours: "2课时", difficulty: "重点", target: "掌握波速决定因素（介质决定波速，波源决定频率），熟练求解机械波多解性问题。", keyConcepts: ["波速公式v=λf", "介质决定v", "波源决定f", "空间周期与时间周期多解"], formulas: ["v = λ/T = λf", "Δt = nT + t₀, Δx = nλ + x₀"] },
+              { id: "xb1_c3_s4", code: "第4节", title: "波的干涉和衍射", pageRange: "P.100 - P.107", hours: "2课时", difficulty: "高考热点", target: "理解明显衍射条件（障碍物尺寸与波长相当），掌握相干波干涉加强点与减弱点路程差判据。", keyConcepts: ["明显衍射条件", "相干波条件", "波峰与波谷相遇", "加强区与减弱区"], formulas: ["Δr = nλ (加强)", "Δr = (2n+1)λ/2 (减弱)"] },
+              { id: "xb1_c3_s5", code: "第5节", title: "多普勒效应", pageRange: "P.108 - P.114", hours: "1课时", difficulty: "应用", target: "掌握波源与观察者相对运动引起接收频率变化的规律，了解红移与宇宙膨胀。", keyConcepts: ["多普勒效应", "相对靠近接收f增大", "相对远离接收f减小", "红移与蓝移"], formulas: ["f' = f (v ± v_人) / (v ∓ v_源)"] }
+            ]
+          }
+        ]
+      },
+      {
+        id: "xb2",
+        name: "选择性必修第二册",
+        shortName: "选必二",
+        grade: "高三上学期",
+        color: "#f59e0b",
+        chapters: [
+          {
+            id: "xb2_c1",
+            code: "第一章",
+            title: "安培力与洛伦兹力",
+            desc: "磁场、磁感应强度、左手定则、安培力与带电粒子在匀强磁场中的圆周运动",
+            sections: [
+              { id: "xb2_c1_s1", code: "第1节", title: "磁场对通电导线的作用力——安培力", pageRange: "P.2 - P.9", hours: "2课时", difficulty: "重点", target: "掌握左手定则判断安培力方向，熟练计算弯曲导线等效长度与通电导线力学平衡。", keyConcepts: ["左手定则", "安培力公式", "有效长度L", "磁电式电流表原理"], formulas: ["F = ILBsinθ", "F = IL_{等效}B"] },
+              { id: "xb2_c1_s2", code: "第2节", title: "磁场对运动电荷的作用力——洛伦兹力", pageRange: "P.10 - P.16", hours: "2课时", difficulty: "重点", target: "理解洛伦兹力方向判定（注意正负电荷差异），深刻理解洛伦兹力永远不做功的特性。", keyConcepts: ["微观洛伦兹力", "安培力微观本质", "洛伦兹力不做功", "速度选择器"], formulas: ["f = qvBsinθ", "f ⊥ v, W_洛 = 0", "qE = qvB ⇒ v = E/B"] },
+              { id: "xb2_c1_s3", code: "第3节", title: "带电粒子在匀强磁场中的运动", pageRange: "P.17 - P.25", hours: "2课时", difficulty: "核心考点", target: "掌握圆心确定方法（两速度垂线交点/弦中垂线交点），推导轨道半径与周期公式，突破磁聚焦与发散。", keyConcepts: ["洛伦兹力提供向心力", "轨道半径R", "周期T与速度无关", "找圆心画轨迹定偏转角"], formulas: ["qvB = mv²/R ⇒ R = mv / (qB)", "T = 2πm / (qB)", "t = (θ/2π)T"] },
+              { id: "xb2_c1_s4", code: "第4节", title: "质谱仪与回旋加速器", pageRange: "P.26 - P.34", hours: "2课时", difficulty: "高考热点", target: "剖析质谱仪同位素分离机制，掌握回旋加速器高频交变电场周期与粒子回旋周期同步原理及最大动能决定因素。", keyConcepts: ["质谱仪比荷", "回旋加速器D形盒", "交变电场同步", "最大动能只与R_D和B有关"], formulas: ["q/m = 2U / (B²R²)", "T_电 = T_磁 = 2πm/(qB)", "E_{km} = q²B²R_D² / (2m)"] }
+            ]
+          },
+          {
+            id: "xb2_c2",
+            code: "第二章",
+            title: "电磁感应",
+            desc: "楞次定律、法拉第电磁感应定律、动生电动势、感生电动势与互感自感",
+            sections: [
+              { id: "xb2_c2_s1", code: "第1节", title: "楞次定律", pageRange: "P.36 - P.43", hours: "2课时", difficulty: "核心考点", target: "深刻理解增反减同、来拒去留、增缩减扩的阻碍本质，熟练应用右手定则与楞次定律判断感应电流方向。", keyConcepts: ["磁通量Φ=BS", "楞次定律", "阻碍磁通量变化", "右手定则", "来拒去留"], formulas: ["Φ = B·S·cosθ", "增反减同判感应场方向"] },
+              { id: "xb2_c2_s2", code: "第2节", title: "法拉第电磁感应定律", pageRange: "P.44 - P.51", hours: "2课时", difficulty: "核心考点", target: "掌握法拉第电磁感应定律推导，区分平均感应电动势与瞬时电动势，推导电荷量q = nΔΦ/R公式。", keyConcepts: ["磁通量变化率ΔΦ/Δt", "法拉第定律", "感生电动势", "流过截面电荷量q"], formulas: ["E = n ΔΦ/Δt", "E = n S ΔB/Δt", "q = n ΔΦ / R_总"] },
+              { id: "xb2_c2_s3", code: "第3节", title: "涡流、电磁阻尼和电磁驱动", pageRange: "P.52 - P.59", hours: "1课时", difficulty: "应用", target: "理解电磁炉涡流热效应与微安表运输电磁阻尼保护，认识感应电动机的电磁驱动。", keyConcepts: ["涡流效应", "硅钢片叠压", "电磁阻尼", "电磁驱动", "磁悬浮列车"], formulas: ["E_{涡} ∝ ΔB/Δt", "阻尼安培力F ∝ v"] },
+              { id: "xb2_c2_s4", code: "第4节", title: "互感和自感", pageRange: "P.60 - P.67", hours: "2课时", difficulty: "难点", target: "观察通电自感与断电自感灯泡明暗现象，掌握自感系数L与磁场能量储存。", keyConcepts: ["互感现象", "通电自感延缓", "断电自感强脉冲", "自感系数L", "磁场能量"], formulas: ["E_L = - L ΔI/Δt"] }
+            ]
+          },
+          {
+            id: "xb2_c3",
+            code: "第三章",
+            title: "交变电流",
+            desc: "正弦交变电流的产生、有效值、变压器与远距离输电",
+            sections: [
+              { id: "xb2_c3_s1", code: "第1节", title: "交变电流", pageRange: "P.70 - P.76", hours: "2课时", difficulty: "重点", target: "掌握矩形线圈在匀强磁场中匀速转动产生正弦交流电的物理过程与中性面特征。", keyConcepts: ["中性面(Φ最大,E=0)", "正弦交流电", "瞬时值表达式", "峰值E_m=nBSω"], formulas: ["e = E_m sin(ωt)", "E_m = n B S ω"] },
+              { id: "xb2_c3_s2", code: "第2节", title: "交变电流的描述", pageRange: "P.77 - P.83", hours: "2课时", difficulty: "核心考点", target: "深刻理解热效应等效法推导交流电有效值，掌握四值（瞬时值、峰值、有效值、平均值）的针对性应用情景。", keyConcepts: ["热效应等效", "有效值(测电表/额定功率/发热)", "平均值(算电荷量q)", "瞬时值(绝缘击穿)"], formulas: ["I = I_m / √2", "U = U_m / √2", "E = E_m / √2 (正弦波)"] },
+              { id: "xb2_c3_s3", code: "第3节", title: "变压器", pageRange: "P.84 - P.92", hours: "2课时", difficulty: "高考热点", target: "掌握理想变压器电压比、电流比与功率守恒关系，掌握原副线圈动态负载分析与等效电阻法。", keyConcepts: ["理想变压器", "电压比U₁/U₂=n₁/n₂", "功率输入等于输出P₁=P₂", "电流比I₁/I₂=n₂/n₁", "等效电阻R'=k²R"], formulas: ["U₁/U₂ = n₁/n₂", "I₁/I₂ = n₂/n₁", "P_{入} = P_{出}"] },
+              { id: "xb2_c3_s4", code: "第4节", title: "电能的输送", pageRange: "P.93 - P.100", hours: "2课时", difficulty: "重点", target: "分析远距离输电线上功率损耗与电压损失，掌握高压输电的核心优势与四变压器计算回路。", keyConcepts: ["输电线损耗ΔP=I²r", "电压损失ΔU=Ir", "升压变压器", "降压变压器", "输电效率"], formulas: ["ΔP = (P/U)² r_{线}", "U₁ → 升压 → U₂ → 输电线ΔU → U₃ → 降压 → U₄"] }
+            ]
+          }
+        ]
+      },
+      {
+        id: "xb3",
+        name: "选择性必修第三册",
+        shortName: "选必三",
+        grade: "高三下学期",
+        color: "#ec4899",
+        chapters: [
+          {
+            id: "xb3_c1",
+            code: "第一章",
+            title: "分子动理论",
+            desc: "阿伏加德罗常数、布朗运动、分子间作用力与内能",
+            sections: [
+              { id: "xb3_c1_s1", code: "第1节", title: "分子的大小", pageRange: "P.2 - P.7", hours: "1课时", difficulty: "基础", target: "掌握油膜法估测分子大小实验与宏观微观阿伏加德罗常数物理纽带。", keyConcepts: ["油膜法", "单分子油膜", "阿伏加德罗常数N_A", "微观球体与立方体模型"], formulas: ["d = V / S", "N_A = M / m_0 = V_m / v_0"] },
+              { id: "xb3_c1_s2", code: "第2节", title: "分子的热运动", pageRange: "P.8 - P.13", hours: "1课时", difficulty: "基础", target: "理解布朗运动是液体分子无规则热运动的间接反映，温度是分子平均动能的标志。", keyConcepts: ["扩散现象", "布朗运动", "温度越高微粒越小运动越剧烈", "统计规律"], formulas: ["Ē_k = 3/2 k_B T"] },
+              { id: "xb3_c1_s3", code: "第3节", title: "分子间的作用力", pageRange: "P.14 - P.20", hours: "2课时", difficulty: "重点", target: "分析引力斥力随距离变化曲线，掌握平衡距离r₀处分子势能最小。", keyConcepts: ["引力与斥力", "合力F-r曲线", "平衡距离r₀", "分子势能Ep-r曲线"], formulas: ["F = F_引 - F_斥", "r = r₀ 时 F_合 = 0, E_p 最小"] }
+            ]
+          },
+          {
+            id: "xb3_c2",
+            code: "第二章",
+            title: "气体、固体和液体",
+            desc: "理想气体状态方程、气体实验三大定律、表面张力与液晶",
+            sections: [
+              { id: "xb3_c2_s1", code: "第1节", title: "温度和温标", pageRange: "P.22 - P.27", hours: "1课时", difficulty: "基础", target: "理解热平衡定律与热力学温标T与摄氏温标t的换算关系。", keyConcepts: ["热平衡", "热力学温标", "绝对零度-273.15℃"], formulas: ["T = t + 273.15 K"] },
+              { id: "xb3_c2_s2", code: "第2节", title: "气体的等温变化", pageRange: "P.28 - P.35", hours: "2课时", difficulty: "重点", target: "探究玻意耳定律，绘制p-V双曲线与p-(1/V)过原点直线。", keyConcepts: ["玻意耳定律", "等温线p-V", "封闭气体压强计算(水银柱/活塞)"], formulas: ["p₁V₁ = p₂V₂ = const (T一定)"] },
+              { id: "xb3_c2_s3", code: "第3节", title: "气体的等容变化和等压变化", pageRange: "P.36 - P.42", hours: "2课时", difficulty: "重点", target: "掌握查理定律与盖-吕萨克定律，理解p-T与V-T图像。", keyConcepts: ["查理定律", "盖吕萨克定律", "等容线", "等压线"], formulas: ["p₁/T₁ = p₂/T₂", "V₁/T₁ = V₂/T₂"] },
+              { id: "xb3_c2_s4", code: "第4节", title: "理想气体状态方程", pageRange: "P.43 - P.50", hours: "2课时", difficulty: "核心考点", target: "熟练运用 pV/T = C 解决变质量气体（充气、抽气、分装）与活塞连通器问题。", keyConcepts: ["理想气体模型", "综合状态方程", "克拉伯龙方程", "变质量问题等效处理"], formulas: ["p₁V₁/T₁ = p₂V₂/T₂ = C", "pV = nRT"] }
+            ]
+          },
+          {
+            id: "xb3_c3",
+            code: "第三章",
+            title: "热力学定律",
+            desc: "热力学第一定律、能量守恒定律与热力学第二定律微观意义",
+            sections: [
+              { id: "xb3_c3_s1", code: "第1节", title: "热力学第一定律", pageRange: "P.52 - P.58", hours: "2课时", difficulty: "重点", target: "掌握符号法则（吸热Q>0、外界对系统做功W>0、内能增加ΔU>0），综合分析气缸气体吸放热与做功。", keyConcepts: ["做功与传热", "热力学第一定律", "正负号准则", "绝热膨胀/压缩"], formulas: ["ΔU = W + Q"] },
+              { id: "xb3_c3_s2", code: "第2节", title: "热力学第二定律", pageRange: "P.59 - P.66", hours: "1课时", difficulty: "重点", target: "理解克劳修斯表述与开尔文表述，明确热传导和做功的方向性与熵增原理。", keyConcepts: ["热传导不可逆", "开尔文表述(第二类永动机不可能)", "克劳修斯表述", "熵增与无序度"], formulas: ["η = W/Q₁ < 1 (热机效率)"] }
+            ]
+          }
+        ]
+      }
+    ];
+
+
+</script>
+  <script>
+/* 工作台 2~7 模块数据（副标签页 + 示例文件）—— 取自物理界面1.html 设计稿 */
+window.WORKBENCH_DATA = {
+      plans: {
+        id: "plans",
+        name: "2. 教学计划安排",
+        icon: "📅",
+        desc: "2025-2026学年高三物理一轮复习进度、人教版教材大单元排课与实验周历",
+        subtabs: [
+          {
+            id: "schedule",
+            name: "一轮复习进度表",
+            subtitle: "按人教版教材六大模块、章、节精确规划的周课时进度安排",
+            sampleFiles: [
+              {
+                id: "plan_1",
+                name: "《2025-2026学年高三物理一轮复习总课时进度与周计划安排表(精确到人教版小节)》.xlsx",
+                type: "xlsx",
+                size: "1.2 MB",
+                tag: "高三一轮大表",
+                author: "张老师(备课组长)",
+                date: "2025-09-01",
+                downloads: 215,
+                keypoints: ["必修一动力学(4周/19节)", "必修二能量与天体(5周/18节)", "选必二电磁学(6周/20节)"],
+                previewContent: `<h4>高三物理一轮复习周历与小节进度表</h4><p>第1-4周：必修一 1.1~4.6 质点运动学与牛顿运动定律全章节；<br>第5-9周：必修二 5.1~8.5 抛体、圆周、万有引力与机械能守恒定律；<br>第10-15周：选必二 1.1~3.4 磁场、电磁感应与交变电流大单元。</p>`
+              },
+              {
+                id: "plan_2",
+                name: "《高三物理必修与选必21个学生必做分组实验开出时间表与实验室预约单》.pdf",
+                type: "pdf",
+                size: "2.8 MB",
+                tag: "实验预约",
+                author: "物理实验员",
+                date: "2025-08-29",
+                downloads: 88,
+                keypoints: ["验证牛顿第二定律", "测定金属电阻率", "验证动量守恒"],
+                previewContent: `<h4>高中物理人教版必做实验计划</h4><p>统筹安排必修一打点计时器实验、选必一单摆测g及选必二伏安法测电阻实验。</p>`
+              }
+            ]
+          }
+        ]
+      },
+      goals: {
+        id: "goals",
+        name: "3. 教学目标评估",
+        icon: "🎯",
+        desc: "物理核心素养评价量规、随堂反馈诊断与达成度数据跟踪",
+        subtabs: [
+          {
+            id: "competence",
+            name: "核心素养达标",
+            subtitle: "物理观念、科学思维、科学探究与科学态度四维评价体系",
+            hasChart: "radarWeakpoints",
+            sampleFiles: [
+              {
+                id: "goal_1",
+                name: "《高中物理人教版新课标四维核心素养课堂达标评价量规表(小节细化版)》.xlsx",
+                type: "xlsx",
+                size: "1.8 MB",
+                tag: "素养评价",
+                author: "市教研室",
+                date: "2025-08-28",
+                downloads: 145,
+                keypoints: ["物理观念", "科学思维", "科学探究", "科学态度与责任"],
+                previewContent: `<h4>高中物理核心素养四维评价指南</h4><p>对接人教版教材每一小节教学目标，设立课堂五级表现性评价量规与达标检测题库。</p>`
+              }
+            ]
+          }
+        ]
+      },
+      analytics: {
+        id: "analytics",
+        name: "4. 班级成绩分析",
+        icon: "📊",
+        desc: "阶段考试小分段统计、班级对比、赋分模拟与考点易错谱系",
+        subtabs: [
+          {
+            id: "exams",
+            name: "阶段考试分析",
+            subtitle: "摸底考/联考成绩单导入、难度系数与正态分布",
+            hasChart: "examDistribution",
+            sampleFiles: [
+              {
+                id: "ana_1",
+                name: "《2025年高三八省名校联考物理小分统计与班级对比明细表(人教版考点溯源)》.xlsx",
+                type: "xlsx",
+                size: "3.2 MB",
+                tag: "联考大数据",
+                author: "数据中心",
+                date: "2025-09-04",
+                downloads: 310,
+                keypoints: ["1班均分84.2", "4班均分79.6", "力学综合失分归因"],
+                previewContent: `<h4>高三八省联考物理数据快报</h4><p>高三(1)班平均分 84.2分，必修一牛顿运动定律得分率 91.5%，选必二电磁感应大题得分率 64.2%。</p>`
+              }
+            ]
+          }
+        ]
+      },
+      students: {
+        id: "students",
+        name: "5. 学生重点跟进",
+        icon: "👥",
+        desc: "拔尖培优档案、强基计划辅导、临界生提分处方单",
+        subtabs: [
+          {
+            id: "top",
+            name: "拔尖培优档案",
+            subtitle: "90分以上拔尖生思维进阶与物理竞赛强基指导档案",
+            sampleFiles: [
+              {
+                id: "stu_1",
+                name: "《高三(1)班物理拔尖生(前6名)高观点思维进阶指导方案(微元法与等效场)》.docx",
+                type: "docx",
+                size: "5.1 MB",
+                tag: "强基培优",
+                author: "张老师",
+                date: "2025-09-02",
+                downloads: 98,
+                keypoints: ["微元法", "等效重力场", "非惯性系惯性力"],
+                previewContent: `<h4>拔尖培优专题：等效法在复合场中的极速求解</h4><p>引入等效重力场加速度 g' = √(g² + (qE/m)²)，将带电粒子在匀强电场和重力场的复合运动直接降维为斜抛运动求解。</p>`
+              }
+            ]
+          }
+        ]
+      },
+      innovation: {
+        id: "innovation",
+        name: "6. 创新思路记录",
+        icon: "💡",
+        desc: "自制低成本教具方案、3D打印模型、STEAM跨学科融合项目",
+        subtabs: [
+          {
+            id: "apparatus",
+            name: "教具与自制实验",
+            subtitle: "低成本自制教具制作指南、开源3D模型与专利",
+            sampleFiles: [
+              {
+                id: "inn_1",
+                name: "《基于智能手机加速度传感器的阻尼振动微型教具制作方案(配人教选必一)》.pdf",
+                type: "pdf",
+                size: "6.4 MB",
+                tag: "自制教具获奖",
+                author: "物理创新实验室",
+                date: "2025-08-20",
+                downloads: 185,
+                keypoints: ["人教选必一2.5节", "Phyphox数据传输", "阻尼系数测定"],
+                previewContent: `<h4>自制教具原理与物料清单</h4><p>配合人教版选择性必修第一册《简谐运动与阻尼振动》，直观绘制振动衰减曲线。</p>`
+              }
+            ]
+          }
+        ]
+      },
+      gaokao: {
+        id: "gaokao",
+        name: "7. 高考题目分析",
+        icon: "🏆",
+        desc: "历年新高考真题微专题拆解、命题情境化趋势与考向预测",
+        subtabs: [
+          {
+            id: "trends",
+            name: "命题趋势预测",
+            subtitle: "2026年新高考命题双向细目表与前沿科技情境预测报告",
+            hasChart: "gaokaoTrendsChart",
+            sampleFiles: [
+              {
+                id: "gk_1",
+                name: "《2026年新高考物理命题情境创新(人教版教材大概念对接)预测报告》.pdf",
+                type: "pdf",
+                size: "7.4 MB",
+                tag: "前沿考向预测",
+                author: "特级教师联合组",
+                date: "2025-09-07",
+                downloads: 540,
+                keypoints: ["中国空间站对接", "全超导托卡马克", "电磁弹射技术"],
+                previewContent: `<h4>2026高考物理新情境命题热点预测</h4><p>紧密对接人教版必修二万有引力与选必二电磁感应核心大概念，解析近年来高考压轴题的建模方法。</p>`
+              }
+            ]
+          }
+        ]
+      }
+    };
+
+
+</script>
+  <script>
+/*
+ * 高中物理教师智能教学工作台 (workbench) —— 应用逻辑
+ * 完全按 物理界面1.html 设计稿：教材目录 PEP_TEXTBOOKS(带课时/难点/目标/核心概念/公式)
+ * + 资源分类(教案/课件/练习/实验) + 标签/难度体系 + 文件卡片(keypoints/预览/下载)。
+ * 数据底座仍是 resources.json(旧模型)：加载后映射为设计的 store(章节→PEP id、分类/标签由类型派生)。
+ * 上传/编辑/删除 走站长 GitHub 令牌直连(写入 workbench/data/resources.json)；含自动识别填表、资源助手、智能简介。
+ */
+(function () {
+  "use strict";
+
+  const ASSET_V = 25;
+  const PEP = window.PEP_TEXTBOOKS || [];
+  const COURSE = window.COURSE || { books: [], resourceTypes: [] };
+  const WORKER_URL = "https://physics-lib.xingang-physics.workers.dev";
+  const WORKER_TOKEN_KEY = "worker_token";
+  const TOKEN_KEY = "gh_publish_token";
+  // 与主库（根站点）共用一份资源清单：写回根仓库 data/ 与 pages/；读取始终拉 GitHub 上的最新清单，
+  // 这样本站部署在任何服务器上都拿得到最新数据，上传后刷新立刻可见。
+  const BASE_DIR = "";
+  const LIB_BASE = "https://xty1763.github.io/xgzx_physics_lib/";
+  // 清单候选源（按顺序尝试，全部支持 CORS；带超时，国内网络下也能命中可用的那个）
+  const LIB_SOURCES = [
+    "https://raw.githubusercontent.com/xty1763/xgzx_physics_lib/main/data/resources.json",
+    "https://xty1763.github.io/xgzx_physics_lib/data/resources.json",
+    "https://cdn.jsdelivr.net/gh/xty1763/xgzx_physics_lib@main/data/resources.json",
+  ];
+  function absUrl(u) { const s = String(u || ""); return /^https?:\/\//i.test(s) ? s : (s ? LIB_BASE + s.replace(/^\/+/, "") : ""); }
+
+  // ---------- 状态 ----------
+  const state = { bookId: null, chapterId: null, sectionId: null, cat: "all", secTag: "all", search: "", view: "grid", treeSearch: "" };
+  const treeExpanded = new Set();
+  function openUploadAtCurrent() { openModal(null, state.bookId, state.chapterId, state.sectionId); }
+  function toggleExpandAll() {
+    const book = bookOf(state.bookId) || COURSE.books[0];
+    const allOpen = book.chapters.every((c) => treeExpanded.has(c.id));
+    if (allOpen) treeExpanded.clear(); else { treeExpanded.add(state.chapterId); book.chapters.forEach((c) => treeExpanded.add(c.id)); }
+    render();
+  }
+  let currentModule = "materials";
+  let store = [];                 // 设计格式的资源(映射后)
+  let resources = [];             // 原始 resources.json(旧模型)
+  const previewUrls = {};
+  let pendingFile = null, editingId = null, saving = false;
+
+  const $ = (sel) => document.querySelector(sel);
+  const $ = (sel) => Array.prototype.slice.call(document.querySelectorAll(sel));
+
+  const bookTitle = (id) => (COURSE.books.find((b) => b.id === id) || {}).title || "";
+  const chapterTitle = (id) => { for (const b of COURSE.books) for (const c of b.chapters) if (c.id === id) return c.title; return ""; };
+  const sectionTitle = (id) => { for (const b of COURSE.books) for (const c of b.chapters) { const s = c.sections.find((x) => x.id === id); if (s) return s.title; } return ""; };
+  const bookOf = (id) => COURSE.books.find((b) => b.id === id);
+  const courseChapter = (id) => { for (const b of COURSE.books) for (const c of b.chapters) if (c.id === id) return c; return null; };
+  const courseSection = (id) => { for (const b of COURSE.books) for (const c of b.chapters) { const s = c.sections.find((x) => x.id === id); if (s) return s; } return null; };
+  // 设计稿元信息索引：按“规范化小节名”匹配，给完整目录补 难度/课时/目标/核心概念/公式
+  const _pepByTitle = {};
+  (PEP || []).forEach((b) => b.chapters.forEach((c) => c.sections.forEach((s) => { const k = norm(s.title); if (k) _pepByTitle[k] = s; })));
+  function pepMeta(title) { return _pepByTitle[norm(title)] || null; }
+  function enrichSection(sec) { const m = pepMeta(sec && sec.title); return { sec: sec, diff: (m && m.difficulty) || "", hours: (m && m.hours) || "", target: (m && m.target) || "", concepts: (m && m.keyConcepts) || [], formulas: (m && m.formulas) || [] }; }
+
+  function toast(msg, bad) {
+    const c = $("#toast-container"); if (!c) return;
+    const t = document.createElement("div"); t.className = "toast-item";
+    t.innerHTML = '<span style="font-size:16px;">' + (bad ? "⚠️" : "✅") + "</span> <span>" + String(msg).replace(/[<>&]/g, (m) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[m])) + "</span>";
+    c.appendChild(t); setTimeout(() => { t.style.opacity = "0"; t.style.transform = "translateX(40px)"; t.style.transition = "all .3s ease"; setTimeout(() => t.remove(), 300); }, 3200);
+  }
+
+  // ---------- 数据映射：旧 resources.json -> 设计 store ----------
+  function norm(s) { return String(s || "").replace(/第[一二三四五六七八九十]+章\s*/, "").replace(/^\s*\d+(\.\d+)*\s*/, "").replace(/\s+/g, "").toLowerCase(); }
+  function categoryOf(type) { if (type === "教案") return "lesson"; if (type === "课件") return "slide"; if (type === "练习" || type === "试卷") return "exercise"; if (type === "仿真资源") return "experiment"; return "lesson"; }
+  function tagOf(type) { if (type === "教案") return "名校公开课"; if (type === "课件") return "动态课件"; if (type === "练习") return "分层作业"; if (type === "试卷") return "模拟试题"; if (type === "仿真资源") return "创新实验"; return "教学资源"; }
+  const BOOK_IDX = { b1: 0, b2: 1, b3: 2, b4: 3, b5: 4, b6: 5 };
+  function mapResource(r) {
+    const ext = (r.url || "").split(".").pop().toLowerCase();
+    return Object.assign({}, r, {
+      bookId: r.book || "", chapterId: r.chapter || "", sectionId: r.section || "",
+      pepKind: ext, category: categoryOf(r.type), tag: tagOf(r.type),
+      keypoints: (r.tags && r.tags.length) ? r.tags.slice() : [String(r.title || "").replace(/\.[a-z0-9]+$/i, "")],
+      downloads: 0, author: "物理教研组",
+      previewContent: "<h4>" + (r.title || "") + "</h4>" + (r.desc ? "<p>" + r.desc + "</p>" : "") + '<p class="hint">点击右下角“打开资源”查看/使用该文件。</p>'
+    });
+  }
+  function rebuildStore() { store = resources.map(mapResource).filter(Boolean); }
+
+  // ---------- 资源列表 ----------
+  // 多源拉取最新清单（任一可用即可），全部失败再退回本地副本
+  async function fetchManifest() {
+    for (const s of LIB_SOURCES) {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        const res = await fetch(s + (s.indexOf("?") > -1 ? "&" : "?") + "t=" + Date.now(), { cache: "no-store", signal: ctrl.signal });
+        clearTimeout(timer);
+        if (!res.ok) continue;
+        const j = await res.json();
+        if (Array.isArray(j) && j.length) return j;
+      } catch (e) { /* 试下一个源 */ }
+    }
+    return null;
+  }
+  async function loadAll() {
+    let list = await fetchManifest();
+    if (!list) {
+      try { const r2 = await fetch("data/resources.json?v=" + ASSET_V, { cache: "no-store" }); const j = await r2.json(); list = Array.isArray(j) ? j : []; }
+      catch (e2) { list = []; }
+    }
+    resources = list || [];
+    rebuildStore();
+    smartDefault();
+    hydrateCounts();
+    render();
+  }
+  function hydrateCounts() {
+    const secs = PEP.reduce((a, b) => a + b.chapters.reduce((x, c) => x + c.sections.length, 0), 0);
+    const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+    set("#stat-sections", secs + "节"); set("#stat-files", resources.length + "份"); set("#count-materials", PEP.length + "册 / " + resources.length + "份");
+  }
+
+  function show(target) { if (previewUrls[target.id]) return Object.assign({}, target, { url: previewUrls[target.id] }); return target; }
+  function setPreview(id, blob) { if (!id || !blob) return; if (previewUrls[id]) { try { URL.revokeObjectURL(previewUrls[id]); } catch (e) {} } previewUrls[id] = URL.createObjectURL(blob); }
+  function openResource(r) { const u = r && absUrl(r.url); if (u) window.open(u, "_blank", "noopener"); else toast("该资源暂无可打开的地址", true); }
+
+  // 设计稿的文件详情/预览弹窗
+  let previewId = null;
+  function openPreview(s) {
+    if (!s) return;
+    previewId = s.id;
+    const sec = courseSection(s.sectionId);
+    const kps = (s.keypoints || []).length ? '<div class="key-concepts-chips">' + s.keypoints.slice(0, 8).map((k) => '<span class="concept-chip">🔹 ' + htmlEscape(k) + "</span>").join("") + "</div>" : "";
+    $("#previewTitle").textContent = s.title || "资源详情";
+    $("#previewBody").innerHTML = '<div class="file-tags-row" style="margin-bottom:12px;"><span class="tag-pill">' + htmlEscape(s.tag || "") + "</span><span class=\"tag-pill\">" + htmlEscape(s.category === "lesson" ? "教案" : s.category === "slide" ? "课件" : s.category === "exercise" ? "练习" : "实验") + '</span></div>' +
+      '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">' + htmlEscape((sec ? sec.code + " " + sec.title : "") + " · " + (sec ? sec.difficulty : "")) + "</div>" +
+      (s.desc ? "<p>" + htmlEscape(s.desc) + "</p>" : "") + (s.previewContent && s.previewContent.indexOf("<h4>") < 0 ? "<p>" + s.previewContent + "</p>" : "") + kps;
+    $("#previewMask").classList.remove("hidden");
+  }
+  function closePreview() { $("#previewMask").classList.add("hidden"); }
+
+  // ---------- GitHub 发布 ----------
+  const PUBLISH_OWNER = "xty1763", PUBLISH_REPO = "xgzx_physics_lib", PUBLISH_BRANCH = "main";
+  function getPublishToken() { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; } }
+  function setPublishToken(t) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} }
+  const getWorkerToken = () => { try { return localStorage.getItem(WORKER_TOKEN_KEY) || ""; } catch (e) { return ""; } };
+  function ghHeaders(token) { return { Authorization: "Bearer " + token, "User-Agent": "physics-lib", Accept: "application/vnd.github+json" }; }
+  function b64(t) { return btoa(unescape(encodeURIComponent(t))); }
+  function fromB64(b) { return decodeURIComponent(escape(atob(b.replace(/\n/g, "")))); }
+  function esc(s) { return String(s == null ? "" : s).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r/g, "").replace(/\n/g, "\\n"); }
+  function slugPath(name, ext) {
+    const fileExt = ext && /^\.[a-z0-9]+$/i.test(ext) ? ext.toLowerCase() : ".html";
+    const base = String(name || "").replace(/\.[a-zA-Z0-9]+$/, "").replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "resource";
+    return base + fileExt;
+  }
+  async function ghFetch(url, opts, timeout) { const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), timeout || 30000); try { return await fetch(url, Object.assign({}, opts, { signal: ctrl.signal })); } catch (e) { if (e && e.name === "AbortError") throw new Error("连接 GitHub 超时"); throw e; } finally { clearTimeout(timer); } }
+  async function ghGetContents(token, path) { const res = await ghFetch("https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO + "/contents/" + path + "?ref=" + PUBLISH_BRANCH, { headers: ghHeaders(token) }); if (!res.ok) throw new Error("读取仓库文件失败（" + res.status + "）"); const d = await res.json(); return { sha: d.sha, text: fromB64(d.content) }; }
+  async function ghGetSha(token, path) { const res = await ghFetch("https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO + "/contents/" + path + "?ref=" + PUBLISH_BRANCH, { headers: ghHeaders(token) }); if (!res.ok) throw new Error("读取文件失败（" + res.status + "）"); return (await res.json()).sha; }
+  async function ghPutFile(token, path, contentB64, message, sha) {
+    const body = { message: message, branch: PUBLISH_BRANCH, content: contentB64 }; if (sha) body.sha = sha;
+    const res = await ghFetch("https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO + "/contents/" + path, { method: "PUT", headers: Object.assign({}, ghHeaders(token), { "Content-Type": "application/json" }), body: JSON.stringify(body) });
+    if (!res.ok) { let m = ""; try { m = (await res.json()).message || ""; } catch (e) {} throw new Error("写入失败（" + res.status + (m ? " " + m : "") + "）"); } return await res.json();
+  }
+  async function ghDeleteFile(token, path, message) { const sha = await ghGetSha(token, path); const res = await ghFetch("https://api.github.com/repos/" + PUBLISH_OWNER + "/" + PUBLISH_REPO + "/contents/" + path, { method: "DELETE", headers: Object.assign({}, ghHeaders(token), { "Content-Type": "application/json" }), body: JSON.stringify({ message: message, sha: sha, branch: PUBLISH_BRANCH }) }); if (!res.ok) throw new Error("删除文件失败（" + res.status + "）"); return await res.json(); }
+  async function saveResources(token, message) {
+    const newJson = JSON.stringify(resources, null, 2), repoPath = BASE_DIR + "data/resources.json";
+    for (let a = 0; a < 4; a++) { try { const cur = await ghGetContents(token, repoPath); await ghPutFile(token, repoPath, b64(newJson), message, cur.sha); return; } catch (e) { if (e.message && /409|does not match/i.test(e.message)) continue; throw e; } }
+    throw new Error("保存清单冲突，请稍后重试");
+  }
+  async function publishResource(rec) {
+    const token = getPublishToken(); if (!token) throw new Error("请先填写 GitHub 访问令牌");
+    const message = "新增资源：" + rec.title;
+    let rel = "pages/" + slugPath(rec.title, rec.fileExt), path = BASE_DIR + rel;
+    for (let dup = 0; dup < 30; dup++) { try { await ghPutFile(token, path, rec.contentB64, message); break; } catch (e) { if (/409|422|already exists|sha was not supplied|does not match/i.test(e.message) && dup < 29) { const d = rel.lastIndexOf("."), s = d > -1 ? rel.slice(0, d) : rel, de = d > -1 ? rel.slice(d) : ""; rel = s + "-" + (dup + 2) + de; path = BASE_DIR + rel; } else throw e; } }
+    resources.push({ id: rec.id, title: rec.title, desc: rec.desc || "", book: rec.book || "", chapter: rec.chapter || "", section: rec.section || "", url: rel, tags: rec.tags || [], type: rec.type || "练习" });
+    await saveResources(token, "登记资源：" + rec.title); if (rec._blob) setPreview(rec.id, rec._blob); return rel;
+  }
+  async function updateResource(rec) {
+    const token = getPublishToken(); if (!token) throw new Error("请先登录管理员");
+    const idx = resources.findIndex((e) => e.id === rec.id); const old = resources[idx]; if (!old) throw new Error("找不到要编辑的资源");
+    let url = old.url || "";
+    if (rec.contentB64) {
+      let p = "pages/" + slugPath(rec.title, rec.fileExt); const taken = (pp) => resources.some((x) => x.id !== rec.id && x.url === pp);
+      if (taken(p)) for (let i = 2; i < 30; i++) { const d = p.lastIndexOf("."), s = d > -1 ? p.slice(0, d) : p, de = d > -1 ? p.slice(d) : "", c = s + "-" + i + de; if (!taken(c)) { p = c; break; } }
+      let sha = null; try { sha = await ghGetSha(token, BASE_DIR + p); } catch (e) { sha = null; }
+      await ghPutFile(token, BASE_DIR + p, rec.contentB64, "更新资源文件：" + rec.title, sha || undefined); url = p;
+      if (rec._blob) setPreview(rec.id, rec._blob);
+      if (old.url && old.url !== p && old.url.indexOf("pages/") === 0) { try { await ghDeleteFile(token, BASE_DIR + old.url, "移除旧文件：" + rec.title); } catch (e) {} }
+    }
+    resources[idx] = { id: old.id, title: rec.title, desc: rec.desc || "", book: rec.book || "", chapter: rec.chapter || "", section: rec.section || "", url: url, tags: rec.tags || [], type: rec.type || "练习" };
+    await saveResources(token, "编辑资源：" + rec.title); rebuildStore(); hydrateCounts(); render();
+  }
+  async function deleteResource(res) {
+    const token = getPublishToken(); if (!token) throw new Error("请先登录管理员");
+    if (res.url && res.url.indexOf("pages/") === 0) { try { await ghDeleteFile(token, BASE_DIR + res.url, "删除资源：" + res.title); } catch (e) { if (!/404|422|失败/.test(e.message)) throw e; } }
+    if (previewUrls[res.id]) { try { URL.revokeObjectURL(previewUrls[res.id]); } catch (e) {} delete previewUrls[res.id]; }
+    resources = resources.filter((e) => e.id !== res.id); await saveResources(token, "删除资源：" + res.title); rebuildStore(); hydrateCounts(); render();
+  }
+  async function handleDelete(r) { if (!window.confirm("确定要删除资源「" + r.title + "」吗？")) return; try { if (getPublishToken()) await deleteResource(r); else throw new Error("请先登录（管理员）"); toast("已删除"); } catch (e) { toast("删除失败：" + e.message, true); } }
+
+  // ---------- 上传弹窗 ----------
+  function isPaperType() { return $("#fType").value === "试卷"; }
+  function populateTypeSelect() { const sel = $("#fType"); sel.innerHTML = ""; COURSE.resourceTypes.forEach((t) => { const o = document.createElement("option"); o.value = t; o.textContent = t; sel.appendChild(o); }); refreshTypeUI(); }
+  function refreshTypeUI() { const p = isPaperType(); $("#typeHint").style.display = p ? "block" : "none"; $("#fSection").disabled = p; }
+  function populateBookSelect() { const sel = $("#fBook"); sel.innerHTML = '<option value="">暂不分教材</option>'; COURSE.books.forEach((b) => { const o = document.createElement("option"); o.value = b.id; o.textContent = b.title; sel.appendChild(o); }); }
+  function populateChapterSelect() { const sel = $("#fChapter"); sel.innerHTML = '<option value="">暂不选章</option>'; (bookOf($("#fBook").value) || {}).chapters.forEach((c) => { const o = document.createElement("option"); o.value = c.id; o.textContent = c.title; sel.appendChild(o); }); populateSectionSelect(); }
+  function populateSectionSelect() { const sel = $("#fSection"); sel.innerHTML = '<option value="">未指定小节</option>'; if (isPaperType()) { sel.disabled = true; return; } const ch = (bookOf($("#fBook").value) || { chapters: [] }).chapters.find((c) => c.id === $("#fChapter").value); if (ch) ch.sections.forEach((s) => { const o = document.createElement("option"); o.value = s.id; o.textContent = s.title; sel.appendChild(o); }); }
+  function refreshAdminUI() { const owner = !!getPublishToken(); const has = owner || !!getWorkerToken(); const u = $("#quick-add-btn"); if (u) u.style.display = has ? "" : "none"; const row = $("#adminLoggedInRow"); if (row) row.style.display = owner ? "block" : "none"; }
+  function openModal(res, presetBook, presetChapter, presetSection) {
+    editingId = res ? res.id : null; populateTypeSelect(); populateBookSelect();
+    if (res) { $("#fTitle").value = res.title || ""; $("#fDesc").value = res.desc || ""; $("#fTags").value = (res.tags || []).join(" "); if (res.type) $("#fType").value = res.type; refreshTypeUI(); if (res.book) $("#fBook").value = res.book; populateChapterSelect(); if (res.chapter) $("#fChapter").value = res.chapter; populateSectionSelect(); if (res.section) $("#fSection").value = res.section; $("#modalTitle").textContent = "编辑资源"; $("#saveResource").textContent = "保存修改"; }
+    else { $("#fTitle").value = ""; $("#fDesc").value = ""; $("#fTags").value = ""; refreshTypeUI(); populateChapterSelect(); if (presetBook) { $("#fBook").value = presetBook; populateChapterSelect(); } if (presetChapter) { $("#fChapter").value = presetChapter; populateSectionSelect(); } if (presetSection) $("#fSection").value = presetSection; $("#modalTitle").textContent = "上传资源"; $("#saveResource").textContent = "保存资源"; }
+    clearPendingFile(); $("#modalMask").classList.remove("hidden"); setTimeout(() => $("#fTitle").focus(), 50);
+  }
+  function closeModal() { $("#modalMask").classList.add("hidden"); }
+  const FILE_RE = /\.(html?|htm|pdf|docx?|pptx?|xlsx?|txt|md|png|jpe?g|webp|gif|mp4|zip)$/i;
+  function setPendingFile(file) {
+    if (!file) return clearPendingFile(); if (!FILE_RE.test(file.name)) { toast("不支持的文件类型", true); return; }
+    pendingFile = file; $("#fileName").textContent = file.name + "（" + (file.size / 1024).toFixed(1) + " KB）"; $("#filePill").style.display = "flex";
+    if (!$("#fTitle").value) $("#fTitle").value = file.name.replace(/\.[^.]+$/, ""); smartFill(false);
+  }
+  function clearPendingFile() { pendingFile = null; $("#fileInput").value = ""; $("#filePill").style.display = "none"; $("#fileName").textContent = ""; }
+  function readFileAsBase64(file) { return new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => { const u = String(fr.result || ""), c = u.indexOf(","); resolve(c > -1 ? u.slice(c + 1) : u); }; fr.onerror = () => reject(fr.error); fr.readAsDataURL(file); }); }
+  async function saveResource() {
+    const btn = $("#saveResource"); if (saving) return;
+    const title = $("#fTitle").value.trim(); if (!title) { toast("请填写资源名称", true); return; }
+    const editing = !!editingId, isPaper = isPaperType();
+    const em = pendingFile && /\.[^.]*$/.exec(pendingFile.name); const fileExt = pendingFile ? (em ? em[0].toLowerCase() : ".html") : undefined;
+    const rec = { id: editingId || ("r" + Date.now() + Math.random().toString(36).slice(2, 7)), title, book: $("#fBook").value, chapter: $("#fChapter").value, section: isPaper ? "" : $("#fSection").value, desc: $("#fDesc").value.trim(), tags: $("#fTags").value.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean), type: isPaper ? "试卷" : $("#fType").value, fileExt, contentB64: null, _blob: pendingFile };
+    const isWorker = !!getWorkerToken() && !getPublishToken();
+    if (!isWorker && !getPublishToken()) { toast("请先登录（管理员）", true); openAdminModal(); return; }
+    saving = true; btn.disabled = true; const og = editing ? "保存修改" : "保存资源"; btn.textContent = "上传中…"; toast("正在保存，请稍候…");
+    try {
+      if (pendingFile) { if (pendingFile.size > 50 * 1024 * 1024) throw new Error("文件过大（超过50MB）"); const b = await readFileAsBase64(pendingFile).catch(() => null); if (!b) { toast("读取文件失败", true); return; } rec.contentB64 = b; }
+      if (editing) { await updateResource(rec); closeModal(); toast("已保存修改"); return; }
+      if (!pendingFile) { toast("请先选择一个文件", true); return; }
+      await publishResource(rec); rebuildStore(); hydrateCounts(); render(); closeModal(); toast("已发布：卡片已出现，约1分钟后其它访客也能看到");
+    } catch (e) { toast((editing ? "保存失败：" : "发布失败：") + (e && e.message), true); }
+    finally { saving = false; btn.disabled = false; btn.textContent = og; }
+  }
+
+  // ---------- 自动识别填表 ----------
+  const TEXT_EXT_RE = /^(html?|htm|md|txt)$/;
+  function extOf(n) { const m = /\.([a-z0-9]+)$/i.exec(n || ""); return m ? m[1].toLowerCase() : ""; }
+  function readTextSample(file) { return new Promise((resolve) => { if (!file) return resolve(""); try { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result || "")); fr.onerror = () => resolve(""); fr.readAsText(file.slice(0, 102400)); } catch (e) { resolve(""); } }); }
+  async function smartFill(force) {
+    const title = $("#fTitle").value.trim() || (pendingFile ? pendingFile.name : ""); if (!title) return;
+    const ext = pendingFile ? extOf(pendingFile.name) : ""; let content = ""; if (pendingFile && TEXT_EXT_RE.test(ext)) content = await readTextSample(pendingFile);
+    const searchStr = (title + " " + content).trim(); const type = detectType(title, ext, content); let bookId = detectBook(searchStr); const loc = detectLoc(title, content, bookId);
+    if (force || !$("#fType").value) { if (type) { $("#fType").value = type; refreshTypeUI(); } }
+    if (loc && loc.chapter && !bookId) bookId = loc && bookOfChapter(loc.chapter);
+    if ((force || !$("#fBook").value) && bookId) $("#fBook").value = bookId; populateChapterSelect();
+    if ((force || !$("#fChapter").value) && loc && loc.chapter) $("#fChapter").value = loc.chapter; populateSectionSelect();
+    if (force && loc && loc.section) $("#fSection").value = loc.section;
+    const topic = removeNoise(title); const secName = loc && loc.section ? sectionTitle(loc.section).replace(/^\s*\d+(\.\d+)*\s*/, "") : (loc && loc.chapter ? chapterTitle(loc.chapter).replace(/^第[一二三四五六七八九十]+章\s*/, "") : "");
+    const existing = $("#fTags").value.split(/[,，\s]+/).filter(Boolean); const tags = []; if (topic) tags.push(topic); if (secName) tags.push(secName); if (type) tags.push(type);
+    $("#fTags").value = tags.concat(existing.filter((t) => tags.indexOf(t) < 0)).join(" "); toast("已自动识别并预填（可再修改）");
+  }
+  const BOOK_ALIASES = [{ id: "b1", names: ["必修第一册", "必修一", "必修1", "高一上"] }, { id: "b2", names: ["必修第二册", "必修二", "必修2", "高一下"] }, { id: "b3", names: ["必修第三册", "必修三", "必修3", "高二上"] }, { id: "b4", names: ["选择性必修第一册", "选择性必修一", "选必一", "选必1", "选修一"] }, { id: "b5", names: ["选择性必修第二册", "选择性必修二", "选必二", "选必2", "选修二"] }, { id: "b6", names: ["选择性必修第三册", "选择性必修三", "选必三", "选必3", "选修三"] }];
+  function detectBook(s) { let best = null, bl = 0; for (const b of BOOK_ALIASES) for (const n of b.names) if (s.indexOf(n) > -1 && n.length > bl) { best = b.id; bl = n.length; } return best; }
+  const allChapters = () => { const a = []; for (const b of COURSE.books) for (const c of b.chapters) a.push(c); return a; };
+  const bookOfChapter = (chapterId) => { for (const b of COURSE.books) for (const c of b.chapters) if (c.id === chapterId) return b.id; return null; };
+  const chapterOf = (id) => allChapters().find((c) => c.id === id);
+  function detectType(s, ext, content) { const t = String(s || "").trim(), c = String(content || "").slice(0, 3000); const hasT = (re) => re.test(t), hasC = (re) => re.test(c); if (hasT(/教案|教学设计|导学案/)) return "教案"; if (hasT(/试卷|试题|卷子|考试|月考|期中|期末|测验/)) return "试卷"; if (hasT(/练习|习题|作业|题目|同步|巩固/)) return "练习"; if (hasT(/课件|幻灯片|演示文稿|\bppt\b/i)) return "课件"; if (hasT(/仿真|模拟|动画|交互|演示/)) return "仿真资源"; if (/^(html?|htm)$/.test(ext)) return "仿真资源"; if (/^(pptx?|ppt)$/.test(ext)) return "课件"; if (hasC(/教案|教学设计|导学案/)) return "教案"; if (hasC(/试卷|试题|考试|测验/)) return "试卷"; if (hasC(/练习|习题|作业|题目/)) return "练习"; if (hasC(/课件|幻灯片|演示文稿/)) return "课件"; if (hasC(/仿真|模拟|动画|交互|演示|canvas/i)) return "仿真资源"; return null; }
+  const NOISE = /练习|习题|作业|题目|试卷|试题|考试|测验|课件|幻灯片|演示文稿|教案|教学设计|导学案|仿真|模拟|动画|交互|演示|\bppt\b/gi;
+  function removeNoise(s) { let t = String(s).replace(/第[一二三四五六七八九十]+\d*章/g, " "); for (const b of BOOK_ALIASES) for (const n of b.names) t = t.replace(new RegExp(n, "g"), " "); t = t.replace(NOISE, " "); t = t.replace(/[，。、,.\s]+/g, " ").trim(); return t; }
+  function cleanChapter(c) { return c.replace(/^第[一二三四五六七八九十]+章\s*/, ""); }
+  function cleanSection(s) { return s.replace(/^\s*\d+(\.\d+)*\s*/, ""); }
+  const CN = { "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10, "十一": 11, "十二": 12, "十三": 13 };
+  function cnNum(w) { if (CN[w] != null) return CN[w]; if (w.charAt(0) === "十") return 10 + (CN[w.slice(1)] || 0); return null; }
+  function parseChapterNum(s) { const m = s.match(/第([一二三四五六七八九十]+|\d{1,2})章/); if (!m) return null; const w = m[1]; return /^\d+$/.test(w) ? parseInt(w, 10) : cnNum(w); }
+  function detectLoc(s, content, bookId) { const books = COURSE.books.filter((b) => !bookId || b.id === bookId); const hay = (s || "") + " " + (content || ""); const wantNum = parseChapterNum(hay), topic = removeNoise(s || ""); let chapter = null, section = null; if (wantNum) { outer: for (const b of books) for (const c of b.chapters) if (parseChapterNum(c.title) === wantNum) { chapter = c.id; break outer; } } if (!chapter && topic.length >= 2) { outer: for (const b of books) for (const c of b.chapters) { const sig = cleanChapter(c.title) + " " + c.sections.map((sec) => cleanSection(sec.title)).join(" "); if (sig.indexOf(topic) > -1) { chapter = c.id; break outer; } } } if (!chapter) { let best = null, bl = 0; for (const b of books) for (const c of b.chapters) { const ct = cleanChapter(c.title); if (ct && ct.length > bl && hay.indexOf(ct) > -1) { best = c.id; bl = ct.length; } } chapter = best; } if (!chapter) { let bc = null, bs = null, bl = 0; for (const b of books) for (const c of b.chapters) for (const sec of c.sections) { const st = cleanSection(sec.title); if (st && st.length > bl && hay.indexOf(st) > -1) { bc = c.id; bs = sec.id; bl = st.length; } } chapter = bc; section = bs; } if (chapter && !section) { const ch = chapterOf(chapter); if (ch) { let best = null, bl = 0; for (const sec of ch.sections) { const st = cleanSection(sec.title); if (st && st.length > bl && hay.indexOf(st) > -1) { best = sec.id; bl = st.length; } } section = best; } } return { chapter: chapter, section: section }; }
+
+  // ---------- 资源助手 ----------
+  function searchAssistant(s) { const bookId = detectBook(s), type = detectType(s), loc = detectLoc(s, "", bookId), topic = removeNoise(s); let pool = resources.slice(); if (bookId) pool = pool.filter((r) => r.book === bookId); if (type) pool = pool.filter((r) => r.type === type); if (loc && loc.chapter) pool = pool.filter((r) => r.chapter === loc.chapter); if (topic.length >= 2) { const lt = topic.toLowerCase(); pool = pool.filter((r) => [r.title, r.desc, (r.tags || []).join(" "), bookTitle(r.book), chapterTitle(r.chapter), sectionTitle(r.section)].join(" ").toLowerCase().indexOf(lt) > -1); } return { pool: pool, book: bookId, type: type, loc: loc, keywords: topic }; }
+  function htmlEscape(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function resLabel(r) { const p = []; if (bookTitle(r.book)) p.push(bookTitle(r.book)); if (chapterTitle(r.chapter)) p.push(chapterTitle(r.chapter)); if (r.section && sectionTitle(r.section)) p.push(sectionTitle(r.section)); return p.join(" · "); }
+  function assistantReply(q) { const res = searchAssistant(q), list = res.pool; const filter = { book: res.book, chapter: res.loc && res.loc.chapter, section: res.loc && res.loc.section, type: res.type }; if (list.length === 0) { if (res.loc && res.loc.chapter) return { text: "这个范围（" + (res.loc.section ? sectionTitle(res.loc.section) : chapterTitle(res.loc.chapter)) + "）暂时还没有已上传的资源。换个关键词或去对应章节看看。", resources: [], filter: filter }; return { text: "没找到相关资源。试试这样问：\n• 必修一 第二章 自由落体 课件\n• 仿真资源\n• 小船过河 ", resources: [], filter: filter }; } let text = "为你找到 " + list.length + " 个相关资源："; if (res.loc && res.loc.chapter) text += "（已定位到 " + (res.loc.section ? sectionTitle(res.loc.section) : chapterTitle(res.loc.chapter)) + "）"; return { text: text, resources: list, filter: filter }; }
+  function addMsg(html, who) { const body = $("#assistMessages"); const el = document.createElement("div"); el.className = "assist-msg " + who; el.innerHTML = html; body.appendChild(el); body.scrollTop = body.scrollHeight; }
+
+  // ---------- 大模型（AI 可选） ----------
+  const AI_DEFAULT_ENDPOINT = "https://open.bigmodel.cn/api/paas/v4/chat/completions", AI_DEFAULT_MODEL = "glm-4-flash";
+  let aiConf = { endpoint: AI_DEFAULT_ENDPOINT, model: AI_DEFAULT_MODEL, key: "" };
+  function getAiConf() { try { const s = localStorage.getItem("ai_conf"); if (s) aiConf = Object.assign({ endpoint: AI_DEFAULT_ENDPOINT, model: AI_DEFAULT_MODEL, key: "" }, JSON.parse(s)); } catch (e) {} return aiConf; }
+  function setAiConf(c) { aiConf = Object.assign({}, getAiConf(), c); try { localStorage.setItem("ai_conf", JSON.stringify(aiConf)); } catch (e) {} }
+  async function llmChat(system, user, opts) { const conf = getAiConf(); if (!conf.endpoint || !conf.key) return null; const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), (opts && opts.timeout) || 9000); try { const headers = { "Content-Type": "application/json", Accept: "application/json" }; if (conf.key) headers.Authorization = "Bearer " + conf.key; const body = { model: conf.model || AI_DEFAULT_MODEL, messages: [{ role: "system", content: system }, { role: "user", content: user }], temperature: (opts && opts.temperature != null) ? opts.temperature : 0.3, max_tokens: (opts && opts.maxTokens) || 200, stream: false }; const res = await fetch(conf.endpoint, { method: "POST", headers: headers, body: JSON.stringify(body), signal: ctrl.signal }); if (!res.ok) throw new Error("AI " + res.status); const data = await res.json(); return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || ""; } catch (e) { return null; } finally { clearTimeout(timer); } }
+  function parseJsonLoose(t) { if (!t) return null; const m = String(t).match(/\{[\s\S]*\}/); if (!m) return null; try { return JSON.parse(m[0]); } catch (e) { try { return JSON.parse(m[0].replace(/'/g, '"').replace(/，/g, ",")); } catch (e2) { return null; } } }
+  async function aiPickTitles(q) { if (!resources.length) return null; const idx = resources.map((r) => { const loc = [bookTitle(r.book), chapterTitle(r.chapter), sectionTitle(r.section)].filter(Boolean).join(" · "); return (r.title || "") + "┃" + loc + "┃" + (r.type || "") + "┃" + (r.desc || ""); }).join("\n"); const system = "你是高中物理教学资源库的检索助手。下面是资源清单，每行：标题┃所属教材/章节┃类型┃简介。\n请根据查询选出最相关的资源标题。只返回 JSON：{\"titles\":[\"标题1\"]}，最多5个；都不相关则 {\"titles\":[]}。只输出JSON。\n\n资源清单：\n" + idx; const resp = await llmChat(system, "查询：" + q, { maxTokens: 300, temperature: 0.2, timeout: 6000 }); const o = parseJsonLoose(resp); if (o && Array.isArray(o.titles)) return o.titles.map((x) => String(x).trim()).filter(Boolean); return null; }
+  async function aiAssistantReply(q) { const picked = await aiPickTitles(q); let list = []; if (picked && picked.length) { for (const t of picked) { if (!t) continue; const r = resources.find((x) => x.title === t) || resources.find((x) => x.title.indexOf(t) > -1 || (t.length > 1 && t.indexOf(x.title) > -1)); if (r && !list.some((x) => x.id === r.id)) list.push(r); } } if (!list.length) return assistantReply(q); let filter = null; const chs = [...new Set(list.map((r) => r.chapter).filter(Boolean))]; if (chs.length === 1) { const f = list.find((r) => r.chapter === chs[0]); filter = { book: (f && f.book) || null, chapter: chs[0], section: null, type: "all" }; } return { text: "为你找到 " + list.length + " 个相关资源：", resources: list, filter: filter }; }
+  function fallbackDesc(title, chapterId, sectionId, type) { const cleanTitle = String(title || "").replace(/\.[a-z0-9]+$/i, ""); const seg = []; const bid = bookOfChapter(chapterId); if (bid) seg.push(bookTitle(bid)); if (chapterId) seg.push(chapterTitle(chapterId)); if (sectionId) seg.push(sectionTitle(sectionId)); const loc = seg.filter(Boolean).map((s) => s.replace(/^第[一二三四五六七八九十]+章\s*/, "").replace(/^\s*\d+(\.\d+)*\s*/, "")).join(" · "); return cleanTitle + (loc ? "（" + loc + "）" : "") + " · " + (type || "教学资源"); }
+  async function aiDescribe(title, chapterId, sectionId, type, contentSample) { const sys = "你是高中物理教学资源库的编辑。请为下面的资源写一句简介，35字以内，只输出简介正文，不要引号、不要“简介：”前缀、不要列表。"; let info = "资源名称：" + title; if (chapterId) info += "\n所属：" + chapterTitle(chapterId) + (sectionId ? " / " + sectionTitle(sectionId) : ""); if (type) info += "\n类型：" + type; if (contentSample) info += "\n文件内容（片段）：" + String(contentSample).slice(0, 300); const resp = await llmChat(sys, info, { maxTokens: 80, temperature: 0.6 }); if (resp) { let d = String(resp).trim().replace(/^("*|“|「|『|\s*简介[:：]?\s*)/, "").replace(/("*|”|」|』)$/, "").trim(); if (d) return { text: d.slice(0, 60), ai: true }; } return { text: fallbackDesc(title, chapterId, sectionId, type), ai: false }; }
+  async function aiGenerateDesc() { const title = $("#fTitle").value.trim(); if (!title) { toast("请先填写资源名称", true); return; } const btn = $("#aiDescBtn"); btn.disabled = true; btn.textContent = "生成中…"; try { let sample = ""; if (pendingFile && TEXT_EXT_RE.test(extOf(pendingFile.name))) sample = await readTextSample(pendingFile); const res = await aiDescribe(title, $("#fChapter").value, $("#fSection").value, $("#fType").value, sample); $("#fDesc").value = res.text; toast(res.ai ? "已生成智能简介（可再修改）" : "已生成简介（本地规则；AI 接口暂不可用，可在管理员登录里配置）"); } catch (e) { $("#fDesc").value = fallbackDesc(title, $("#fChapter").value, $("#fSection").value, $("#fType").value); toast("已生成简介（AI 异常已用本地规则）"); } finally { btn.disabled = false; btn.textContent = "✨ 智能简介"; } }
+  async function assistantSend() { const input = $("#assistInput"), q = input.value.trim(); if (!q) return; input.value = ""; addMsg(htmlEscape(q), "user"); const sb = $("#assistSend"); sb.disabled = true; sb.textContent = "思考中…"; const th = document.createElement("div"); th.className = "assist-msg bot"; th.textContent = "🤖 正在思考…"; $("#assistMessages").appendChild(th); $("#assistMessages").scrollTop = $("#assistMessages").scrollHeight; let reply; try { reply = await aiAssistantReply(q); } catch (e) { reply = assistantReply(q); } if (th.parentNode) th.parentNode.removeChild(th); sb.disabled = false; sb.textContent = "发送"; const hit = reply.resources.length ? "<ul>" + reply.resources.map((r) => "<li><span class='assist-hit' data-id='" + r.id + "'>" + htmlEscape(r.title) + "</span> <small>" + htmlEscape(resLabel(r)) + "</small></li>").join("") + "</ul>" : ""; const fb = reply.filter && reply.resources.length ? "<div class='assist-btnrow'><button class='btn btn-secondary btn-sm' data-applyfilter='1'>筛选到右侧</button></div>" : ""; addMsg(reply.text.replace(/\n/g, "<br/>") + hit + fb, "bot"); $("#assistMessages .assist-hit").forEach((el) => { el.onclick = () => { const r = resources.find((x) => x.id === el.getAttribute("data-id")); if (r) openResource(r); }; }); $("#assistMessages [data-applyfilter]").forEach((b) => { b.onclick = () => { const f = reply.filter; state.bookId = BOOK_IDX[f.book] != null ? PEP[BOOK_IDX[f.book]].id : null; state.chapterId = f.chapter ? mapChId(f.chapter) : null; state.sectionId = null; state.cat = "all"; render(); closeAssist(); }; }); }
+  function mapChId(oldChapter) { for (const b of PEP) for (const c of b.chapters) { if (norm(c.title) === norm(chapterTitle(oldChapter))) return c.id; } return null; }
+  function openAssist() { $("#assistPanel").hidden = false; if ($("#assistMessages").childElementCount === 0) addMsg("你好！我是资源助手。告诉我你想找的教材/章节/类型或关键词。", "bot"); setTimeout(() => $("#assistInput").focus(), 50); }
+  function closeAssist() { $("#assistPanel").hidden = true; }
+
+  // ---------- 管理员 / AI 登录 ----------
+  function openAdminModal() { $("#adminToken").value = getPublishToken(); const ai = getAiConf(); if ($("#aiEndpoint")) $("#aiEndpoint").value = ai.endpoint || ""; if ($("#aiModel")) $("#aiModel").value = ai.model || ""; if ($("#aiKey")) $("#aiKey").value = ai.key || ""; refreshAdminUI(); $("#adminMask").classList.remove("hidden"); setTimeout(() => $("#adminToken").focus(), 50); }
+  function closeAdminModal() { $("#adminMask").classList.add("hidden"); }
+  function saveAdmin() { const t = $("#adminToken").value.trim(); if (!t) { toast("请输入 GitHub 访问令牌", true); return; } setPublishToken(t); setAiConf({ endpoint: $("#aiEndpoint") ? $("#aiEndpoint").value.trim() : aiConf.endpoint, model: $("#aiModel") ? $("#aiModel").value.trim() : aiConf.model, key: $("#aiKey") ? $("#aiKey").value.trim() : aiConf.key }); closeAdminModal(); refreshAdminUI(); hydrateCounts(); render(); toast("已登录，上传与编辑入口已开启"); }
+  function clearToken() { if (!window.confirm("确定要清除本机保存的管理员令牌吗？")) return; try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} closeAdminModal(); refreshAdminUI(); hydrateCounts(); render(); toast("已退出，上传入口已隐藏"); }
+
+  // ---------- 渲染 ----------
+  const MODULE_INFO = { materials: { name: "1. 教学材料上传", sub: "人教版各章节 · 小节文件浏览目录" }, plans: { name: "2. 教学计划安排", sub: "教学进度 / 大单元排课" }, goals: { name: "3. 教学目标评估", sub: "核心素养评价量规" }, analytics: { name: "4. 班级成绩分析", sub: "阶段考试统计" }, students: { name: "5. 学生重点跟进", sub: "拔尖培优" }, innovation: { name: "6. 创新思路记录", sub: "自制教具 / STEAM" }, gaokao: { name: "7. 高考题目分析", sub: "真题微专题" } };
+  let stateSubtab = "";
+  let previewIsModule = false;
+  function render() {
+    const info = MODULE_INFO[currentModule] || MODULE_INFO.materials; $("#header-module-name").textContent = info.name;
+    if (currentModule === "materials") { $("#header-sub-name").textContent = info.sub; $("#subtabs-bar").style.display = "none"; renderMaterials(); }
+    else { $("#header-sub-name").textContent = info.sub; renderModule(currentModule, info); }
+    $("#main-nav-menu .nav-item").forEach((b) => b.classList.toggle("active", b.getAttribute("data-module") === currentModule));
+  }
+  // 按设计稿渲染 2~7 模块：头部横幅 + 副标签页 + 示例文件卡片 + 图表框
+  function renderModule(id, info) {
+    const WB = window.WORKBENCH_DATA || {}; const mod = WB[id];
+    if (!mod || !mod.subtabs || !mod.subtabs.length) { renderPlaceholder(id, info); return; }
+    const stabs = mod.subtabs;
+    if (!stateSubtab || !stabs.some((s) => s.id === stateSubtab)) stateSubtab = stabs[0].id;
+    $("#subtabs-bar").style.display = "flex";
+    $("#subtabs-container").innerHTML = stabs.map((s) => '<button class="subtab-btn' + (s.id === stateSubtab ? " active" : "") + '" data-subtab-id="' + s.id + '">' + s.name + "</button>").join("");
+    $("#subtabs-actions").innerHTML = '<button class="btn btn-secondary btn-sm">示例数据</button>';
+    const active = stabs.find((s) => s.id === stateSubtab) || stabs[0];
+    const hero = '<div class="module-hero-banner"><div class="banner-text"><h2><span>' + (mod.icon || "") + " " + mod.name.replace(/^\d+\.\s*/, "") + '</span><span class="ph-badge" style="margin-left:10px;">示例占位数据</span></h2><p>' + (mod.desc || "") + "</p></div></div>";
+    const chartHtml = active.hasChart ? '<div class="chart-container-box"><div class="chart-header-row"><h4><span>📊</span> 数据看板</h4><span style="font-size:11px;color:var(--text-dim);">示例（无真实数据）</span></div><div class="chart-canvas-wrap"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:13px;text-align:center;">📈 示例图表占位<br/><span style="font-size:11px;">（接入真实分析模块后自动生成）</span></div></div></div>' : "";
+    const cards = (active.sampleFiles || []).map((f) => moduleCard(f)).join("");
+    const files = cards ? '<div class="pep-files-grid">' + cards + "</div>" : '<div class="module-placeholder"><div class="ph-icon">🗂️</div><h3>暂无示例文件</h3></div>';
+    $("#content-viewport").innerHTML = hero + '<div class="pep-module-wrap"><div class="pep-toolbar"><div class="tree-filter-pills"><button class="tree-filter-pill active">' + active.name + '</button></div><span style="font-size:12px;color:var(--text-dim);">' + (active.subtitle || "") + "</span></div>" + chartHtml + files + "</div>";
+  }
+  function moduleCard(f) {
+    const icon = iconBadge(f.type);
+    const kp = (f.keypoints || []).slice(0, 3).map((k) => '<span class="tag-pill">' + htmlEscape(k) + "</span>").join("");
+    return '<article class="pep-file-card" data-modfile="' + f.id + '"><div class="card-top-row">' + icon + '<div class="file-title-wrap"><div class="file-item-name">' + htmlEscape(f.name) + '</div><span class="file-section-badge">' + htmlEscape(f.tag || "") + '</span>' + (kp ? '<div class="file-tags-row">' + kp + "</div>" : "") + '</div></div><div class="file-card-footer"><span class="section-badge">' + htmlEscape((f.author || "") + " · " + (f.date || "")) + '</span><div class="file-actions-row"><button class="btn btn-primary btn-xs" data-modfile-open="' + f.id + '">👁 预览</button></div></div></article>';
+  }
+  function openModuleFile(fid) {
+    const mod = (window.WORKBENCH_DATA || {})[currentModule]; if (!mod) return;
+    for (const st of mod.subtabs) for (const f of (st.sampleFiles || [])) if (f.id === fid) { previewModuleFile(f); return; }
+  }
+  function previewModuleFile(f) {
+    previewIsModule = true;
+    $("#previewTitle").textContent = f.name || "文件预览";
+    $("#previewBody").innerHTML = (f.previewContent || "") + '<div class="file-tags-row" style="margin-top:12px;">' + (f.tag ? '<span class="tag-pill">' + htmlEscape(f.tag) + "</span>" : "") + (f.author ? '<span class="tag-pill">' + htmlEscape(f.author) + "</span>" : "") + (f.size ? '<span class="tag-pill">' + htmlEscape(f.size) + "</span>" : "") + (f.downloads != null ? '<span class="tag-pill">↓ ' + f.downloads + "</span>" : "") + "</div>";
+    $("#previewMask").classList.remove("hidden");
+  }
+  function renderPlaceholder(id, info) { $("#content-viewport").innerHTML = '<div class="module-placeholder"><div class="ph-icon">🚧</div><h3>' + info.name.replace(/^\d+\.\s*/, "") + '</h3><p>该模块正在建设中。</p><span class="ph-badge">敬请期待</span></div>'; }
+  function openPreviewSet(s, isModule) { previewIsModule = !!isModule; openPreview(s); }
+
+  function smartDefault() {
+    if (!state.bookId || !resources.some((r) => r.book === state.bookId)) { const b = COURSE.books.find((x) => resources.some((r) => r.book === x.id)) || COURSE.books[0]; state.bookId = b ? b.id : COURSE.books[0].id; }
+    const book = bookOf(state.bookId) || COURSE.books[0];
+    if (!state.chapterId || !resources.some((r) => r.chapter === state.chapterId)) { const ch = book.chapters.find((c) => resources.some((r) => r.chapter === c.id)) || book.chapters[0]; state.chapterId = ch ? ch.id : book.chapters[0].id; state.sectionId = null; }
+    if (state.chapterId) treeExpanded.add(state.chapterId);
+  }
+
+  function bookCount(bookId) { return store.filter((s) => s.bookId === bookId).length; }
+  function chCount(chId) { return store.filter((s) => s.chapterId === chId).length; }
+  function secCount(chId, secId) { return store.filter((s) => s.chapterId === chId && s.sectionId === secId).length; }
+
+  function visibleStore() {
+    let list = store.slice();
+    if (state.chapterId) list = list.filter((s) => s.chapterId === state.chapterId);
+    if (state.sectionId) list = list.filter((s) => s.sectionId === state.sectionId);
+    if (state.cat !== "all") list = list.filter((s) => s.category === state.cat);
+    if (state.search.trim()) { const q = state.search.trim().toLowerCase(); list = list.filter((s) => [s.title, s.desc, (s.tags || []).join(" "), s.tag].filter(Boolean).join(" ").toLowerCase().indexOf(q) > -1); }
+    return list;
+  }
+
+  function iconBadge(ext) { let cls = "icon-doc", label = "DOC"; if (/pptx?/.test(ext)) { cls = "icon-ppt"; label = "PPT"; } else if (/pdf/.test(ext)) { cls = "icon-pdf"; label = "PDF"; } else if (/xlsx?/.test(ext)) { cls = "icon-xls"; label = "XLS"; } else if (/mp4|webm|mov/.test(ext)) { cls = "icon-mp4"; label = "MP4"; } else if (/html?/.test(ext)) { cls = "icon-doc"; label = "HTML"; } return '<div class="file-icon-badge ' + cls + '">' + label + "</div>"; }
+  function difficultyClass(difficulty) { if (/实验|探究/.test(difficulty || "")) return "section-tag-exp"; return "section-tag-mini"; }
+
+  function buildCard(s) {
+    const r = show(s);
+    const sec = courseSection(s.sectionId);
+    let actions = "";
+    if (getPublishToken()) actions = '<button class="btn btn-secondary btn-xs" data-act="edit" data-id="' + r.id + '">✏️ 编辑</button><button class="btn btn-secondary btn-xs" style="color:var(--accent-rose);" data-act="del" data-id="' + r.id + '">🗑 删除</button>';
+    const kp = (s.keypoints || []).slice(0, 3).map((k) => '<span class="tag-pill">' + htmlEscape(k) + "</span>").join("");
+    const diff = (pepMeta(sec && sec.title) || {}).difficulty || "";
+    const catColor = { lesson: "#38bdf8", slide: "#f43f5e", exercise: "#10b981", experiment: "#8b5cf6" }[s.category] || "#38bdf8";
+    const catLabel = s.category === "lesson" ? "教案" : s.category === "slide" ? "课件" : s.category === "exercise" ? "练习" : "实验";
+    return '<article class="pep-file-card" data-id="' + r.id + '" style="border-left:3px solid ' + catColor + ';">' +
+      '<div class="card-top-row">' + iconBadge(s.pepKind) +
+      '<div class="file-title-wrap"><div class="file-item-name">' + htmlEscape(r.title || "未命名资源") + '</div><span class="file-section-badge" style="color:' + catColor + ';">' + catLabel + "</span>" + (kp ? '<div class="file-tags-row">' + kp + "</div>" : "") + "</div></div>" +
+      (r.desc ? '<p style="font-size:12px;color:var(--text-muted);line-height:1.5;">' + htmlEscape(r.desc) + "</p>" : "<p></p>") +
+      '<div class="file-card-footer"><span class="section-badge">' + htmlEscape(s.tag || "") + " · " + htmlEscape(diff || (sec && sec.title) || "") + '</span><div class="file-actions-row"><button class="btn btn-primary btn-xs" data-act="open" data-id="' + r.id + '">↗ 打开</button>' + actions + "</div></div>" +
+      "</article>";
+  }
+
+  function renderMaterials() {
+    smartDefault();
+    const book = bookOf(state.bookId) || COURSE.books[0];
+    const activeChapter = courseChapter(state.chapterId) || book.chapters[0];
+    if (state.sectionId && !activeChapter.sections.some((s) => s.id === state.sectionId)) state.sectionId = null;
+    const vis = visibleStore();
+
+    const catLabels = { all: "全部类型", lesson: "教案", slide: "课件", exercise: "练习", experiment: "实验" };
+    const catBtns = '<div class="category-filter-group">' + Object.keys(catLabels).map((k) => '<button class="cat-btn' + (state.cat === k ? " active" : "") + '" data-cat="' + k + '">' + catLabels[k] + "</button>").join("") + '</div><div class="view-mode-group"><button class="view-btn' + (state.view === "grid" ? " active" : "") + '" data-view="grid">▦ 卡片</button><button class="view-btn' + (state.view === "list" ? " active" : "") + '" data-view="list">☰ 列表</button></div>';
+
+    const chHead = (ch) => { const code = (ch.title.match(/^第[一二三四五六七八九十]+章/) || [""])[0]; const tit = ch.title.replace(/^第[一二三四五六七八九十]+章\s*/, ""); return code ? code + " " + tit : tit; };
+    const secTitle = (s) => s.title;
+    const treeHtml = book.chapters.map((ch) => {
+      const open = treeExpanded.has(ch.id); const selCh = ch.id === state.chapterId;
+      let secs = ch.sections;
+      if (state.treeSearch.trim()) { const q = state.treeSearch.trim().toLowerCase(); secs = secs.filter((s) => (s.title + " " + (enrichSection(s).concepts || []).join(" ")).toLowerCase().indexOf(q) > -1); }
+      if (state.secTag === "core") secs = secs.filter((s) => /重点|核心考点|高考热点/.test(enrichSection(s).diff || ""));
+      else if (state.secTag === "exp") secs = secs.filter((s) => /实验|探究/.test(enrichSection(s).diff || ""));
+      else if (state.secTag === "hard") secs = secs.filter((s) => /难点|核心考点/.test(enrichSection(s).diff || ""));
+      return '<div class="chapter-node ' + (open ? "expanded" : "") + (selCh ? " selected-chapter" : "") + '"><div class="chapter-head" data-chapter-id="' + ch.id + '"><span class="chapter-toggle-icon">▶</span><div class="chapter-title-wrap"><div class="chapter-code-title"><span>' + chHead(ch) + '</span></div><div class="chapter-meta"><span>' + ch.sections.length + "个小节</span><span class=\"chapter-count-tag\">" + chCount(ch.id) + "份</span></div></div></div>" +
+        '<div class="section-list">' +
+        '<div class="section-node' + (selCh && state.sectionId === null ? " active-section" : "") + '" data-chapter-id="' + ch.id + '" data-section-id=""><span class="section-bullet"></span><span class="section-title">📂 全章资源</span><span class="section-badge">' + chCount(ch.id) + "</span></div>" +
+        secs.map((s) => { const act = selCh && state.sectionId === s.id; const d = enrichSection(s).diff; return '<div class="section-node' + (act ? " active-section" : "") + '" data-chapter-id="' + ch.id + '" data-section-id="' + s.id + '"><span class="section-bullet"></span><span class="section-title">' + secTitle(s) + '</span>' + (d ? '<span class="' + difficultyClass(d) + '">' + d + "</span>" : "") + '<span class="section-badge">' + secCount(ch.id, s.id) + "</span></div>"; }).join("") +
+        "</div></div>";
+    }).join("");
+
+    const activeSec = state.sectionId ? courseSection(state.sectionId) : null;
+    const enr = enrichSection(activeSec);
+    const overview = '<div class="section-overview-card"><div class="section-path-nav"><div class="section-path-crumbs"><span>人教版高中物理</span><span>&gt;</span><span>' + book.title + '</span><span>&gt;</span><span>' + activeChapter.title + '</span>' + (activeSec ? '<span>&gt;</span><strong>' + activeSec.title + "</strong>" : '<span>&gt;</span><strong>(全章汇总)</strong>') + '</div></div>' +
+      '<div class="section-overview-main"><div class="section-heading-block"><h2><span>' + (activeSec ? activeSec.title : activeChapter.title) + '</span><span class="section-highlight-badge">' + (enr.diff || "共" + activeChapter.sections.length + "小节") + '</span></h2><div class="section-meta-row"><div class="section-meta-item"><span>课时建议:</span><strong>' + (enr.hours || "—") + "</strong></div><div class=\"section-meta-item\"><span>所属大单元:</span><strong>" + book.title + " · " + activeChapter.title + '</strong></div><div class="section-meta-item"><span>当前范围资源:</span><strong style="color:var(--primary);">' + vis.length + " 份</strong></div></div></div></div>" +
+      '<div class="section-teaching-targets"><div class="target-title"><span>🎯</span><span>小节课标要求与素养导向：</span></div><div class="target-desc">' + ((enr.target || activeChapter.desc) || "") + '</div>' + (enr.concepts.length ? '<div class="key-concepts-chips"><span style="font-size:11px;color:var(--text-dim);margin-right:4px;">核心概念:</span>' + enr.concepts.map((kc) => '<span class="concept-chip">🔹 ' + htmlEscape(kc) + "</span>").join("") + enr.formulas.map((f) => '<span class="formula-badge">📐 ' + htmlEscape(f) + "</span>").join("") + "</div>" : "") + "</div></div>";
+
+    const uploadZone = '<div class="chapter-upload-zone" id="chapter-dropzone"><div class="upload-zone-left"><div class="upload-zone-icon"><span>📤</span></div><div class="upload-zone-text"><h4>精准上传教学材料至当前【' + (activeSec ? activeSec.title : activeChapter.title) + '】</h4><p>支持 HTML/PDF/Word/PPT/Excel/图片/视频/压缩包，保存即发布到线上并登记到资源清单。</p></div></div><div class="upload-zone-right"><button class="btn btn-primary btn-sm" id="btn-open-upload-modal"><span>+ 精准上传到本节</span></button></div></div>';
+
+    const cardsHtml = state.view === "grid" ? '<div class="pep-files-grid">' + (vis.length ? vis.map(buildCard).join("") : emptyHtml()) + "</div>" : buildTable(vis);
+
+    const allExpanded = book.chapters.length && book.chapters.every((c) => treeExpanded.has(c.id));
+    const treeSearchEsc = (state.treeSearch || "").replace(/"/g, "&quot;");
+    const bookBadge = (t) => t.replace(/必修|选择性|册/g, "").slice(0, 2);
+    $("#content-viewport").innerHTML = '<div class="pep-module-wrap">' +
+      '<div class="pep-book-tabs">' + COURSE.books.map((b) => '<button class="pep-book-tab' + (b.id === state.bookId ? " active" : "") + '" data-book-id="' + b.id + '"><span class="book-tab-badge">' + bookBadge(b.title) + '</span><div class="book-tab-info"><span class="book-tab-title">' + b.title + '</span><span class="book-tab-sub">' + b.chapters.reduce((x, c) => x + c.sections.length, 0) + "小节 (" + bookCount(b.id) + "份)</span></div></button>").join("") + "</div>" +
+      '<div class="pep-main-layout"><div class="pep-tree-panel"><div class="tree-header"><div class="tree-title-row"><span>📂</span><h3>教材小节精准目录</h3></div><div style="display:flex;gap:4px;"><button class="btn btn-secondary btn-xs" id="btn-expand-all' + '" title="全部展开/收起">' + (allExpanded ? "收起" : "展开") + '</button></div></div>' +
+      '<div class="tree-search-wrap"><span class="tree-search-icon">🔍</span><input type="text" id="tree-filter-input" placeholder="输入小节名/考点检索..." value="' + treeSearchEsc + '" /></div>' +
+      '<div class="tree-filter-pills"><button class="tree-filter-pill ' + (state.secTag === "all" ? "active" : "") + '" data-sec-tag="all">全部小节</button><button class="tree-filter-pill ' + (state.secTag === "core" ? "active" : "") + '" data-sec-tag="core">重点/热点</button><button class="tree-filter-pill ' + (state.secTag === "exp" ? "active" : "") + '" data-sec-tag="exp">实验探究</button><button class="tree-filter-pill ' + (state.secTag === "hard" ? "active" : "") + '" data-sec-tag="hard">核心难点</button></div>' +
+      '<div class="tree-nodes-container">' + treeHtml + "</div></div>" +
+      '<div class="pep-content-panel">' + overview + uploadZone + '<div class="pep-toolbar">' + catBtns + "</div><div class=\"pep-files-container\">" + cardsHtml + "</div></div></div></div>";
+  }
+  function emptyHtml() { return '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-dim);"><div style="font-size:40px;margin-bottom:10px;">🗂️</div><b>暂无匹配的资源</b><br/>试试调整搜索关键词或分类筛选。</div>'; }
+  function buildTable(list) { if (!list.length) return emptyHtml(); const rows = list.map((s) => { const r = show(s); const sec = courseSection(s.sectionId); let a = '<button class="btn btn-primary btn-xs" data-act="open" data-id="' + r.id + '">打开</button>'; if (getPublishToken()) a += '<button class="btn btn-secondary btn-xs" data-act="edit" data-id="' + r.id + '">编辑</button><button class="btn btn-secondary btn-xs" style="color:var(--accent-rose);" data-act="del" data-id="' + r.id + '">删除</button>'; return "<tr data-id='" + r.id + "'><td>" + htmlEscape(r.title || "") + "</td><td>" + htmlEscape(s.tag || "") + "</td><td>" + htmlEscape((sec && sec.title) || "") + "</td><td class=\"td-actions\">" + a + "</td></tr>"; }).join(""); return '<table class="pep-files-table"><thead><tr><th>资源名称</th><th>标签</th><th>所属小节</th><th>操作</th></tr></thead><tbody>' + rows + "</tbody></table>"; }
+
+  function onTreeOrCardClick(e) {
+    const b = e.target.closest(".pep-book-tab"); if (b) { state.bookId = b.getAttribute("data-book-id"); state.chapterId = null; state.sectionId = null; treeExpanded.clear(); render(); return; }
+    const chh = e.target.closest(".chapter-head"); if (chh) { const cid = chh.getAttribute("data-chapter-id"); if (state.chapterId !== cid) { state.chapterId = cid; state.sectionId = null; treeExpanded.add(cid); } else if (treeExpanded.has(cid)) treeExpanded.delete(cid); else treeExpanded.add(cid); render(); return; }
+    const nd = e.target.closest(".section-node"); if (nd) { const tag = nd.getAttribute("data-sec-tag"); if (tag) { state.secTag = tag; render(); return; } state.chapterId = nd.getAttribute("data-chapter-id"); state.sectionId = nd.getAttribute("data-section-id") || null; render(); return; }
+    const cat = e.target.closest(".cat-btn"); if (cat) { state.cat = cat.getAttribute("data-cat"); render(); return; }
+    const v = e.target.closest(".view-btn"); if (v) { state.view = v.getAttribute("data-view"); render(); return; }
+    const act = e.target.closest("[data-act]"); if (act) { const id = act.getAttribute("data-id"); const r = resources.find((x) => x.id === id); if (!r) return; const a = act.getAttribute("data-act"); if (a === "open") openResource(r); else if (a === "edit") openModal(r); else if (a === "del") handleDelete(r); return; }
+    const card = e.target.closest(".pep-file-card");
+    if (card && !e.target.closest("button")) { const s = store.find((x) => x.id === card.getAttribute("data-id")); if (s) openPreview(s); return; }
+    const mf = e.target.closest("[data-modfile-open]"); if (mf) { openModuleFile(mf.getAttribute("data-modfile-open")); return; }
+    if (e.target.closest("#btn-expand-all")) { toggleExpandAll(); return; }
+    if (e.target.closest("#btn-open-upload-modal")) { openUploadAtCurrent(); return; }
+  }
+
+  function bindEvents() {
+    $("#main-nav-menu .nav-item").forEach((b) => { b.onclick = () => { currentModule = b.getAttribute("data-module"); render(); }; });
+    let deb;
+    $("#global-search").addEventListener("input", (e) => { clearTimeout(deb); deb = setTimeout(() => { state.search = e.target.value.trim(); render(); }, 150); });
+    $("#content-viewport").addEventListener("click", onTreeOrCardClick);
+    $("#content-viewport").addEventListener("input", (e) => { if (e.target && e.target.id === "tree-filter-input") { state.treeSearch = e.target.value.trim(); render(); } });
+    $("#quick-add-btn").onclick = () => openModal(); $("#btn-notifications").onclick = openAdminModal;
+    $("#closeModal").onclick = closeModal; $("#cancelModal").onclick = closeModal; let mm = $("#modalMask"); if (mm) mm.addEventListener("click", (e) => { if (e.target === mm) closeModal(); });
+    $("#fType").addEventListener("change", () => { refreshTypeUI(); populateSectionSelect(); });
+    $("#fBook").addEventListener("change", populateChapterSelect); $("#fChapter").addEventListener("change", populateSectionSelect);
+    $("#autoFillBtn").onclick = async () => { await smartFill(true); aiGenerateDesc(); }; $("#aiDescBtn").onclick = aiGenerateDesc; $("#saveResource").onclick = saveResource;
+    $("#assistFab").onclick = openAssist; $("#assistClose").onclick = closeAssist; $("#assistSend").onclick = assistantSend; $("#assistInput").addEventListener("keydown", (e) => { if (e.key === "Enter") assistantSend(); });
+    $("#closePreview").onclick = closePreview; $("#previewCancel").onclick = closePreview; $("#previewOpen").onclick = () => { if (previewIsModule) { toast("示例数据，暂无实际文件可打开"); return; } const r = resources.find((x) => x.id === previewId); if (r) openResource(r); else { const s = store.find((x) => x.id === previewId); if (s) openResource(s); } }; let pv = $("#previewMask"); if (pv) pv.addEventListener("click", (e) => { if (e.target === pv) closePreview(); });
+    const stc = $("#subtabs-container"); if (stc) stc.addEventListener("click", (e) => { const b = e.target.closest("[data-subtab-id]"); if (b) { stateSubtab = b.getAttribute("data-subtab-id"); render(); } });
+    $("#closeAdminModal").onclick = closeAdminModal; $("#cancelAdminModal").onclick = closeAdminModal; let am = $("#adminMask"); if (am) am.addEventListener("click", (e) => { if (e.target === am) closeAdminModal(); });
+    $("#adminSave").onclick = saveAdmin; $("#clearTokenBtn").onclick = clearToken; $("#adminToken").addEventListener("keydown", (e) => { if (e.key === "Enter") saveAdmin(); });
+    const dz = $("#dropzone"), fi = $("#fileInput"); dz.onclick = () => fi.click(); fi.addEventListener("change", () => setPendingFile(fi.files[0]));
+    ["dragenter", "dragover"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add("drag"); }));
+    ["dragleave", "drop"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove("drag"); }));
+    dz.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) setPendingFile(f); }); $("#clearFile").onclick = clearPendingFile;
+  }
+
+  document.addEventListener("DOMContentLoaded", () => { const hm = /\bm=([a-z]+)/.exec((location.hash || "").replace(/^#/, "")); if (hm && MODULE_INFO[hm[1]]) currentModule = hm[1]; bindEvents(); refreshAdminUI(); render(); loadAll().catch((e) => toast("初始化失败：" + (e && e.message), true)); });
+})();
+
+
+
+
+</script>
+</body>
+</html>
+
+
+
+
